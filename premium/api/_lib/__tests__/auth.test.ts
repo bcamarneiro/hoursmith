@@ -1,12 +1,15 @@
 /**
- * Tests for the consolidated JWT verifier (ADA-343).
+ * Tests for the consolidated JWT verifier (ADA-343, hardened in ADA-344).
  *
  * Layers:
- *  - orchestration: decode / expiry / claim / fallback decisions, with injected
+ *  - orchestration: decode / expiry / fallback decisions, injected
  *    fetchJwks/restVerify so they're deterministic and network-free.
- *  - real crypto: an ES256 round-trip (generate key → sign → verify) exercising
- *    the actual WebCrypto import + verify path, plus tamper rejection.
- *  - hardening: confirmWithServer, claim checks (exp/nbf/iss/aud), JWKS caching.
+ *  - confirmWithServer: sensitive endpoints always hit the live server.
+ *  - time claims: exp-required / nbf are DEFINITIVE (hard-reject, no REST).
+ *  - project claims: iss/aud mismatch DEFERS to REST (not hard-reject), so a
+ *    custom-domain deploy can't 401 every user.
+ *  - JWKS caching: one fetch per TTL window (amplification guard).
+ *  - real crypto: an ES256 round-trip (generate → sign → verify) + tamper.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,6 +43,39 @@ function makeUnsignedJwt(
 }
 
 const FUTURE = Math.floor(Date.now() / 1000) + 3600;
+
+/** A real ES256 keypair + signer + a matching JWKS fetcher, for the local path. */
+async function es256() {
+	const pair = (await crypto.subtle.generateKey(
+		{ name: 'ECDSA', namedCurve: 'P-256' },
+		true,
+		['sign', 'verify'],
+	)) as CryptoKeyPair;
+	const exported = (await crypto.subtle.exportKey(
+		'jwk',
+		pair.publicKey,
+	)) as JsonWebKey;
+	const jwk: Jwk = { ...exported, kid: 'test-key' };
+
+	async function sign(payload: Record<string, unknown>): Promise<string> {
+		const header = b64url(JSON.stringify({ alg: 'ES256', kid: 'test-key' }));
+		const body = b64url(JSON.stringify(payload));
+		const sig = new Uint8Array(
+			await crypto.subtle.sign(
+				{ name: 'ECDSA', hash: 'SHA-256' },
+				pair.privateKey,
+				new TextEncoder().encode(`${header}.${body}`),
+			),
+		);
+		return `${header}.${body}.${b64url(sig)}`;
+	}
+
+	return {
+		sign,
+		fetchJwks: vi.fn(async (): Promise<Jwk[]> => [jwk]),
+		restVerify: vi.fn(async () => null),
+	};
+}
 
 beforeEach(() => {
 	__resetAuthCache();
@@ -103,7 +139,6 @@ describe('verifyJwt — confirmWithServer (sensitive endpoints)', () => {
 	it('always uses REST and never touches the local JWKS path', async () => {
 		const restVerify = vi.fn(async () => ({ userId: 'srv', email: null }));
 		const fetchJwks = vi.fn(async (): Promise<Jwk[]> => []);
-		// A token that WOULD verify locally still goes to the server.
 		const token = makeUnsignedJwt(
 			{ alg: 'ES256', kid: 'k1' },
 			{ sub: 'local', exp: FUTURE },
@@ -135,15 +170,12 @@ describe('verifyJwt — confirmWithServer (sensitive endpoints)', () => {
 	});
 });
 
-describe('verifyJwt — local claim checks', () => {
-	// These tokens reach the local path (ES256 + kid + url) and are rejected on
-	// claims BEFORE signature work, so they need no valid signature and must not
-	// fall back to REST.
+describe('verifyJwt — time claims (definitive, hard-reject)', () => {
 	function localToken(payload: Record<string, unknown>): string {
 		return makeUnsignedJwt({ alg: 'ES256', kid: 'k1' }, payload);
 	}
 
-	it('rejects a token with no exp (no unbounded local accepts)', async () => {
+	it('rejects a token with no exp without REST or a JWKS fetch', async () => {
 		const restVerify = vi.fn(async () => null);
 		const fetchJwks = vi.fn(async (): Promise<Jwk[]> => []);
 		const out = await verifyJwt(localToken({ sub: 'u1' }), {
@@ -156,38 +188,42 @@ describe('verifyJwt — local claim checks', () => {
 		expect(fetchJwks).not.toHaveBeenCalled();
 	});
 
-	it('rejects a token whose nbf is in the future', async () => {
+	it('rejects a token whose nbf is in the future without REST', async () => {
 		const restVerify = vi.fn(async () => null);
+		const fetchJwks = vi.fn(async (): Promise<Jwk[]> => []);
 		const out = await verifyJwt(
 			localToken({ sub: 'u1', exp: FUTURE, nbf: FUTURE }),
-			{ env: ENV, restVerify },
+			{ env: ENV, restVerify, fetchJwks },
 		);
 		expect(out).toBeNull();
 		expect(restVerify).not.toHaveBeenCalled();
+		expect(fetchJwks).not.toHaveBeenCalled();
+	});
+});
+
+describe('verifyJwt — project claims (defer to REST, not hard-reject)', () => {
+	it('defers a validly-signed token with a different iss to the server', async () => {
+		const { sign, fetchJwks, restVerify } = await es256();
+		restVerify.mockResolvedValue({ userId: 'srv', email: null });
+		const token = await sign({
+			sub: 'u1',
+			exp: FUTURE,
+			iss: 'https://evil.supabase.co/auth/v1',
+			aud: 'authenticated',
+		});
+		const out = await verifyJwt(token, { env: ENV, fetchJwks, restVerify });
+		// Signature was valid, but iss didn't match → authoritative server decides.
+		expect(restVerify).toHaveBeenCalledOnce();
+		expect(out).toEqual({ userId: 'srv', email: null });
 	});
 
-	it('rejects a token whose iss is a different project', async () => {
-		const restVerify = vi.fn(async () => null);
-		const out = await verifyJwt(
-			localToken({
-				sub: 'u1',
-				exp: FUTURE,
-				iss: 'https://evil.supabase.co/auth/v1',
-			}),
-			{ env: ENV, restVerify },
-		);
+	it('defers a validly-signed token with a non-authenticated aud to the server', async () => {
+		const { sign, fetchJwks, restVerify } = await es256();
+		restVerify.mockResolvedValue(null);
+		const token = await sign({ sub: 'u1', exp: FUTURE, aud: 'anon' });
+		const out = await verifyJwt(token, { env: ENV, fetchJwks, restVerify });
+		expect(restVerify).toHaveBeenCalledOnce();
 		expect(out).toBeNull();
-		expect(restVerify).not.toHaveBeenCalled();
-	});
-
-	it('rejects a token whose aud is not "authenticated"', async () => {
-		const restVerify = vi.fn(async () => null);
-		const out = await verifyJwt(
-			localToken({ sub: 'u1', exp: FUTURE, aud: 'anon' }),
-			{ env: ENV, restVerify },
-		);
-		expect(out).toBeNull();
-		expect(restVerify).not.toHaveBeenCalled();
 	});
 });
 
@@ -196,7 +232,6 @@ describe('verifyJwt — JWKS caching (amplification guard)', () => {
 		const restVerify = vi.fn(async () => null);
 		const fetchJwks = vi.fn(async (): Promise<Jwk[]> => [{ kid: 'real' }]);
 		const now = Date.now();
-		// Two requests with an unknown kid, same window → one fetch total.
 		const tok = makeUnsignedJwt(
 			{ alg: 'ES256', kid: 'unknown' },
 			{ sub: 'u1', exp: FUTURE },
@@ -206,41 +241,37 @@ describe('verifyJwt — JWKS caching (amplification guard)', () => {
 		expect(fetchJwks).toHaveBeenCalledOnce();
 		expect(restVerify).toHaveBeenCalledTimes(2);
 	});
+
+	it('keys the cache by URL so two projects do not share a slot', async () => {
+		const now = Date.now();
+		const a = vi.fn(async (): Promise<Jwk[]> => [{ kid: 'a' }]);
+		const b = vi.fn(async (): Promise<Jwk[]> => [{ kid: 'b' }]);
+		const restVerify = vi.fn(async () => null);
+		const tok = makeUnsignedJwt(
+			{ alg: 'ES256', kid: 'a' },
+			{ sub: 'u1', exp: FUTURE },
+		);
+		// Same token, two different SUPABASE_URLs → each fetches its own JWKS.
+		await verifyJwt(tok, {
+			env: { SUPABASE_URL: 'https://a.supabase.co' },
+			fetchJwks: a,
+			restVerify,
+			nowMs: now,
+		});
+		await verifyJwt(tok, {
+			env: { SUPABASE_URL: 'https://b.supabase.co' },
+			fetchJwks: b,
+			restVerify,
+			nowMs: now,
+		});
+		expect(a).toHaveBeenCalledOnce();
+		expect(b).toHaveBeenCalledOnce();
+	});
 });
 
 describe('verifyJwt — real ES256 crypto', () => {
-	async function setup() {
-		const pair = (await crypto.subtle.generateKey(
-			{ name: 'ECDSA', namedCurve: 'P-256' },
-			true,
-			['sign', 'verify'],
-		)) as CryptoKeyPair;
-		const exported = (await crypto.subtle.exportKey(
-			'jwk',
-			pair.publicKey,
-		)) as JsonWebKey;
-		const jwk: Jwk = { ...exported, kid: 'test-key' };
-
-		async function sign(payload: Record<string, unknown>): Promise<string> {
-			const header = b64url(JSON.stringify({ alg: 'ES256', kid: 'test-key' }));
-			const body = b64url(JSON.stringify(payload));
-			const sig = new Uint8Array(
-				await crypto.subtle.sign(
-					{ name: 'ECDSA', hash: 'SHA-256' },
-					pair.privateKey,
-					new TextEncoder().encode(`${header}.${body}`),
-				),
-			);
-			return `${header}.${body}.${b64url(sig)}`;
-		}
-
-		const fetchJwks = vi.fn(async (): Promise<Jwk[]> => [jwk]);
-		const restVerify = vi.fn(async () => null);
-		return { sign, fetchJwks, restVerify };
-	}
-
 	it('accepts a validly-signed token locally (no REST hop)', async () => {
-		const { sign, fetchJwks, restVerify } = await setup();
+		const { sign, fetchJwks, restVerify } = await es256();
 		const token = await sign({
 			sub: 'user-9',
 			email: 'x@y.com',
@@ -253,8 +284,16 @@ describe('verifyJwt — real ES256 crypto', () => {
 		expect(restVerify).not.toHaveBeenCalled();
 	});
 
+	it('accepts a validly-signed token with no iss/aud claims (local)', async () => {
+		const { sign, fetchJwks, restVerify } = await es256();
+		const token = await sign({ sub: 'user-9', exp: FUTURE });
+		const out = await verifyJwt(token, { env: ENV, fetchJwks, restVerify });
+		expect(out).toEqual({ userId: 'user-9', email: null });
+		expect(restVerify).not.toHaveBeenCalled();
+	});
+
 	it('rejects a tampered payload without falling back to REST', async () => {
-		const { sign, fetchJwks, restVerify } = await setup();
+		const { sign, fetchJwks, restVerify } = await es256();
 		const token = await sign({ sub: 'user-9', exp: FUTURE });
 		const [h, _p, s] = token.split('.');
 		const forged = `${h}.${b64url(JSON.stringify({ sub: 'attacker', exp: FUTURE }))}.${s}`;
@@ -264,8 +303,14 @@ describe('verifyJwt — real ES256 crypto', () => {
 	});
 
 	it('userIdFromToken / emailFromToken unwrap the verified token', async () => {
-		const { sign, fetchJwks, restVerify } = await setup();
-		const token = await sign({ sub: 'user-9', email: 'x@y.com', exp: FUTURE });
+		const { sign, fetchJwks, restVerify } = await es256();
+		const token = await sign({
+			sub: 'user-9',
+			email: 'x@y.com',
+			exp: FUTURE,
+			iss: ISS,
+			aud: 'authenticated',
+		});
 		const opts = { env: ENV, fetchJwks, restVerify };
 		expect(await userIdFromToken(token, opts)).toBe('user-9');
 		expect(await emailFromToken(token, opts)).toBe('x@y.com');
