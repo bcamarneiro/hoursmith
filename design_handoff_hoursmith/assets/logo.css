@@ -1,0 +1,322 @@
+/* ============================================================
+   Hoursmith — Forge logo explorations
+   Built on review.css tokens.
+   ============================================================ */
+
+.logo-intro {
+	display: grid;
+	grid-template-columns: 1.3fr 1fr;
+	gap: 40px;
+	align-items: start;
+	margin-top: 28px;
+}
+.forge-pal {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	overflow: hidden;
+}
+.forge-pal .sw {
+	padding: 12px 10px;
+	min-height: 78px;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+}
+.forge-pal .sw .role {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	opacity: 0.85;
+}
+.forge-pal .sw .hex {
+	font-family: var(--mono);
+	font-size: 10.5px;
+	margin-top: 2px;
+}
+
+/* ---- gallery grid ---- */
+.logo-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 22px;
+	margin-top: 30px;
+}
+.logo-card {
+	border: 1px solid var(--line);
+	border-radius: 16px;
+	overflow: hidden;
+	background: var(--card);
+	display: flex;
+	flex-direction: column;
+}
+.logo-card.reco {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 1px var(--accent);
+}
+
+.lc-stage {
+	padding: 40px 34px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 150px;
+	background: var(--paper);
+	border-bottom: 1px solid var(--line);
+	position: relative;
+}
+.lc-badge {
+	position: absolute;
+	top: 14px;
+	right: 14px;
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	padding: 4px 10px;
+	border-radius: 999px;
+	background: var(--accent);
+	color: #fff5ee;
+}
+
+/* lockup */
+.lockup {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+.lockup .wm {
+	font-family: var(--display);
+	font-weight: 700;
+	font-size: 30px;
+	letter-spacing: -0.025em;
+	color: var(--ink);
+	line-height: 1;
+}
+.lockup .wm .s {
+	color: var(--accent);
+}
+.lockup .wm-spark {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	background: var(--spark, #ee6b2d);
+	border-radius: 2px;
+	transform: rotate(45deg);
+	margin-left: 6px;
+	vertical-align: middle;
+}
+
+/* svg mark sizing */
+.mk {
+	display: block;
+}
+.mk-56 {
+	width: 56px;
+	height: 56px;
+}
+.mk-48 {
+	width: 48px;
+	height: 48px;
+}
+
+/* tile (iron app-icon container) */
+.tile {
+	background: #1c1714;
+	border-radius: 23%;
+	display: grid;
+	place-items: center;
+	flex: none;
+}
+.tile.paper {
+	background: var(--paper);
+	border: 1px solid var(--line-strong);
+}
+.tile svg {
+	width: 66%;
+	height: 66%;
+	display: block;
+}
+.tile.t56 {
+	width: 56px;
+	height: 56px;
+}
+.tile.t46 {
+	width: 46px;
+	height: 46px;
+}
+.tile.t34 {
+	width: 34px;
+	height: 34px;
+}
+.tile.t22 {
+	width: 22px;
+	height: 22px;
+}
+.selftile {
+	border-radius: 23%;
+}
+
+/* meta */
+.lc-meta {
+	padding: 22px 26px 8px;
+}
+.lc-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+.lc-head h3 {
+	font-size: 21px;
+}
+.lc-no {
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--ink-3);
+}
+.lc-rat {
+	font-size: 14.5px;
+	color: var(--ink-2);
+	margin-top: 8px;
+	line-height: 1.55;
+}
+.lc-best {
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--accent);
+	margin-top: 12px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.lc-best::before {
+	content: "";
+	width: 16px;
+	height: 1.5px;
+	background: var(--accent);
+	flex: none;
+}
+
+/* context strip */
+.lc-ctx {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 18px 26px 24px;
+	margin-top: 14px;
+	border-top: 1px solid var(--line);
+}
+.lc-ctx .ctx-k {
+	font-family: var(--mono);
+	font-size: 10.5px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+	margin-right: 4px;
+}
+.lc-ctx .vrule {
+	width: 1px;
+	align-self: stretch;
+	background: var(--line);
+	margin: 2px 4px;
+}
+
+/* ---- recommended stress test ---- */
+.stress {
+	border: 1px solid var(--accent);
+	border-radius: 18px;
+	overflow: hidden;
+	margin-top: 32px;
+}
+.stress-head {
+	padding: 22px 30px;
+	background: var(--accent-soft);
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	align-items: baseline;
+	gap: 14px;
+}
+.stress-head h3 {
+	color: var(--accent);
+}
+.stress-head .sh-sub {
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--ink-2);
+}
+.stress-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+}
+.stress-cell {
+	padding: 30px 24px;
+	border-right: 1px solid var(--line);
+	border-bottom: 1px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 16px;
+	justify-content: space-between;
+	min-height: 150px;
+}
+.stress-cell .sc-demo {
+	flex: 1;
+	display: grid;
+	place-items: center;
+	width: 100%;
+}
+.stress-cell .sc-k {
+	font-family: var(--mono);
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--ink-3);
+	text-align: center;
+}
+.stress-cell.on-iron {
+	background: #1c1714;
+}
+.stress-cell.on-iron .sc-k {
+	color: #9b8e7e;
+}
+.stress-cell.on-ember {
+	background: var(--accent);
+}
+.stress-cell.on-ember .sc-k {
+	color: #fbe1d4;
+}
+.wm-rev {
+	font-family: var(--display);
+	font-weight: 700;
+	font-size: 23px;
+	letter-spacing: -0.025em;
+	color: var(--paper);
+}
+.wm-rev .s {
+	color: var(--spark, #ee6b2d);
+}
+.wm-onember {
+	font-family: var(--display);
+	font-weight: 700;
+	font-size: 23px;
+	letter-spacing: -0.025em;
+	color: #fff5ee;
+}
+.favrow {
+	display: flex;
+	align-items: flex-end;
+	gap: 12px;
+}
+
+@media (max-width: 900px) {
+	.logo-intro,
+	.logo-grid {
+		grid-template-columns: 1fr;
+	}
+	.stress-grid {
+		grid-template-columns: 1fr 1fr;
+	}
+}

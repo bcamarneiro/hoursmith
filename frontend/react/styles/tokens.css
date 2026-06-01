@@ -1,61 +1,90 @@
-:root {
-	/* Colors - Primary */
-	--color-primary: #4f46e5;
-	--color-primary-hover: #4338ca;
-	--color-primary-light: #e0e7ff;
-	--color-primary-focus: rgba(79, 70, 229, 0.15);
+/* ============================================================
+   Hoursmith — Forge × Ledger design tokens (redesign Phase 1)
 
-	/* Colors - Surfaces */
-	--color-bg: #f8fafc;
-	--color-surface: #ffffff;
-	--color-surface-hover: #f1f5f9;
+   The Forge identity (ember brand on warm iron/paper) + Ledger
+   numerics (JetBrains Mono, tabular) mapped onto the EXISTING token
+   names so every component re-skins without renaming anything.
+
+   Hard rules (see CLAUDE.md / design_handoff_hoursmith):
+   - Brand accent (ember #c8431a) is BRAND-ONLY. It never appears on
+     the green/amber/red worklog status ramp.
+   - The old indigo "overtime" day-state moves OFF the brand colour to
+     --color-info (teal-slate #3f6b7d).
+   - All hour/number figures use the mono numeral font, tabular.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+	/* Colors - Primary (ember; brand-only, off the status ramp) */
+	--color-primary: #c8431a;
+	--color-primary-hover: #a8380f;
+	--color-primary-light: #f0d9cd;
+	--color-primary-focus: rgba(200, 67, 26, 0.15);
+	/* Optional spark accent for small highlights / loading motifs */
+	--color-spark: #ee6b2d;
+
+	/* Colors - Surfaces (warm iron + paper) */
+	--color-bg: #f4efe7;
+	--color-surface: #fbf8f2;
+	--color-surface-hover: #f1e9dc;
 	--color-surface-raised: #ffffff;
-	--color-surface-sunken: #f1f5f9;
+	--color-surface-sunken: #ede4d6;
+	/* Dark hero / app-icon ground */
+	--color-iron: #1c1714;
 
 	/* Colors - Borders */
-	--color-border: #e2e8f0;
-	--color-border-subtle: #f1f5f9;
-	--color-border-strong: #cbd5e1;
+	--color-border: #e2d8c8;
+	--color-border-subtle: #efe7da;
+	--color-border-strong: #cabda7;
 
-	/* Colors - Text */
-	--color-text: #0f172a;
-	--color-text-secondary: #64748b;
-	--color-text-tertiary: #94a3b8;
-	--color-text-inverse: #ffffff;
-	--color-text-link: #4f46e5;
+	/* Colors - Text (warm ink) */
+	--color-text: #241d18;
+	--color-text-secondary: #574d43;
+	--color-text-tertiary: #938778;
+	--color-text-inverse: #fff5ee;
+	--color-text-link: #c8431a;
 
-	/* Colors - Semantic */
-	--color-success: #16a34a;
-	--color-success-bg: #f0fdf4;
-	--color-success-border: #86efac;
-	--color-warning: #d97706;
-	--color-warning-bg: #fffbeb;
-	--color-warning-border: #fcd34d;
-	--color-error: #dc2626;
-	--color-error-bg: #fef2f2;
-	--color-error-border: #fca5a5;
-	--color-info: #6366f1;
-	--color-info-bg: #eef2ff;
-	--color-info-border: #a5b4fc;
+	/* Colors - Semantic (worklog status ramp — meaningful, separate from brand) */
+	--color-success: #4d7c3a;
+	--color-success-bg: #eef3e6;
+	--color-success-border: #b9cfa3;
+	--color-warning: #b07d18;
+	--color-warning-bg: #f7efda;
+	--color-warning-border: #e3c87f;
+	--color-error: #b23a2e;
+	--color-error-bg: #f6e4df;
+	--color-error-border: #e0a99e;
+	/* "overtime" / info — was indigo (collided with brand), now teal-slate */
+	--color-info: #3f6b7d;
+	--color-info-bg: #e3edf1;
+	--color-info-border: #a9c6d1;
 
-	/* Calendar day states */
-	--color-day-complete-bg: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-	--color-day-complete-border: #86efac;
-	--color-day-incomplete-bg: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-	--color-day-incomplete-border: #fcd34d;
-	--color-day-overtime-bg: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-	--color-day-overtime-border: #a5b4fc;
-	--color-day-weekend-bg: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-	--color-day-weekend-border: #fecaca;
-	--color-day-weekend-empty-bg: #f8fafc;
-	--color-day-weekend-empty-border: #e2e8f0;
-	--color-day-today-ring: #4f46e5;
+	/* Calendar day states (status ramp, never brand ember) */
+	--color-day-complete-bg: linear-gradient(135deg, #eef3e6 0%, #dde9cc 100%);
+	--color-day-complete-border: #b9cfa3;
+	--color-day-incomplete-bg: linear-gradient(135deg, #f7efda 0%, #efe0b8 100%);
+	--color-day-incomplete-border: #e3c87f;
+	/* overtime → teal-slate (--color-info), off the brand colour */
+	--color-day-overtime-bg: linear-gradient(135deg, #e3edf1 0%, #cfe0e7 100%);
+	--color-day-overtime-border: #a9c6d1;
+	--color-day-weekend-bg: linear-gradient(135deg, #f6e4df 0%, #efd2c9 100%);
+	--color-day-weekend-border: #e0a99e;
+	--color-day-weekend-empty-bg: #f4efe7;
+	--color-day-weekend-empty-border: #e2d8c8;
+	--color-day-today-ring: #c8431a;
 
-	/* Typography */
+	/* Typography
+	   display = Bricolage Grotesque (headings, numbers-as-display)
+	   sans    = Hanken Grotesk (body)
+	   mono    = JetBrains Mono (ALL hour/number figures, tabular) */
+	--font-display:
+		"Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI",
+		system-ui, sans-serif;
 	--font-sans:
-		"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+		"Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
 		sans-serif;
-	--font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+	--font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 
 	--text-xs: 0.75rem;
 	--text-sm: 0.8125rem;
@@ -120,58 +149,64 @@
 	--nav-height: 56px;
 }
 
+/* ============================================================
+   Dark mode — the repo flips tokens under a dark scope. Mirror the
+   Forge dark ramp; ember lifts to spark (#ee6b2d) for contrast.
+   ============================================================ */
+
 /* Dark mode - system preference fallback */
 @media (prefers-color-scheme: dark) {
 	:root {
-		--color-primary: #818cf8;
-		--color-primary-hover: #6366f1;
-		--color-primary-light: #1e1b4b;
-		--color-primary-focus: rgba(129, 140, 248, 0.2);
+		--color-primary: #ee6b2d;
+		--color-primary-hover: #f4843f;
+		--color-primary-light: #3a241a;
+		--color-primary-focus: rgba(238, 107, 45, 0.22);
+		--color-spark: #f4843f;
 
-		--color-bg: #0f172a;
-		--color-surface: #1e293b;
-		--color-surface-hover: #334155;
-		--color-surface-raised: #1e293b;
-		--color-surface-sunken: #0f172a;
+		--color-bg: #161210;
+		--color-surface: #211b16;
+		--color-surface-hover: #2a221c;
+		--color-surface-raised: #2a221c;
+		--color-surface-sunken: #161210;
 
-		--color-border: #334155;
-		--color-border-subtle: #1e293b;
-		--color-border-strong: #475569;
+		--color-border: #34291f;
+		--color-border-subtle: #271f18;
+		--color-border-strong: #4a3b2c;
 
-		--color-text: #f1f5f9;
-		--color-text-secondary: #94a3b8;
-		--color-text-tertiary: #64748b;
-		--color-text-inverse: #0f172a;
-		--color-text-link: #818cf8;
+		--color-text: #f4efe7;
+		--color-text-secondary: #c4b6a5;
+		--color-text-tertiary: #938778;
+		--color-text-inverse: #1c1714;
+		--color-text-link: #f4843f;
 
-		--color-success: #4ade80;
-		--color-success-bg: #052e16;
-		--color-success-border: #166534;
-		--color-warning: #fbbf24;
-		--color-warning-bg: #451a03;
-		--color-warning-border: #92400e;
-		--color-error: #f87171;
-		--color-error-bg: #450a0a;
-		--color-error-border: #991b1b;
-		--color-info: #818cf8;
-		--color-info-bg: #1e1b4b;
-		--color-info-border: #3730a3;
+		--color-success: #8fbf6e;
+		--color-success-bg: #1d2a15;
+		--color-success-border: #3f5a2c;
+		--color-warning: #d9ad4f;
+		--color-warning-bg: #2e2410;
+		--color-warning-border: #5c4a1d;
+		--color-error: #e08474;
+		--color-error-bg: #2e1714;
+		--color-error-border: #5c2e26;
+		--color-info: #7eaabd;
+		--color-info-bg: #16262d;
+		--color-info-border: #2e4d59;
 
-		--color-day-complete-bg: linear-gradient(135deg, #052e16 0%, #064e3b 100%);
-		--color-day-complete-border: #166534;
+		--color-day-complete-bg: linear-gradient(135deg, #1d2a15 0%, #25391a 100%);
+		--color-day-complete-border: #3f5a2c;
 		--color-day-incomplete-bg: linear-gradient(
 			135deg,
-			#451a03 0%,
-			#78350f 100%
+			#2e2410 0%,
+			#3d3014 100%
 		);
-		--color-day-incomplete-border: #92400e;
-		--color-day-overtime-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-		--color-day-overtime-border: #3730a3;
-		--color-day-weekend-bg: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
-		--color-day-weekend-border: #991b1b;
-		--color-day-weekend-empty-bg: #1e293b;
-		--color-day-weekend-empty-border: #334155;
-		--color-day-today-ring: #818cf8;
+		--color-day-incomplete-border: #5c4a1d;
+		--color-day-overtime-bg: linear-gradient(135deg, #16262d 0%, #1d333c 100%);
+		--color-day-overtime-border: #2e4d59;
+		--color-day-weekend-bg: linear-gradient(135deg, #2e1714 0%, #3d1d18 100%);
+		--color-day-weekend-border: #5c2e26;
+		--color-day-weekend-empty-bg: #211b16;
+		--color-day-weekend-empty-border: #34291f;
+		--color-day-today-ring: #ee6b2d;
 
 		--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
 		--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -183,51 +218,52 @@
 
 /* Dark mode - manual override */
 [data-theme="dark"] {
-	--color-primary: #818cf8;
-	--color-primary-hover: #6366f1;
-	--color-primary-light: #1e1b4b;
-	--color-primary-focus: rgba(129, 140, 248, 0.2);
+	--color-primary: #ee6b2d;
+	--color-primary-hover: #f4843f;
+	--color-primary-light: #3a241a;
+	--color-primary-focus: rgba(238, 107, 45, 0.22);
+	--color-spark: #f4843f;
 
-	--color-bg: #0f172a;
-	--color-surface: #1e293b;
-	--color-surface-hover: #334155;
-	--color-surface-raised: #1e293b;
-	--color-surface-sunken: #0f172a;
+	--color-bg: #161210;
+	--color-surface: #211b16;
+	--color-surface-hover: #2a221c;
+	--color-surface-raised: #2a221c;
+	--color-surface-sunken: #161210;
 
-	--color-border: #334155;
-	--color-border-subtle: #1e293b;
-	--color-border-strong: #475569;
+	--color-border: #34291f;
+	--color-border-subtle: #271f18;
+	--color-border-strong: #4a3b2c;
 
-	--color-text: #f1f5f9;
-	--color-text-secondary: #94a3b8;
-	--color-text-tertiary: #64748b;
-	--color-text-inverse: #0f172a;
-	--color-text-link: #818cf8;
+	--color-text: #f4efe7;
+	--color-text-secondary: #c4b6a5;
+	--color-text-tertiary: #938778;
+	--color-text-inverse: #1c1714;
+	--color-text-link: #f4843f;
 
-	--color-success: #4ade80;
-	--color-success-bg: #052e16;
-	--color-success-border: #166534;
-	--color-warning: #fbbf24;
-	--color-warning-bg: #451a03;
-	--color-warning-border: #92400e;
-	--color-error: #f87171;
-	--color-error-bg: #450a0a;
-	--color-error-border: #991b1b;
-	--color-info: #818cf8;
-	--color-info-bg: #1e1b4b;
-	--color-info-border: #3730a3;
+	--color-success: #8fbf6e;
+	--color-success-bg: #1d2a15;
+	--color-success-border: #3f5a2c;
+	--color-warning: #d9ad4f;
+	--color-warning-bg: #2e2410;
+	--color-warning-border: #5c4a1d;
+	--color-error: #e08474;
+	--color-error-bg: #2e1714;
+	--color-error-border: #5c2e26;
+	--color-info: #7eaabd;
+	--color-info-bg: #16262d;
+	--color-info-border: #2e4d59;
 
-	--color-day-complete-bg: linear-gradient(135deg, #052e16 0%, #064e3b 100%);
-	--color-day-complete-border: #166534;
-	--color-day-incomplete-bg: linear-gradient(135deg, #451a03 0%, #78350f 100%);
-	--color-day-incomplete-border: #92400e;
-	--color-day-overtime-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-	--color-day-overtime-border: #3730a3;
-	--color-day-weekend-bg: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
-	--color-day-weekend-border: #991b1b;
-	--color-day-weekend-empty-bg: #1e293b;
-	--color-day-weekend-empty-border: #334155;
-	--color-day-today-ring: #818cf8;
+	--color-day-complete-bg: linear-gradient(135deg, #1d2a15 0%, #25391a 100%);
+	--color-day-complete-border: #3f5a2c;
+	--color-day-incomplete-bg: linear-gradient(135deg, #2e2410 0%, #3d3014 100%);
+	--color-day-incomplete-border: #5c4a1d;
+	--color-day-overtime-bg: linear-gradient(135deg, #16262d 0%, #1d333c 100%);
+	--color-day-overtime-border: #2e4d59;
+	--color-day-weekend-bg: linear-gradient(135deg, #2e1714 0%, #3d1d18 100%);
+	--color-day-weekend-border: #5c2e26;
+	--color-day-weekend-empty-bg: #211b16;
+	--color-day-weekend-empty-border: #34291f;
+	--color-day-today-ring: #ee6b2d;
 
 	--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -238,55 +274,69 @@
 
 /* Light mode - manual override (forces light even if OS prefers dark) */
 [data-theme="light"] {
-	--color-primary: #4f46e5;
-	--color-primary-hover: #4338ca;
-	--color-primary-light: #e0e7ff;
-	--color-primary-focus: rgba(79, 70, 229, 0.15);
+	--color-primary: #c8431a;
+	--color-primary-hover: #a8380f;
+	--color-primary-light: #f0d9cd;
+	--color-primary-focus: rgba(200, 67, 26, 0.15);
+	--color-spark: #ee6b2d;
 
-	--color-bg: #f8fafc;
-	--color-surface: #ffffff;
-	--color-surface-hover: #f1f5f9;
+	--color-bg: #f4efe7;
+	--color-surface: #fbf8f2;
+	--color-surface-hover: #f1e9dc;
 	--color-surface-raised: #ffffff;
-	--color-surface-sunken: #f1f5f9;
+	--color-surface-sunken: #ede4d6;
 
-	--color-border: #e2e8f0;
-	--color-border-subtle: #f1f5f9;
-	--color-border-strong: #cbd5e1;
+	--color-border: #e2d8c8;
+	--color-border-subtle: #efe7da;
+	--color-border-strong: #cabda7;
 
-	--color-text: #0f172a;
-	--color-text-secondary: #64748b;
-	--color-text-tertiary: #94a3b8;
-	--color-text-inverse: #ffffff;
-	--color-text-link: #4f46e5;
+	--color-text: #241d18;
+	--color-text-secondary: #574d43;
+	--color-text-tertiary: #938778;
+	--color-text-inverse: #fff5ee;
+	--color-text-link: #c8431a;
 
-	--color-success: #16a34a;
-	--color-success-bg: #f0fdf4;
-	--color-success-border: #86efac;
-	--color-warning: #d97706;
-	--color-warning-bg: #fffbeb;
-	--color-warning-border: #fcd34d;
-	--color-error: #dc2626;
-	--color-error-bg: #fef2f2;
-	--color-error-border: #fca5a5;
-	--color-info: #6366f1;
-	--color-info-bg: #eef2ff;
-	--color-info-border: #a5b4fc;
+	--color-success: #4d7c3a;
+	--color-success-bg: #eef3e6;
+	--color-success-border: #b9cfa3;
+	--color-warning: #b07d18;
+	--color-warning-bg: #f7efda;
+	--color-warning-border: #e3c87f;
+	--color-error: #b23a2e;
+	--color-error-bg: #f6e4df;
+	--color-error-border: #e0a99e;
+	--color-info: #3f6b7d;
+	--color-info-bg: #e3edf1;
+	--color-info-border: #a9c6d1;
 
-	--color-day-complete-bg: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-	--color-day-complete-border: #86efac;
-	--color-day-incomplete-bg: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-	--color-day-incomplete-border: #fcd34d;
-	--color-day-overtime-bg: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-	--color-day-overtime-border: #a5b4fc;
-	--color-day-weekend-bg: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-	--color-day-weekend-border: #fecaca;
-	--color-day-weekend-empty-bg: #f8fafc;
-	--color-day-weekend-empty-border: #e2e8f0;
-	--color-day-today-ring: #4f46e5;
+	--color-day-complete-bg: linear-gradient(135deg, #eef3e6 0%, #dde9cc 100%);
+	--color-day-complete-border: #b9cfa3;
+	--color-day-incomplete-bg: linear-gradient(135deg, #f7efda 0%, #efe0b8 100%);
+	--color-day-incomplete-border: #e3c87f;
+	--color-day-overtime-bg: linear-gradient(135deg, #e3edf1 0%, #cfe0e7 100%);
+	--color-day-overtime-border: #a9c6d1;
+	--color-day-weekend-bg: linear-gradient(135deg, #f6e4df 0%, #efd2c9 100%);
+	--color-day-weekend-border: #e0a99e;
+	--color-day-weekend-empty-bg: #f4efe7;
+	--color-day-weekend-empty-border: #e2d8c8;
+	--color-day-today-ring: #c8431a;
 
 	--shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 	--shadow-md: 0 4px 6px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
 	--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.04);
 	--shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 8px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* ============================================================
+   Numeral utility — all hour/number figures render mono + tabular.
+   Components already tag numeric cells with `font-variant-numeric:
+   tabular-nums`; this utility is the shared hook for markup that
+   wants the Ledger numerals directly (e.g. <span class="num">).
+   ============================================================ */
+.num,
+[data-num] {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
 }

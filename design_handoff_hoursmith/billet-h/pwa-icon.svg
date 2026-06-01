@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Hoursmith">
+  <rect width="512" height="512" rx="112" fill="#1c1714"></rect>
+  
+  <rect x="128" y="96" width="72" height="320" rx="18" fill="#f4efe7"></rect>
+  <rect x="312" y="96" width="72" height="320" rx="18" fill="#f4efe7"></rect>
+  
+  <rect x="128" y="214" width="256" height="84" rx="18" fill="#ee6b2d"></rect>
+  
+  <circle cx="424" cy="196" r="17" fill="#ee6b2d"></circle>
+  <circle cx="452" cy="238" r="11" fill="#ee6b2d"></circle>
+</svg>
