@@ -29,12 +29,12 @@ import { downloadAsFile } from '../utils/downloadFile';
 import { generateWeeklyCsv } from '../utils/weekCsvExport';
 import { buildWeeklyCloseAssistantModel } from '../utils/weeklyCloseAssistant';
 import { generateWeeklySummary } from '../utils/weekSummary';
-import * as styles from './DashboardPage.module.css';
+import * as styles from './MyWeekPage.module.css';
 
 const GAP_DAYS_SECTION_ID = 'dashboard-gap-days';
 
-export const DashboardPage: React.FC = () => {
-	usePageTitle('Dashboard');
+export const MyWeekPage: React.FC = () => {
+	usePageTitle('My Week');
 	useDashboardDataFetcher();
 
 	const jiraHost = useConfigStore((s) => s.config.jiraHost);

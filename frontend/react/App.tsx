@@ -22,9 +22,9 @@ const HomePage = lazy(() =>
 		default: module.HomePage,
 	})),
 );
-const DashboardPage = lazy(() =>
-	import('./pages/DashboardPage').then((module) => ({
-		default: module.DashboardPage,
+const MyWeekPage = lazy(() =>
+	import('./pages/MyWeekPage').then((module) => ({
+		default: module.MyWeekPage,
 	})),
 );
 const PricingPage = lazy(() =>
@@ -32,9 +32,9 @@ const PricingPage = lazy(() =>
 		default: module.PricingPage,
 	})),
 );
-const TimesheetPage = lazy(() =>
-	import('./pages/TimesheetPage').then((module) => ({
-		default: module.TimesheetPage,
+const ReportsPage = lazy(() =>
+	import('./pages/ReportsPage').then((module) => ({
+		default: module.ReportsPage,
 	})),
 );
 const SettingsPage = lazy(() =>
@@ -121,10 +121,14 @@ const AppShell: React.FC = () => {
 			>
 				<Routes>
 					<Route path="/" element={<HomePage />} />
-					<Route path="/dashboard" element={<DashboardPage />} />
+					<Route path="/my-week" element={<MyWeekPage />} />
+					<Route
+						path="/dashboard"
+						element={<Navigate to="/my-week" replace />}
+					/>
 					<Route path="/pricing" element={<PricingPage />} />
 					<Route path="/demo" element={<DemoPage />} />
-					<Route path="/reports" element={<TimesheetPage />} />
+					<Route path="/reports" element={<ReportsPage />} />
 					<Route path="/team" element={<Navigate to="/reports" replace />} />
 					<Route
 						path="/timesheet"
