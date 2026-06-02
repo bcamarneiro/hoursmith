@@ -65,6 +65,12 @@ export interface SupabaseAdminClient {
 		stripe_customer_id: string | null;
 		metadata?: Record<string, unknown>;
 	}): Promise<void>;
+	/**
+	 * Idempotency guard for billing webhooks (ADA-308). Records a processed
+	 * billing event id; returns `true` if newly recorded, `false` if it was
+	 * already seen (a duplicate delivery that must not be reprocessed).
+	 */
+	recordBillingEvent(eventId: string): Promise<boolean>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -263,5 +269,24 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		if (!res.ok) {
 			throw new Error(`supabaseAdmin.insertAuditLog failed: ${res.status}`);
 		}
+	}
+
+	async recordBillingEvent(eventId: string): Promise<boolean> {
+		// INSERT ... ON CONFLICT DO NOTHING via PostgREST. With
+		// `return=representation` the body holds the inserted rows — empty when
+		// the id already existed, which is exactly our duplicate signal.
+		const res = await fetch(`${this.url}/rest/v1/billing_event_log`, {
+			method: 'POST',
+			headers: this.headers({
+				'content-type': 'application/json',
+				prefer: 'resolution=ignore-duplicates,return=representation',
+			}),
+			body: JSON.stringify({ event_id: eventId }),
+		});
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.recordBillingEvent failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as unknown[];
+		return Array.isArray(rows) && rows.length > 0;
 	}
 }
