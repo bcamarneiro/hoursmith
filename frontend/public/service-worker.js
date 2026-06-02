@@ -1,10 +1,11 @@
-const CACHE_NAME = 'hoursmith-shell-v1';
+const CACHE_NAME = 'hoursmith-shell-v2';
 const APP_SHELL = [
 	'./',
 	'./index.html',
 	'./bundle.js',
 	'./bundle.css',
 	'./manifest.webmanifest',
+	'./favicon.svg',
 	'./pwa-icon.svg',
 	'./pwa-icon-maskable.svg',
 ];

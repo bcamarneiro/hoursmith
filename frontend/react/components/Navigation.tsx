@@ -30,8 +30,56 @@ export const Navigation: React.FC = () => {
 	return (
 		<nav className={styles.nav} aria-label="Primary">
 			<div className={styles.navContent}>
-				<Link to="/" className={styles.brandLink}>
-					<span className={styles.brand}>Hoursmith</span>
+				<Link to="/" className={styles.brandLink} aria-label="Hoursmith">
+					{/* Billet H lockup. Dark-ink parts use currentColor so the wordmark
+					    follows --color-text (iron on light, paper on dark); the ember
+					    crossbar + spark stay brand colours in both themes. */}
+					<svg
+						className={styles.brandLogo}
+						viewBox="0 0 360 80"
+						role="img"
+						aria-label="Hoursmith"
+					>
+						<g transform="translate(8 8)">
+							<rect
+								x="2"
+								y="6"
+								width="11"
+								height="52"
+								rx="2.6"
+								fill="currentColor"
+							/>
+							<rect
+								x="31"
+								y="6"
+								width="11"
+								height="52"
+								rx="2.6"
+								fill="currentColor"
+							/>
+							<rect
+								x="2"
+								y="25"
+								width="40"
+								height="13"
+								rx="2.6"
+								fill="#c8431a"
+							/>
+							<circle cx="48" cy="16" r="2.6" fill="#ee6b2d" />
+							<circle cx="52.5" cy="22" r="1.7" fill="#ee6b2d" />
+						</g>
+						<text
+							x="86"
+							y="52"
+							fontFamily="'Bricolage Grotesque', system-ui, sans-serif"
+							fontWeight="700"
+							fontSize="40"
+							letterSpacing="-1"
+						>
+							<tspan fill="currentColor">Hour</tspan>
+							<tspan fill="#c8431a">smith</tspan>
+						</text>
+					</svg>
 				</Link>
 				<div className={styles.navLinks}>
 					{NAV_ITEMS.map((item) => (
