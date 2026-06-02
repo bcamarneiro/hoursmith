@@ -39,6 +39,14 @@
 	gap: var(--space-1);
 }
 
+/* Sign in / Account cluster, pushed to the right edge of the bar. */
+.authCluster {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	margin-left: var(--space-4);
+}
+
 .navLink {
 	text-decoration: none;
 	color: var(--color-text-secondary);
@@ -90,5 +98,21 @@
 		flex: 1 1 0;
 		text-align: center;
 		padding: var(--space-2);
+		/* Comfortable tap targets on mobile (WCAG 2.5.5). */
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.authCluster {
+		width: 100%;
+		margin-left: 0;
+		justify-content: space-between;
+	}
+
+	.authCluster .navLink,
+	.authCluster .navLinkActive {
+		flex: 1 1 0;
 	}
 }
