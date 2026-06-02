@@ -32,7 +32,10 @@ function buildMisconfiguredContext(): AuthContextValue {
 		session: null,
 		isLoading: false,
 		signIn: fail,
-		signUp: fail,
+		signUp: async () => ({
+			error: MISSING_ENV_ERROR,
+			needsEmailConfirmation: false,
+		}),
 		signInWithGitHub: fail,
 		signOut: async () => {},
 	};
@@ -49,7 +52,7 @@ export interface AuthContextValue {
 	signUp: (
 		email: string,
 		password: string,
-	) => Promise<{ error: string | null }>;
+	) => Promise<{ error: string | null; needsEmailConfirmation: boolean }>;
 	signInWithGitHub: (redirectTo?: string) => Promise<{ error: string | null }>;
 	signOut: () => Promise<void>;
 }
@@ -143,13 +146,17 @@ function ConfiguredAuthProvider({
 
 	const signUp = useCallback(
 		async (email: string, password: string) => {
-			const { error } = await supabase.auth.signUp({ email, password });
+			const { data, error } = await supabase.auth.signUp({ email, password });
 			if (error) {
 				logEvent('sign_up_failed');
-				return { error: error.message };
+				return { error: error.message, needsEmailConfirmation: false };
 			}
 			logEvent('sign_up_success');
-			return { error: null };
+			// With Supabase "Confirm email" ON, signUp returns no session — the
+			// user must click the emailed link before they can sign in (ADA-291).
+			// Guard `data?.session` so a stubbed `{ error: null }` is treated as
+			// "needs confirmation" rather than throwing.
+			return { error: null, needsEmailConfirmation: !data?.session };
 		},
 		[supabase],
 	);

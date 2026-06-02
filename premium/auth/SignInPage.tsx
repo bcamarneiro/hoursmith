@@ -1,10 +1,11 @@
 /**
  * Sign-in page for Hoursmith Premium.
  *
- * Email/password + GitHub OAuth. Redirects to `/account` on success, or to
- * the `?redirect=` target if RequireAuth bounced the user here.
+ * Email/password sign-in. Redirects to `/account` on success, or to the
+ * `?redirect=` target if RequireAuth bounced the user here. GitHub OAuth is
+ * hidden until it's wired (ADA-289 / ADA-309).
  *
- * Linear: ADA-256.
+ * Linear: ADA-256, ADA-309.
  */
 
 import { type FormEvent, useEffect, useState } from 'react';
@@ -20,7 +21,7 @@ export function SignInPage(): JSX.Element {
 			document.title = previous;
 		};
 	}, []);
-	const { signIn, signInWithGitHub } = useAuth();
+	const { signIn } = useAuth();
 	const navigate = useNavigate();
 	const [params] = useSearchParams();
 	const redirect = params.get('redirect') || '/account';
@@ -41,13 +42,6 @@ export function SignInPage(): JSX.Element {
 			return;
 		}
 		navigate(redirect, { replace: true });
-	}
-
-	async function handleGitHub(): Promise<void> {
-		setError(null);
-		const callback = `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`;
-		const { error: err } = await signInWithGitHub(callback);
-		if (err) setError(err);
 	}
 
 	return (
@@ -87,17 +81,15 @@ export function SignInPage(): JSX.Element {
 							onChange={(e) => setPassword(e.target.value)}
 						/>
 					</div>
-					{error && <p className={styles.error}>{error}</p>}
+					{error && (
+						<p className={styles.error} role="alert">
+							{error}
+						</p>
+					)}
 					<button type="submit" className={styles.primary} disabled={pending}>
 						{pending ? 'Signing in…' : 'Sign in'}
 					</button>
 				</form>
-
-				<div className={styles.divider}>or</div>
-
-				<button type="button" className={styles.oauth} onClick={handleGitHub}>
-					Continue with GitHub
-				</button>
 
 				<p className={styles.footer}>
 					No account? <Link to="/auth/sign-up">Create one</Link>
