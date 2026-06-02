@@ -53,6 +53,13 @@ export interface SupabaseAdminClient {
 	deleteSubscription(userId: string): Promise<void>;
 	deleteProfile(userId: string): Promise<void>;
 	deleteAuthUser(userId: string): Promise<void>;
+	/**
+	 * Globally revoke every session (and refresh token) tied to a user's JWT.
+	 * Used by account deletion as a defense-in-depth step so a leaked token
+	 * can't outlive the account. Hits GoTrue `POST /logout?scope=global` with
+	 * the user's own bearer token (there is no admin-by-id signout endpoint).
+	 */
+	signOutUser(token: string): Promise<void>;
 	insertAuditLog(row: {
 		event_type: string;
 		stripe_customer_id: string | null;
@@ -148,6 +155,24 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		});
 		if (!res.ok) {
 			throw new Error(`supabaseAdmin.deleteAuthUser failed: ${res.status}`);
+		}
+	}
+
+	async signOutUser(token: string): Promise<void> {
+		// GoTrue: POST /auth/v1/logout?scope=global with the user's own bearer
+		// token revokes all of that user's sessions and refresh tokens across
+		// every device. We pass the JWT the delete handler already verified.
+		const res = await fetch(`${this.url}/auth/v1/logout?scope=global`, {
+			method: 'POST',
+			headers: {
+				apikey: this.serviceRoleKey,
+				authorization: `Bearer ${token}`,
+			},
+		});
+		// 204 = signed out. Treat an already-invalid token (401) as success:
+		// the goal (no usable session remains) is met either way.
+		if (!res.ok && res.status !== 401) {
+			throw new Error(`supabaseAdmin.signOutUser failed: ${res.status}`);
 		}
 	}
 
