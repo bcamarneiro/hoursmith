@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hoursmith — Forge Logo Explorations</title>
+<link rel="stylesheet" href="assets/review.css" />
+<link rel="stylesheet" href="assets/logo.css" />
+</head>
+<body style="--spark:#ee6b2d;">
+
+<!-- ============ SVG MARK DEFINITIONS ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 1 · STRUCK H (self-tiled) -->
+    <symbol id="mk1-dark" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="15" fill="#1c1714"/>
+      <rect x="19" y="17" width="7.5" height="30" rx="1.8" fill="#ee6b2d"/>
+      <rect x="37.5" y="17" width="7.5" height="30" rx="1.8" fill="#ee6b2d"/>
+      <rect x="19" y="28.2" width="26" height="6.6" rx="1.8" fill="#ee6b2d"/>
+      <rect x="43.5" y="43.5" width="11" height="11" rx="2.6" transform="rotate(45 49 49)" fill="#ee6b2d" stroke="#1c1714" stroke-width="3.6"/>
+    </symbol>
+    <symbol id="mk1-mono" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="15" fill="#1c1714"/>
+      <rect x="19" y="17" width="7.5" height="30" rx="1.8" fill="#f4efe7"/>
+      <rect x="37.5" y="17" width="7.5" height="30" rx="1.8" fill="#f4efe7"/>
+      <rect x="19" y="28.2" width="26" height="6.6" rx="1.8" fill="#f4efe7"/>
+      <rect x="43.5" y="43.5" width="11" height="11" rx="2.6" transform="rotate(45 49 49)" fill="#f4efe7" stroke="#1c1714" stroke-width="3.6"/>
+    </symbol>
+
+    <!-- 2 · HOT BILLET H (open monogram) -->
+    <symbol id="mk2-light" viewBox="0 0 64 64">
+      <rect x="16" y="12" width="9" height="40" rx="2.2" fill="#1c1714"/>
+      <rect x="39" y="12" width="9" height="40" rx="2.2" fill="#1c1714"/>
+      <rect x="16" y="27" width="32" height="10" rx="2.2" fill="#c8431a"/>
+      <circle cx="52.5" cy="24.5" r="2" fill="#ee6b2d"/>
+      <circle cx="56" cy="29.5" r="1.3" fill="#ee6b2d"/>
+    </symbol>
+    <symbol id="mk2-dark" viewBox="0 0 64 64">
+      <rect x="16" y="12" width="9" height="40" rx="2.2" fill="#f4efe7"/>
+      <rect x="39" y="12" width="9" height="40" rx="2.2" fill="#f4efe7"/>
+      <rect x="16" y="27" width="32" height="10" rx="2.2" fill="#ee6b2d"/>
+      <circle cx="52.5" cy="24.5" r="2" fill="#ee6b2d"/>
+      <circle cx="56" cy="29.5" r="1.3" fill="#ee6b2d"/>
+    </symbol>
+    <symbol id="mk2-mono" viewBox="0 0 64 64">
+      <rect x="16" y="12" width="9" height="40" rx="2.2" fill="#1c1714"/>
+      <rect x="39" y="12" width="9" height="40" rx="2.2" fill="#1c1714"/>
+      <rect x="16" y="27" width="32" height="10" rx="2.2" fill="#1c1714"/>
+    </symbol>
+
+    <!-- 3 · ANVIL -->
+    <symbol id="mk3-light" viewBox="0 0 64 64">
+      <g fill="#1c1714">
+        <rect x="12" y="24" width="33" height="8" rx="2"/>
+        <polygon points="44,24 55,28 44,32"/>
+        <polygon points="26,31 38,31 35,43 29,43"/>
+        <rect x="15" y="43" width="34" height="7.5" rx="2.5"/>
+      </g>
+      <rect x="29.2" y="9" width="7.5" height="7.5" rx="1.6" transform="rotate(45 32.95 12.75)" fill="#ee6b2d"/>
+      <circle cx="41.5" cy="11.5" r="1.5" fill="#ee6b2d"/>
+    </symbol>
+    <symbol id="mk3-dark" viewBox="0 0 64 64">
+      <g fill="#f4efe7">
+        <rect x="12" y="24" width="33" height="8" rx="2"/>
+        <polygon points="44,24 55,28 44,32"/>
+        <polygon points="26,31 38,31 35,43 29,43"/>
+        <rect x="15" y="43" width="34" height="7.5" rx="2.5"/>
+      </g>
+      <rect x="29.2" y="9" width="7.5" height="7.5" rx="1.6" transform="rotate(45 32.95 12.75)" fill="#ee6b2d"/>
+      <circle cx="41.5" cy="11.5" r="1.5" fill="#ee6b2d"/>
+    </symbol>
+
+    <!-- 4 · MAKER'S STAMP (hex seal) -->
+    <symbol id="mk4-light" viewBox="0 0 64 64">
+      <polygon points="32,5 55,18.5 55,45.5 32,59 9,45.5 9,18.5" fill="#1c1714"/>
+      <g fill="#f4efe7">
+        <rect x="24.5" y="21" width="5.6" height="22" rx="1.2"/>
+        <rect x="33.9" y="21" width="5.6" height="22" rx="1.2"/>
+        <rect x="24.5" y="29.2" width="15" height="5.6" rx="1.2"/>
+      </g>
+      <rect x="42.5" y="40" width="6.6" height="6.6" rx="1.4" transform="rotate(45 45.8 43.3)" fill="#ee6b2d"/>
+    </symbol>
+    <symbol id="mk4-dark" viewBox="0 0 64 64">
+      <polygon points="32,5 55,18.5 55,45.5 32,59 9,45.5 9,18.5" fill="#f4efe7"/>
+      <g fill="#1c1714">
+        <rect x="24.5" y="21" width="5.6" height="22" rx="1.2"/>
+        <rect x="33.9" y="21" width="5.6" height="22" rx="1.2"/>
+        <rect x="24.5" y="29.2" width="15" height="5.6" rx="1.2"/>
+      </g>
+      <rect x="42.5" y="40" width="6.6" height="6.6" rx="1.4" transform="rotate(45 45.8 43.3)" fill="#ee6b2d"/>
+    </symbol>
+
+    <!-- 5 · STRIKE SPARK -->
+    <symbol id="mk5-solid" viewBox="0 0 64 64">
+      <path d="M32 7 C34 26 38 30 57 32 C38 34 34 38 32 57 C30 38 26 34 7 32 C26 30 30 26 32 7 Z" fill="#c8431a"/>
+      <path d="M49 11 C50 18.5 50.5 19 58 20 C50.5 21 50 21.5 49 29 C48 21.5 47.5 21 40 20 C47.5 19 48 18.5 49 11 Z" fill="#ee6b2d"/>
+    </symbol>
+    <symbol id="mk5-mono" viewBox="0 0 64 64">
+      <path d="M32 7 C34 26 38 30 57 32 C38 34 34 38 32 57 C30 38 26 34 7 32 C26 30 30 26 32 7 Z" fill="#1c1714"/>
+      <path d="M49 11 C50 18.5 50.5 19 58 20 C50.5 21 50 21.5 49 29 C48 21.5 47.5 21 40 20 C47.5 19 48 18.5 49 11 Z" fill="#1c1714"/>
+    </symbol>
+
+    <!-- 6 · Hs MONOGRAM TILE -->
+    <symbol id="mk6-dark" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="15" fill="#1c1714"/>
+      <text x="31" y="43" text-anchor="middle" font-family="'Bricolage Grotesque',sans-serif" font-weight="800" font-size="31" fill="#f4efe7">Hs</text>
+      <rect x="45" y="44" width="7" height="7" rx="1.4" transform="rotate(45 48.5 47.5)" fill="#ee6b2d"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <a class="mark" href="index.html">
+    <span class="glyph">H</span>
+    <span>Hoursmith&nbsp;<span class="sub">/ brand &amp; ux review</span></span>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">01 — Diagnosis</a>
+    <a href="ia.html">02 — Structure</a>
+    <a href="directions.html">03 — Directions</a>
+    <a href="screens.html">04 — Screens</a>
+    <a class="active" href="logo.html">05 — Logo</a>
+    <a href="settings.html">06 — Settings</a>
+  </nav>
+</header>
+
+<!-- ============ INTRO ============ -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Section 05 — Logo · Forge direction</span>
+    <h2 style="margin-top:16px;max-width:20ch;">Six ways to forge the mark.</h2>
+    <div class="logo-intro">
+      <p class="muted" style="font-size:17px;">All six live in the <strong>Forge</strong> system — iron &amp; ember, Bricolage Grotesque, the craft the name promises. They range from literal (an anvil) to pure monogram (a struck "H"). Each is shown as a full lockup plus the contexts that decide a logo: scaled down to a favicon, reversed, and one-colour. None uses gradients or fine detail that would collapse at 16px.</p>
+      <div>
+        <div class="note" style="margin-bottom:10px;">The palette they're built from</div>
+        <div class="forge-pal">
+          <div class="sw" style="background:#1c1714;color:#f4efe7;"><span class="role">Iron</span><span class="hex">#1C1714</span></div>
+          <div class="sw" style="background:#c8431a;color:#fff5ee;"><span class="role">Ember</span><span class="hex">#C8431A</span></div>
+          <div class="sw" style="background:#ee6b2d;color:#2a160c;"><span class="role">Spark</span><span class="hex">#EE6B2D</span></div>
+          <div class="sw" style="background:#f4efe7;color:#1c1714;"><span class="role">Paper</span><span class="hex">#F4EFE7</span></div>
+          <div class="sw" style="background:#938778;color:#fff;"><span class="role">Ash</span><span class="hex">#938778</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GALLERY ============ -->
+<section style="padding-top:0;">
+  <div class="wrap-wide">
+    <div class="logo-grid">
+
+      <!-- 1 STRUCK H -->
+      <div class="logo-card">
+        <div class="lc-stage">
+          <div class="lockup">
+            <svg class="mk selftile" style="width:56px;height:56px"><use href="#mk1-dark"/></svg>
+            <span class="wm">Hour<span class="s">smith</span></span>
+          </div>
+        </div>
+        <div class="lc-meta">
+          <div class="lc-head"><h3>Struck H</h3><span class="lc-no">01</span></div>
+          <p class="lc-rat">An ember "H" stamped into an iron tile, with a single strike-spark at the corner. The cleanest, most app-native mark — reads instantly as a tile and a monogram at once.</p>
+          <div class="lc-best">Best for: the safe, modern default</div>
+        </div>
+        <div class="lc-ctx">
+          <span class="ctx-k">App</span>
+          <svg class="selftile" style="width:46px;height:46px"><use href="#mk1-dark"/></svg>
+          <svg class="selftile" style="width:34px;height:34px"><use href="#mk1-dark"/></svg>
+          <svg class="selftile" style="width:22px;height:22px"><use href="#mk1-dark"/></svg>
+          <span class="vrule"></span>
+          <span class="ctx-k">Mono</span>
+          <svg class="selftile" style="width:34px;height:34px"><use href="#mk1-mono"/></svg>
+        </div>
+      </div>
+
+      <!-- 2 HOT BILLET H -->
+      <div class="logo-card reco">
+        <div class="lc-stage">
+          <span class="lc-badge">Selected ✓</span>
+          <div class="lockup">
+            <svg class="mk mk-56"><use href="#mk2-light"/></svg>
+            <span class="wm">Hour<span class="s">smith</span></span>
+          </div>
+        </div>
+        <div class="lc-meta">
+          <div class="lc-head"><h3>Billet H</h3><span class="lc-no">02</span></div>
+          <p class="lc-rat">Two iron posts joined by a glowing ember bar — raw stock being worked, hot, with sparks flying off the strike. The most name-true mark: it literally shows hours being forged, and it's an open monogram that needs no container.</p>
+          <div class="lc-best">Best for: distinctive &amp; ownable</div>
+        </div>
+        <div class="lc-ctx">
+          <span class="ctx-k">App</span>
+          <span class="tile t46"><svg><use href="#mk2-dark"/></svg></span>
+          <span class="tile t34"><svg><use href="#mk2-dark"/></svg></span>
+          <span class="tile t22"><svg><use href="#mk2-dark"/></svg></span>
+          <span class="vrule"></span>
+          <span class="ctx-k">Mono</span>
+          <span class="tile paper t34"><svg><use href="#mk2-mono"/></svg></span>
+        </div>
+      </div>
+
+      <!-- 3 ANVIL -->
+      <div class="logo-card">
+        <div class="lc-stage">
+          <div class="lockup">
+            <svg class="mk mk-56"><use href="#mk3-light"/></svg>
+            <span class="wm">Hour<span class="s">smith</span></span>
+          </div>
+        </div>
+        <div class="lc-meta">
+          <div class="lc-head"><h3>Anvil</h3><span class="lc-no">03</span></div>
+          <p class="lc-rat">The literal tool of the trade, drawn as a clean geometric silhouette with an ember spark landing on the horn. The most explicit nod to "smith" — warm and unmistakable, though less abstract than the monograms.</p>
+          <div class="lc-best">Best for: friendly &amp; literal</div>
+        </div>
+        <div class="lc-ctx">
+          <span class="ctx-k">App</span>
+          <span class="tile t46"><svg><use href="#mk3-dark"/></svg></span>
+          <span class="tile t34"><svg><use href="#mk3-dark"/></svg></span>
+          <span class="tile t22"><svg><use href="#mk3-dark"/></svg></span>
+          <span class="vrule"></span>
+          <span class="ctx-k">Light</span>
+          <span class="tile paper t34"><svg><use href="#mk3-light"/></svg></span>
+        </div>
+      </div>
+
+      <!-- 4 MAKER'S STAMP -->
+      <div class="logo-card">
+        <div class="lc-stage">
+          <div class="lockup">
+            <svg class="mk mk-56"><use href="#mk4-light"/></svg>
+            <span class="wm">Hour<span class="s">smith</span></span>
+          </div>
+        </div>
+        <div class="lc-meta">
+          <div class="lc-head"><h3>Maker's Stamp</h3><span class="lc-no">04</span></div>
+          <p class="lc-rat">An "H" punched into a hex seal — a smith's maker's mark, the stamp of provenance on finished work. The hexagon adds an industrial, bolt-head precision that suits the "numbers your client won't question" promise.</p>
+          <div class="lc-best">Best for: trust &amp; provenance</div>
+        </div>
+        <div class="lc-ctx">
+          <span class="ctx-k">App</span>
+          <span class="tile t46"><svg><use href="#mk4-dark"/></svg></span>
+          <span class="tile t34"><svg><use href="#mk4-dark"/></svg></span>
+          <span class="tile t22"><svg><use href="#mk4-dark"/></svg></span>
+          <span class="vrule"></span>
+          <span class="ctx-k">Light</span>
+          <span class="tile paper t34"><svg><use href="#mk4-light"/></svg></span>
+        </div>
+      </div>
+
+      <!-- 5 STRIKE SPARK -->
+      <div class="logo-card">
+        <div class="lc-stage">
+          <div class="lockup">
+            <svg class="mk mk-56"><use href="#mk5-solid"/></svg>
+            <span class="wm">Hour<span class="s">smith</span></span>
+          </div>
+        </div>
+        <div class="lc-meta">
+          <div class="lc-head"><h3>Strike Spark</h3><span class="lc-no">05</span></div>
+          <p class="lc-rat">No letterform — just the spark of hammer on hot metal, a four-point strike with a second smaller flash. The most energetic and abstract option; flexes well as a standalone icon and a "loading / working" motif in-app.</p>
+          <div class="lc-best">Best for: energetic &amp; flexible</div>
+        </div>
+        <div class="lc-ctx">
+          <span class="ctx-k">App</span>
+          <span class="tile t46"><svg><use href="#mk5-solid"/></svg></span>
+          <span class="tile t34"><svg><use href="#mk5-solid"/></svg></span>
+          <span class="tile t22"><svg><use href="#mk5-solid"/></svg></span>
+          <span class="vrule"></span>
+          <span class="ctx-k">Mono</span>
+          <span class="tile paper t34"><svg><use href="#mk5-mono"/></svg></span>
+        </div>
+      </div>
+
+      <!-- 6 WORDMARK-LED -->
+      <div class="logo-card">
+        <div class="lc-stage">
+          <div class="lockup">
+            <span class="wm" style="font-size:34px;">Hour<span class="s">smith</span><span class="wm-spark"></span></span>
+          </div>
+        </div>
+        <div class="lc-meta">
+          <div class="lc-head"><h3>Wordmark + Spark</h3><span class="lc-no">06</span></div>
+          <p class="lc-rat">No icon at all — the wordmark carries it, with "smith" in ember and a single spark punctuating the end. The most grown-up, least gimmicky route; pairs with a derived "Hs" tile for the app icon and favicon.</p>
+          <div class="lc-best">Best for: minimal &amp; mature</div>
+        </div>
+        <div class="lc-ctx">
+          <span class="ctx-k">App</span>
+          <svg class="selftile" style="width:46px;height:46px"><use href="#mk6-dark"/></svg>
+          <svg class="selftile" style="width:34px;height:34px"><use href="#mk6-dark"/></svg>
+          <svg class="selftile" style="width:22px;height:22px"><use href="#mk6-dark"/></svg>
+          <span class="vrule"></span>
+          <span class="ctx-k">Reverse</span>
+          <span style="background:#1c1714;border-radius:8px;padding:8px 12px;"><span class="wm-rev" style="font-size:16px;">Hour<span class="s">smith</span></span></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ RECOMMENDED STRESS TEST ============ -->
+<section style="padding-top:14px;">
+  <div class="wrap-wide">
+    <span class="section-num">Recommended</span>
+    <h3 style="margin-top:8px;">02 · Billet H, stress-tested</h3>
+    <p class="muted" style="margin-top:10px;max-width:62ch;">The pick has to survive every context a logo lands in. Here it is reversed, on the brand accent, shrunk to a 16px favicon, and as a one-colour mark — no gradients, no detail loss.</p>
+    <div class="stress">
+      <div class="stress-head">
+        <h3>Billet H</h3>
+        <span class="sh-sub">raw stock + a worked, glowing bar — hours, forged</span>
+      </div>
+      <div class="stress-grid">
+        <div class="stress-cell">
+          <div class="sc-demo"><span class="tile t56"><svg><use href="#mk2-dark"/></svg></span></div>
+          <div class="sc-k">App icon · iron tile</div>
+        </div>
+        <div class="stress-cell on-iron">
+          <div class="sc-demo"><span class="wm-rev">Hour<span class="s">smith</span></span></div>
+          <div class="sc-k">Reversed lockup</div>
+        </div>
+        <div class="stress-cell on-ember">
+          <div class="sc-demo"><svg style="width:54px;height:54px"><use href="#mk2-mono" fill="#fff5ee"/></svg></div>
+          <div class="sc-k">On ember · knockout</div>
+        </div>
+        <div class="stress-cell">
+          <div class="sc-demo">
+            <div class="favrow">
+              <span class="tile t34"><svg><use href="#mk2-dark"/></svg></span>
+              <span class="tile t22"><svg><use href="#mk2-dark"/></svg></span>
+              <span class="tile" style="width:16px;height:16px"><svg><use href="#mk2-dark"/></svg></span>
+            </div>
+          </div>
+          <div class="sc-k">Favicon · 34 / 22 / 16px</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<section class="pagefoot">
+  <div class="wrap">
+    <span class="eyebrow">Selected · Billet H</span>
+    <h2 style="margin-top:14px;max-width:20ch;">Billet H it is — now forged into the screens.</h2>
+    <p class="muted" style="margin-top:14px;max-width:60ch;">The mark now runs across the redesigned Home, My Week and Reports nav. Next, if you want, I'll cut the final production SVG with locked clear-space and a min-size rule, plus a dark-mode variant — and apply it to the favicon and PWA tiles.</p>
+    <div class="nextlinks">
+      <a class="nextcard" href="directions.html">
+        <div class="nl-k">Back to 03</div>
+        <h3>← The Forge direction</h3>
+        <p>Palette, type and voice the mark sits inside.</p>
+      </a>
+      <a class="nextcard" href="screens.html">
+        <div class="nl-k">Section 04</div>
+        <h3>See it in place →</h3>
+        <p>The mark now runs as the Billet H across the redesigned screens.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { migrateStorageKey } from '../../stores/migrateStorageKeys';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import { toLocalDateString } from '../utils/date';
 
-const STORAGE_KEY = 'jira-timesheet-last-reminded-week';
+const STORAGE_KEY = 'hoursmith-last-reminded-week';
+
+// Carry existing users' data across the jira-timesheet-report → hoursmith rename.
+migrateStorageKey('jira-timesheet-last-reminded-week', STORAGE_KEY);
 
 interface ComplianceReminderResult {
 	canRemind: boolean;

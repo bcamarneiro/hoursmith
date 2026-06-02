@@ -23,6 +23,8 @@
  * Linear: ADA-294 (migrated from Stripe ADA-260).
  */
 
+import { emailFromToken } from '../_lib/authEmail.js';
+import { canCheckout, checkoutEnabled, paywallPublic } from '../_lib/flags.js';
 import {
 	type CreateCheckoutInput,
 	createPolarCheckout,
@@ -47,6 +49,16 @@ const TIER_PRODUCT_ENV: Record<CheckoutTier, string> = {
 	lead: 'POLAR_PRODUCT_LEAD',
 };
 
+/**
+ * Operational gate (ADA-341). Extracted so tests can force open/closed states
+ * without an Edge Config connection; defaults bind to the live flag helpers.
+ */
+export interface CheckoutGate {
+	checkoutEnabled(): Promise<boolean>;
+	paywallPublic(): Promise<boolean>;
+	canCheckout(email: string | null): Promise<boolean>;
+}
+
 export interface CheckoutDeps {
 	/** Inject Supabase admin client (tests). */
 	supabase?: SupabaseAdminClient;
@@ -56,6 +68,8 @@ export interface CheckoutDeps {
 	) => Promise<{ url: string; id: string }>;
 	/** Inject env reader (tests). Defaults to `process.env`. */
 	env?: Partial<Record<string, string | undefined>>;
+	/** Inject the operational gate (tests). Defaults to Edge Config flags. */
+	gate?: CheckoutGate;
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -68,6 +82,11 @@ export async function handleCheckout(
 ): Promise<Response> {
 	const start = Date.now();
 	const env = deps.env ?? process.env;
+	const gate: CheckoutGate = deps.gate ?? {
+		checkoutEnabled: () => checkoutEnabled(env),
+		paywallPublic: () => paywallPublic(env),
+		canCheckout: (email) => canCheckout(email, env),
+	};
 
 	if (request.method !== 'POST') {
 		return jsonResponse(405, { error: 'method_not_allowed' });
@@ -111,6 +130,33 @@ export async function handleCheckout(
 			durationMs: Date.now() - start,
 		});
 		return jsonResponse(401, { error: 'invalid_token' });
+	}
+
+	// 1b. Operational kill switches (ADA-341). Block when checkout is disabled,
+	//     and enforce the closed-launch paywall (email allowlist) before opening
+	//     a session. The /api/polar/webhook stays ungated elsewhere.
+	if (!(await gate.checkoutEnabled())) {
+		logCheckout({
+			userId,
+			tier: null,
+			code: 'checkout_disabled',
+			status: 503,
+			durationMs: Date.now() - start,
+		});
+		return jsonResponse(503, { error: 'checkout_disabled' });
+	}
+	if (!(await gate.paywallPublic())) {
+		const email = await emailFromToken(token, env);
+		if (!(await gate.canCheckout(email))) {
+			logCheckout({
+				userId,
+				tier: null,
+				code: 'paywall_closed',
+				status: 403,
+				durationMs: Date.now() - start,
+			});
+			return jsonResponse(403, { error: 'paywall_closed' });
+		}
 	}
 
 	// 2. Parse body and validate the tier.
