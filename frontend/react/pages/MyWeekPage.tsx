@@ -54,9 +54,20 @@ export const MyWeekPage: React.FC = () => {
 	const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
 	const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
 
-	const weekdays = daySummaries.filter((d) => !d.isWeekend);
+	// Gap-first: the day you still owe rises to the top so the close surface leads
+	// with what's unfinished; completed days settle to the bottom. Stable by date
+	// within equal gaps. The week overview above stays chronological (Mon→Fri).
+	const orderedWeekdays = useMemo(
+		() =>
+			daySummaries
+				.filter((d) => !d.isWeekend)
+				.sort(
+					(a, b) => b.gapSeconds - a.gapSeconds || a.date.localeCompare(b.date),
+				),
+		[daySummaries],
+	);
 	const { focusedDayIndex, focusedSuggestionIndex, showHelp, setShowHelp } =
-		useKeyboardShortcuts(weekdays);
+		useKeyboardShortcuts(orderedWeekdays);
 	const { canRemind, reminderEnabled, enableReminder, totalGapHours } =
 		useComplianceReminder();
 	const { copyPreviousWeek, isLoading: isCopyingPrevWeek } =
@@ -179,7 +190,7 @@ export const MyWeekPage: React.FC = () => {
 		);
 	}
 
-	const hasGaps = weekdays.some((d) => d.gapSeconds > 0);
+	const hasGaps = orderedWeekdays.some((d) => d.gapSeconds > 0);
 	const jumpToGapDays = () => {
 		document.getElementById(GAP_DAYS_SECTION_ID)?.scrollIntoView({
 			behavior: 'smooth',
@@ -220,7 +231,7 @@ export const MyWeekPage: React.FC = () => {
 						Export MD
 					</Button>
 					<Button
-						variant="secondary"
+						variant="primary"
 						onClick={handleExportCsv}
 						disabled={weekWorklogs.length === 0}
 					>
@@ -285,15 +296,27 @@ export const MyWeekPage: React.FC = () => {
 						</div>
 					)}
 
+					{/* Lead with the close surface: one panel, one primary job. */}
+					<WeeklyCloseAssistant
+						model={closeAssistantModel}
+						canExport={weekWorklogs.length > 0}
+						isCopyingPrevWeek={isCopyingPrevWeek}
+						onJumpToGapDays={jumpToGapDays}
+						onCopyPrevWeek={handleCopyPrevWeek}
+						onCopySummary={handleExportMd}
+						onExportCsv={handleExportCsv}
+						onEnableReminders={enableReminder}
+					/>
+
 					<WeekOverview days={daySummaries} />
 
-					{weekdays.length > 0 && (
+					{orderedWeekdays.length > 0 && (
 						<div id={GAP_DAYS_SECTION_ID} className={styles.daysSection}>
 							<h3 className={styles.sectionTitle}>This week</h3>
-							{/* All weekdays render in order; complete days collapse in
-							    place (DayCard) instead of disappearing, so they stay
-							    reviewable and editable. */}
-							{weekdays.map((day, i) => (
+							{/* Gap-first: the day you still owe leads; complete days
+							    collapse in place (DayCard) rather than disappearing, so
+							    they stay reviewable and editable. */}
+							{orderedWeekdays.map((day, i) => (
 								<DayCard
 									key={day.date}
 									day={day}
@@ -305,17 +328,6 @@ export const MyWeekPage: React.FC = () => {
 							))}
 						</div>
 					)}
-
-					<WeeklyCloseAssistant
-						model={closeAssistantModel}
-						canExport={weekWorklogs.length > 0}
-						isCopyingPrevWeek={isCopyingPrevWeek}
-						onJumpToGapDays={jumpToGapDays}
-						onCopyPrevWeek={handleCopyPrevWeek}
-						onCopySummary={handleExportMd}
-						onExportCsv={handleExportCsv}
-						onEnableReminders={enableReminder}
-					/>
 
 					{monthHeatmap.isLoading && monthHeatmap.data.size === 0 && (
 						<div className={styles.heatmapLoading}>

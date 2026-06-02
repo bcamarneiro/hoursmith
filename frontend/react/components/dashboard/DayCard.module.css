@@ -68,12 +68,16 @@
 	font-size: var(--text-sm);
 	font-weight: var(--font-semibold);
 	color: var(--color-text);
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
 }
 
 .gap {
 	font-size: var(--text-sm);
 	font-weight: var(--font-medium);
 	color: var(--color-error);
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
 }
 
 .timeOff {
