@@ -103,6 +103,7 @@
 	font-size: var(--text-xs);
 	color: var(--color-text-tertiary);
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 	min-width: 32px;
 	text-align: right;
 }
@@ -110,6 +111,7 @@
 .hoursCell {
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 	width: 15%;
 }
 
