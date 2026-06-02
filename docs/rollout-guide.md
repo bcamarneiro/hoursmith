@@ -48,14 +48,14 @@ npm run build:vercel
 4. Run a real-data consistency check for a recent window with:
 
 ```bash
-node scripts/validate-real-data-consistency.cjs ~/Downloads/jira-timesheet-settings.json
+node scripts/validate-real-data-consistency.cjs ~/Downloads/hoursmith-settings.json
 ```
 
 For SOCKS5 environments:
 
 ```bash
 node scripts/validate-real-data-consistency.cjs \
-  ~/Downloads/jira-timesheet-settings.json \
+  ~/Downloads/hoursmith-settings.json \
   socks5h://127.0.0.1:8080 \
   2
 ```

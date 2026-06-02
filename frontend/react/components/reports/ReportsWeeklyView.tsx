@@ -5,7 +5,7 @@ import type {
 	ReportsSortDirection,
 	ReportsSortField,
 } from '../../hooks/useReportsURLState';
-import * as styles from '../../pages/TimesheetPage.module.css';
+import * as styles from '../../pages/ReportsPage.module.css';
 import { addDaysToIsoDate, parseIsoDateLocal } from '../../utils/date';
 import { formatHours } from '../../utils/format';
 import type { ManagerTrendModel } from '../../utils/teamReports';

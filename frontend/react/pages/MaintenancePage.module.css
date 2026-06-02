@@ -1,0 +1,42 @@
+.maintenance {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2rem;
+	background: var(--color-bg, #0b1020);
+	color: var(--color-text, #e7ecf3);
+}
+
+.card {
+	max-width: 32rem;
+	text-align: center;
+}
+
+.title {
+	font-size: 1.75rem;
+	font-weight: 700;
+	margin: 0 0 0.75rem;
+}
+
+.body {
+	font-size: 1.05rem;
+	line-height: 1.6;
+	margin: 0 0 0.5rem;
+	opacity: 0.85;
+}
+
+.footer {
+	font-size: 0.95rem;
+	opacity: 0.7;
+	margin: 0;
+}
+
+.link {
+	color: var(--color-primary, #6ea8fe);
+	text-decoration: none;
+}
+
+.link:hover {
+	text-decoration: underline;
+}

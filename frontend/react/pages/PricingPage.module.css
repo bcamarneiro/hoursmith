@@ -76,6 +76,7 @@
 	font-weight: var(--font-bold);
 	letter-spacing: -0.02em;
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 }
 
 .priceCadence {

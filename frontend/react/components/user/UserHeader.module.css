@@ -81,6 +81,7 @@
 	font-size: var(--text-sm);
 	color: var(--color-text-secondary);
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 	white-space: nowrap;
 }
 

@@ -38,7 +38,7 @@ import {
 import { buildTeamCsv } from '../utils/teamCsvExport';
 import { uid } from '../utils/uid';
 import { classifyWorklog } from '../utils/worklogClassifier';
-import * as styles from './TimesheetPage.module.css';
+import * as styles from './ReportsPage.module.css';
 
 type SortField = 'name' | 'total' | 'gap';
 type SortDirection = 'asc' | 'desc';
@@ -105,7 +105,7 @@ function sumMonthlyHours(
 
 // --- Main component ---
 
-export const TimesheetPage: React.FC = () => {
+export const ReportsPage: React.FC = () => {
 	usePageTitle('Reports');
 	const queryClient = useQueryClient();
 	// Seed selectedUser from ?user= synchronously on first mount so that
