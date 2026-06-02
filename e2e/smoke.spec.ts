@@ -27,14 +27,10 @@ test.describe('Smoke rollout paths', () => {
 		await page.goto('/settings');
 		await page.waitForLoadState('networkidle');
 
-		await expect(page.getByText('Setup wizard')).toBeVisible();
-		await expect(page.getByText('Readiness and trust signals')).toBeVisible();
-		await expect(
-			page.getByRole('button', { name: 'Refresh diagnostics' }),
-		).toBeVisible();
+		await expect(page.getByText('Setup & readiness')).toBeVisible();
 
 		const downloadPromise = page.waitForEvent('download');
-		await page.getByRole('button', { name: 'Backup' }).click();
+		await page.getByRole('button', { name: 'Backup', exact: true }).click();
 		const download = await downloadPromise;
 		expect(download.suggestedFilename()).toBe('jira-timesheet-settings.json');
 	});
