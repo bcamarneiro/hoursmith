@@ -16,20 +16,9 @@ import { ManagerInsightsPanel } from './ManagerInsightsPanel';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-const hoursCellStyleMap = {
-	green: styles.hoursCellGreen,
-	yellow: styles.hoursCellYellow,
-	red: styles.hoursCellRed,
-	neutral: styles.hoursCell,
-} as const;
-
-function getHoursCellStyle(hours: number): string {
-	if (hours >= 8) return hoursCellStyleMap.green;
-	if (hours >= 4) return hoursCellStyleMap.yellow;
-	if (hours > 0) return hoursCellStyleMap.red;
-	return hoursCellStyleMap.neutral;
-}
-
+// Per-day cells stay neutral mono — the Gap column is the single red signal on
+// this table (screens.html: "only the gap cell goes red"). Per-day fullness is
+// read from the figure itself, not a colour wash.
 const gapCellStyleMap = {
 	positive: styles.gapPositive,
 	zero: styles.gapZero,
@@ -97,7 +86,7 @@ function TeamMemberRow({
 			{weekdays.map((day) => {
 				const hours = member.dailyHours.get(day) || 0;
 				return (
-					<td key={day} className={getHoursCellStyle(hours)}>
+					<td key={day} className={styles.hoursCell}>
 						{hours > 0 ? formatHoursDecimal(hours) : '-'}
 					</td>
 				);
@@ -132,7 +121,7 @@ function SummaryRow({
 					members.reduce((sum, m) => sum + (m.dailyHours.get(day) || 0), 0) /
 					count;
 				return (
-					<td key={day} className={getHoursCellStyle(avg)}>
+					<td key={day} className={styles.hoursCell}>
 						{avg > 0 ? formatHoursDecimal(avg) : '-'}
 					</td>
 				);
