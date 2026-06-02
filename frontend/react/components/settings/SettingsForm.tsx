@@ -330,7 +330,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		});
 		downloadAsFile(
 			`${JSON.stringify(backup, null, 2)}\n`,
-			'jira-timesheet-settings.json',
+			'hoursmith-settings.json',
 			'application/json;charset=utf-8',
 		);
 		toast.success('Settings exported');
@@ -340,7 +340,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		const sharePack = createSettingsSharePack(savedConfig, calendarMappings);
 		downloadAsFile(
 			`${JSON.stringify(sharePack, null, 2)}\n`,
-			'jira-timesheet-share-pack.json',
+			'hoursmith-share-pack.json',
 			'application/json;charset=utf-8',
 		);
 		toast.success('Share pack exported without local secrets');

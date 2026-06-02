@@ -32,7 +32,7 @@ test.describe('Smoke rollout paths', () => {
 		const downloadPromise = page.waitForEvent('download');
 		await page.getByRole('button', { name: 'Backup', exact: true }).click();
 		const download = await downloadPromise;
-		expect(download.suggestedFilename()).toBe('jira-timesheet-settings.json');
+		expect(download.suggestedFilename()).toBe('hoursmith-settings.json');
 	});
 
 	test('reports exposes controls, consistency, and snapshot exports', async ({

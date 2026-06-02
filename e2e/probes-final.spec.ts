@@ -118,12 +118,10 @@ test.describe('Snapshot HTML probes', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 test.describe('localStorage corruption probes', () => {
-	test('app boots with malformed jira-timesheet-config JSON', async ({
-		page,
-	}) => {
+	test('app boots with malformed hoursmith-config JSON', async ({ page }) => {
 		await go(page, '/');
 		await page.evaluate(() => {
-			localStorage.setItem('jira-timesheet-config', '{not valid json');
+			localStorage.setItem('hoursmith-config', '{not valid json');
 		});
 		await page.reload();
 		await page.waitForLoadState('networkidle');
@@ -138,7 +136,7 @@ test.describe('localStorage corruption probes', () => {
 		await go(page, '/');
 		await page.evaluate(() => {
 			localStorage.setItem(
-				'jira-timesheet-config',
+				'hoursmith-config',
 				JSON.stringify({
 					state: {
 						config: {
@@ -157,7 +155,7 @@ test.describe('localStorage corruption probes', () => {
 		await go(page, '/settings');
 		// SettingsForm should render despite garbage input — normalizeConfig
 		// is the safety net.
-		await expect(page.getByText('Setup wizard')).toBeVisible();
+		await expect(page.getByText('Setup & readiness')).toBeVisible();
 	});
 
 	test('user-data store has no version field — additive schema change is unsafe', async ({
@@ -165,7 +163,7 @@ test.describe('localStorage corruption probes', () => {
 	}) => {
 		await go(page, '/');
 		const probe = await page.evaluate(() => {
-			const raw = localStorage.getItem('jira-timesheet-user-data');
+			const raw = localStorage.getItem('hoursmith-userdata');
 			if (!raw) return { hasRaw: false } as const;
 			try {
 				const parsed = JSON.parse(raw) as {
@@ -209,7 +207,7 @@ test.describe('Email casing drift probe', () => {
 		// Inject a config with mixed-case email.
 		await page.evaluate(() => {
 			localStorage.setItem(
-				'jira-timesheet-config',
+				'hoursmith-config',
 				JSON.stringify({
 					state: {
 						config: {
@@ -433,7 +431,7 @@ test.describe('Browser back/forward', () => {
 		await page.goBack();
 		await page.goForward();
 		await page.waitForLoadState('networkidle');
-		await expect(page.getByText('Setup wizard')).toBeVisible();
+		await expect(page.getByText('Setup & readiness')).toBeVisible();
 	});
 });
 
