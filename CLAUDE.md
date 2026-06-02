@@ -1,37 +1,35 @@
-# Hoursmith — agent operating contract
+# Hoursmith — active work: Forge × Ledger redesign
 
-**Linear is the single source of truth for project state.** Any change in scope, status, design decision, or new work discovered must land in Linear *before this session ends*. If a change isn't in Linear, treat it as if it didn't happen — the next agent (or future-Bruno) won't see it.
+A full brand + UX redesign is being applied to this app. The complete spec,
+visual references, and production assets live in **`design_handoff_hoursmith/`**.
 
-## Required workflow
+## Start here
+Read `design_handoff_hoursmith/CLAUDE_CODE_PROMPT.md` (the phased plan) and
+`design_handoff_hoursmith/README.md` (the detailed spec) before making changes.
+The `*.html` files in that folder are **design references**, not code to copy —
+recreate them in this repo's stack (React 18 + react-router-dom + CSS Modules,
+themed via `frontend/react/styles/tokens.css`). Keep the browser-only / PWA
+architecture and all existing data flows intact.
 
-When you start work in this repo:
+## Work order — ONE phase per PR, stop for review between each
+1. **Tokens** — apply `design_handoff_hoursmith/tokens.forge.css` over the existing
+   token names in `tokens.css`. Low-risk, re-skins everything.
+2. **IA rename** — Dashboard → **My Week** (`/dashboard` → `/my-week` redirect);
+   keep **Reports** and fold `/team` + `/timesheet` into it as filters; rename
+   `TimesheetPage` → `ReportsPage`; delete the `TeamPage.tsx` stub.
+3. **Settings** — merge `SetupWizard` + `DiagnosticsPanel` into one readiness header,
+   add a left-rail section nav, persistent sticky save bar. **Reorganization only.**
+4. **Screens + logo** — My Week + Reports per `screens.html`; drop in the Billet H
+   SVGs from `design_handoff_hoursmith/billet-h/`.
 
-1. **Identify the active ticket.** Query Linear:
-   `project:"Jira Timesheet Report — Commercialization"` · `label:pre-go-live` · `state:Todo`.
-   If the user is asking for something not covered by an open ticket, **create the ticket before writing code**.
-2. **Move the ticket to `In Progress`** when you actually start coding.
-3. **Update the ticket description** whenever you make a decision that changes scope, approach, or acceptance criteria. Never let a decision live only in chat.
-4. **Move to `In Review`** when you open a PR; **`Done`** when it merges.
-5. **Capture discovered work** as new tickets with the right label and `blockedBy`/`blocks` relations — don't bury follow-ups in chat or code comments.
-
-When you stop work (end of session, or context switch):
-
-6. **Audit Linear before signing off.** Status of every touched ticket reflects reality. Any in-flight discovery is filed.
-7. **Move the next ticket to `Todo`** (the one that should be attacked next). The next session must be able to identify it from Linear state alone, not from chat history.
-
-## What does NOT live in Linear
-
-- **Durable reference data** (IDs, URLs, connection strings, environment refs, sandbox details) → `~/.claude/projects/-Users-brunocamarneiro-Projects-bcamarneiro-jira-timesheet-report/memory/`. See `MEMORY.md` for the index. *Examples worth keeping there: Supabase project refs, Polar sandbox org id, Edge Config id, custom domain ↔ branch mapping.*
-- **Code reasoning** → code comments / commit messages. Project state ≠ code state.
-
-If you catch yourself writing "TODO", "next:", or "remember to" in chat, code, or markdown — **stop and create a Linear ticket** (or update the relevant one) before continuing.
-
-## Project quick map
-
-- **Repo:** this directory. Branches `main` (production, deploys to `hoursmith.io`) + `staging` (release candidate, deploys to `https://staging.hoursmith.io`).
-- **Default PR target:** `staging`. Promote `staging → main` to release.
-- **Linear team:** Adamastor. **Project:** "Jira Timesheet Report — Commercialization".
-- **Pre-go-live label:** `pre-go-live` (red `#DC2626`). The next ticket to attack is the one with this label in state `Todo`.
-- **Active sub-projects:** see memory `monetization-gates` for the workstream map.
-
-See `MEMORY.md` (in the memory directory above) for curated reference memories: monetization gates summary, sandbox/staging IDs, pricing model, product brand.
+## Hard rules (do not violate)
+- **Settings keeps 100% field parity.** Every row of the parity ledger in
+  `design_handoff_hoursmith/README.md` (and `settings.html`) must still exist and
+  behave identically. No field, store binding, test handler, or helper string may
+  be removed or renamed — this is a layout/IA change, not a logic rewrite.
+- **Brand accent (ember `#c8431a`) is brand-only.** Never put it on the
+  green / amber / red worklog status ramp. Move the old indigo "overtime" state to
+  `--color-info` (teal-slate `#3f6b7d`).
+- **All hour/number figures** use the mono numeral font (JetBrains Mono), tabular.
+- Don't introduce a CSS framework or component library; match existing CSS Modules.
+- Run the test suite after each phase and fix any fallout before opening the PR.

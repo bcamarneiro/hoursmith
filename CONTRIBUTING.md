@@ -5,8 +5,8 @@ Thanks for your interest in contributing to Hoursmith! This guide will get you u
 ## Quick Start
 
 ```bash
-git clone https://github.com/bcamarneiro/jira-timesheet-report.git
-cd jira-timesheet-report
+git clone https://github.com/bcamarneiro/hoursmith.git
+cd hoursmith
 npm install
 npm run dev:offline   # runs with mock data, no Jira needed
 ```
@@ -136,6 +136,6 @@ npm run cors-proxy:socks
 
 ## Need Help?
 
-- Check existing [issues](https://github.com/bcamarneiro/jira-timesheet-report/issues) for context
+- Check existing [issues](https://github.com/bcamarneiro/hoursmith/issues) for context
 - See [ROADMAP.md](ROADMAP.md) for planned features
 - Open an issue if you're unsure about an approach before investing time

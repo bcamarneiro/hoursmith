@@ -1,10 +1,13 @@
 /**
  * Sign-up page for Hoursmith Premium.
  *
- * Email/password + GitHub OAuth. Redirects to `/account` on success.
- * Email confirmation is OFF for v1 (Supabase default); revisit when abuse appears.
+ * Email/password sign-up. When Supabase "Confirm email" is enabled, signUp
+ * returns no session and the user must confirm via the emailed link before they
+ * can sign in — we show a "check your inbox" state for that case instead of
+ * navigating to a half-authenticated /account (ADA-291). GitHub OAuth is hidden
+ * until it's wired (ADA-289 / ADA-309).
  *
- * Linear: ADA-256.
+ * Linear: ADA-256, ADA-291, ADA-309.
  */
 
 import { type FormEvent, useEffect, useState } from 'react';
@@ -20,32 +23,50 @@ export function SignUpPage(): JSX.Element {
 			document.title = previous;
 		};
 	}, []);
-	const { signUp, signInWithGitHub } = useAuth();
+	const { signUp } = useAuth();
 	const navigate = useNavigate();
 
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState<string | null>(null);
 	const [pending, setPending] = useState(false);
+	const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
 
 	async function handleSubmit(e: FormEvent): Promise<void> {
 		e.preventDefault();
 		setPending(true);
 		setError(null);
-		const { error: err } = await signUp(email, password);
+		const { error: err, needsEmailConfirmation } = await signUp(
+			email,
+			password,
+		);
 		setPending(false);
 		if (err) {
 			setError(err);
 			return;
 		}
+		if (needsEmailConfirmation) {
+			setAwaitingConfirmation(true);
+			return;
+		}
 		navigate('/account', { replace: true });
 	}
 
-	async function handleGitHub(): Promise<void> {
-		setError(null);
-		const callback = `${window.location.origin}/auth/callback?redirect=/account`;
-		const { error: err } = await signInWithGitHub(callback);
-		if (err) setError(err);
+	if (awaitingConfirmation) {
+		return (
+			<div className={styles.container}>
+				<div className={styles.card}>
+					<h1 className={styles.title}>Check your inbox</h1>
+					<p className={styles.subtitle}>
+						We sent a confirmation link to <strong>{email}</strong>. Click it to
+						activate your account, then sign in.
+					</p>
+					<p className={styles.footer}>
+						<Link to="/auth/sign-in">Back to sign in</Link>
+					</p>
+				</div>
+			</div>
+		);
 	}
 
 	return (
@@ -86,17 +107,15 @@ export function SignUpPage(): JSX.Element {
 							onChange={(e) => setPassword(e.target.value)}
 						/>
 					</div>
-					{error && <p className={styles.error}>{error}</p>}
+					{error && (
+						<p className={styles.error} role="alert">
+							{error}
+						</p>
+					)}
 					<button type="submit" className={styles.primary} disabled={pending}>
 						{pending ? 'Creating account…' : 'Create account'}
 					</button>
 				</form>
-
-				<div className={styles.divider}>or</div>
-
-				<button type="button" className={styles.oauth} onClick={handleGitHub}>
-					Continue with GitHub
-				</button>
 
 				<p className={styles.footer}>
 					Already have an account? <Link to="/auth/sign-in">Sign in</Link>

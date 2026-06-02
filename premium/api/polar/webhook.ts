@@ -45,6 +45,8 @@ type Outcome =
 	| 'ok'
 	| 'ignored_unknown_event'
 	| 'ignored_stale_event'
+	| 'ignored_duplicate_event'
+	| 'ignored_wrong_environment'
 	| 'missing_signature'
 	| 'invalid_signature'
 	| 'invalid_payload'
@@ -78,6 +80,25 @@ export interface PolarWebhookDeps {
 	) => Promise<boolean>;
 	/** Injectable secret (tests). Defaults to POLAR_WEBHOOK_SECRET. */
 	secret?: string;
+	/** Injectable env (tests). Defaults to `process.env` — for the env guard. */
+	env?: Partial<Record<string, string | undefined>>;
+}
+
+/**
+ * Environment guard (ADA-308). Polar's payload doesn't reliably expose the
+ * event environment, so we assert the deployment's configured `POLAR_SERVER`
+ * matches the deployment mode: a production deployment must talk to Polar
+ * production. A mismatch means a sandbox⇄prod cross-wire — we ignore the event
+ * rather than mutate live subscription state from the wrong environment.
+ */
+export function isWrongEnvironment(
+	env: Partial<Record<string, string | undefined>>,
+): boolean {
+	return (
+		env.VERCEL_ENV === 'production' &&
+		!!env.POLAR_SERVER &&
+		env.POLAR_SERVER !== 'production'
+	);
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -159,7 +180,36 @@ export async function handlePolarWebhook(
 		return jsonResponse(200, { received: true });
 	}
 
+	// Environment guard (ADA-308): reject a wrong-environment delivery before
+	// touching subscription state. 200 so Polar doesn't retry a misroute.
+	const env = deps.env ?? process.env;
+	if (isWrongEnvironment(env)) {
+		logWebhook({
+			eventType: event.type,
+			userId: null,
+			outcome: 'ignored_wrong_environment',
+			status: 200,
+		});
+		return jsonResponse(200, { received: true });
+	}
+
 	try {
+		// Idempotency guard (ADA-308): the Standard Webhooks `webhook-id` is the
+		// per-delivery key. A duplicate delivery is short-circuited so we don't
+		// re-run the upsert. (verifyPolarWebhook already required this header.)
+		const webhookId = request.headers.get('webhook-id');
+		if (webhookId) {
+			const isNew = await supabase.recordBillingEvent(webhookId);
+			if (!isNew) {
+				logWebhook({
+					eventType: event.type,
+					userId: null,
+					outcome: 'ignored_duplicate_event',
+					status: 200,
+				});
+				return jsonResponse(200, { received: true });
+			}
+		}
 		return await handleSubscription(event, supabase);
 	} catch (err) {
 		logWebhook({

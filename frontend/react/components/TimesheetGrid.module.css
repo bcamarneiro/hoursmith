@@ -42,4 +42,5 @@
 	font-weight: var(--font-bold);
 	color: var(--color-text);
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 }

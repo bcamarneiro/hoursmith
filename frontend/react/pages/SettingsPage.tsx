@@ -9,10 +9,10 @@ import {
 	buildJiraConnectionFingerprint,
 	useUIStore,
 } from '../../stores/useUIStore';
-import { DiagnosticsPanel } from '../components/settings/DiagnosticsPanel';
 import { SettingsForm } from '../components/settings/SettingsForm';
-import { SetupWizard } from '../components/settings/SetupWizard';
+import { SettingsReadinessHeader } from '../components/settings/SettingsReadinessHeader';
 import { toast } from '../components/ui/Toast';
+import { SETTINGS_SECTION_IDS } from '../constants/settingsSections';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { buildSettingsSetupModel } from '../utils/settingsSetup';
 import * as styles from './SettingsPage.module.css';
@@ -41,6 +41,10 @@ export const SettingsPage: React.FC = () => {
 	const [lastDiagnosticsSummary, setLastDiagnosticsSummary] = useState<
 		string | null
 	>(null);
+	const [activeSection, setActiveSection] = useState<string>(
+		SETTINGS_SECTION_IDS.connection,
+	);
+	const [readinessCollapsed, setReadinessCollapsed] = useState(false);
 
 	const isDirty = JSON.stringify(formData) !== JSON.stringify(savedConfig);
 	const canTestJira =
@@ -68,8 +72,11 @@ export const SettingsPage: React.FC = () => {
 		savedConnectionEvidenceAt,
 	);
 
-	const jumpToSection = (sectionId: string) => {
-		document.getElementById(sectionId)?.scrollIntoView({
+	// Selecting a readiness step/section activates that rail section in the form
+	// and scrolls it into view (replaces the old scroll-to-anchor behaviour).
+	const selectSection = (sectionId: string) => {
+		setActiveSection(sectionId);
+		document.getElementById(SETTINGS_SECTION_IDS.form)?.scrollIntoView({
 			behavior: 'smooth',
 			block: 'start',
 		});
@@ -121,80 +128,24 @@ export const SettingsPage: React.FC = () => {
 
 	return (
 		<div className={styles.container}>
-			<section className={styles.hero}>
-				<div className={styles.heroText}>
-					<p className={styles.kicker}>Setup and trust</p>
-					<h1>Connect Jira once. Keep the workspace trustworthy.</h1>
-					<p className={styles.lead}>
-						Use this page to connect Jira, run diagnostics, and save a setup
-						that makes Dashboard and Reports reliable for day-to-day use.
-					</p>
-					<p className={styles.helper}>
-						Start with Jira first and leave the proxy field blank on the first
-						attempt. Add a local proxy only if direct browser access is blocked.
-						Calendars, GitLab, and RescueTime can come later.
-					</p>
-				</div>
-				<div className={styles.heroChecklist}>
-					<div>
-						<strong>Core setup</strong>
-						<span>Connect Jira, run the check, and save a clean baseline.</span>
-					</div>
-					<div>
-						<strong>Access path</strong>
-						<span>
-							Try direct browser access first. Only add the local proxy if the
-							checks show your environment blocks Jira requests.
-						</span>
-					</div>
-					<div>
-						<strong>Optional signals</strong>
-						<span>
-							Add calendars, GitLab, or RescueTime when you want smarter
-							suggestions.
-						</span>
-					</div>
-					<div>
-						<strong>Trust signal</strong>
-						<span>
-							Diagnostics below show whether Dashboard and Reports are actually
-							ready to rely on.
-						</span>
-					</div>
-				</div>
-			</section>
+			<SettingsReadinessHeader
+				model={model}
+				canRunChecks={canRunChecks}
+				checksRunning={checksRunning}
+				lastRunAt={lastDiagnosticsRunAt}
+				lastRunSummary={lastDiagnosticsSummary}
+				canCollapse={model.status === 'ready'}
+				collapsed={readinessCollapsed}
+				onToggleCollapsed={() => setReadinessCollapsed((value) => !value)}
+				onSelectSection={selectSection}
+				onRunAvailableChecks={runAvailableChecks}
+			/>
 
-			<div className={styles.overviewGrid}>
-				<SetupWizard
-					model={model}
-					canRunChecks={canRunChecks}
-					checksRunning={checksRunning}
-					onJumpToSection={jumpToSection}
-					onRunAvailableChecks={runAvailableChecks}
-				/>
-				<DiagnosticsPanel
-					model={model}
-					canRunChecks={canRunChecks}
-					checksRunning={checksRunning}
-					lastRunAt={lastDiagnosticsRunAt}
-					lastRunSummary={lastDiagnosticsSummary}
-					onJumpToSection={jumpToSection}
-					onRunAvailableChecks={runAvailableChecks}
-				/>
-			</div>
-
-			<section className={styles.formSection}>
-				<div className={styles.formIntro}>
-					<div>
-						<h2>Configuration form</h2>
-						<p>
-							The wizard and diagnostics read from the same configuration below.
-							Update the fields here, then save once the setup looks right.
-						</p>
-					</div>
-				</div>
-				<SettingsForm />
-			</section>
+			<SettingsForm
+				setupModel={model}
+				activeSection={activeSection}
+				onSelectSection={setActiveSection}
+			/>
 		</div>
 	);
 };
