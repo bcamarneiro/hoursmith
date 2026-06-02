@@ -7,8 +7,10 @@
  *
  * NEVER expose the service-role key to the browser.
  *
- * Linear: ADA-263, ADA-264.
+ * Linear: ADA-263, ADA-264, ADA-343 (JWT verify via _lib/auth.ts).
  */
+
+import { userIdFromToken } from './auth.js';
 
 export interface ProfileRow {
 	id: string;
@@ -204,15 +206,18 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 	}
 
 	async getUserIdFromToken(token: string): Promise<string | null> {
-		const res = await fetch(`${this.url}/auth/v1/user`, {
-			headers: {
-				apikey: this.serviceRoleKey,
-				authorization: `Bearer ${token}`,
+		// Consolidated verify (ADA-343). This client backs the low-traffic,
+		// sensitive flows (checkout, billing portal, account subscription), so we
+		// require a live GoTrue check (`confirmWithServer`): a deleted user or
+		// revoked session must be rejected here, not accepted until token expiry.
+		// The hot proxy path uses entitlement.ts's local-first client instead.
+		return userIdFromToken(token, {
+			confirmWithServer: true,
+			env: {
+				SUPABASE_URL: this.url,
+				SUPABASE_SERVICE_ROLE_KEY: this.serviceRoleKey,
 			},
 		});
-		if (!res.ok) return null;
-		const body = (await res.json()) as { id?: string };
-		return body.id ?? null;
 	}
 
 	async insertIncompleteSubscription(input: {
