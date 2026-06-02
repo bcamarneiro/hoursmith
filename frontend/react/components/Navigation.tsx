@@ -16,8 +16,8 @@ export const Navigation: React.FC = () => {
 					<span className={styles.brand}>Hoursmith</span>
 				</Link>
 				<div className={styles.navLinks}>
-					<Link to="/dashboard" className={getLinkStyle('/dashboard')}>
-						Dashboard
+					<Link to="/my-week" className={getLinkStyle('/my-week')}>
+						My Week
 					</Link>
 					<Link to="/reports" className={getLinkStyle('/reports')}>
 						Reports

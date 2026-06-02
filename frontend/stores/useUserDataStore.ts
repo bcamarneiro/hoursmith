@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { migrateStorageKey } from './migrateStorageKeys';
 import { getPersistStorage } from './persistStorage';
 
 /**
@@ -262,6 +263,9 @@ function dedupeByCaseInsensitive<T>(
 	return result;
 }
 
+// Carry existing users' data across the jira-timesheet-report → hoursmith rename.
+migrateStorageKey('jira-timesheet-userdata', 'hoursmith-userdata');
+
 export const useUserDataStore = create<UserDataState>()(
 	persist(
 		(set) => ({
@@ -483,7 +487,7 @@ export const useUserDataStore = create<UserDataState>()(
 				})),
 		}),
 		{
-			name: 'jira-timesheet-userdata',
+			name: 'hoursmith-userdata',
 			storage: createJSONStorage(getPersistStorage),
 			version: USER_DATA_STORAGE_VERSION,
 			migrate: (persistedState, _version) => {

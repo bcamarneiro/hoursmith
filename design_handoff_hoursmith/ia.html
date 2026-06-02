@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hoursmith — Information Architecture</title>
+<link rel="stylesheet" href="assets/review.css" />
+<link rel="stylesheet" href="assets/ia.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <a class="mark" href="index.html">
+    <span class="glyph">H</span>
+    <span>Hoursmith&nbsp;<span class="sub">/ brand &amp; ux review</span></span>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">01 — Diagnosis</a>
+    <a class="active" href="ia.html">02 — Structure</a>
+    <a href="directions.html">03 — Directions</a>
+    <a href="screens.html">04 — Screens</a>
+    <a href="logo.html">05 — Logo</a>
+    <a href="settings.html">06 — Settings</a>
+  </nav>
+</header>
+
+<!-- ============ INTRO ============ -->
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Section 02 — Structure · Information Architecture</span>
+    <h2 style="margin-top:16px;max-width:20ch;">The app has three names for two screens.</h2>
+    <p class="muted" style="margin-top:18px;max-width:68ch;">You felt an incongruence between <em>Dashboard</em>, <em>Reports</em>, <em>my timesheet</em> and <em>my team's timesheet</em> — and you're right. It isn't a vibe; it's visible in the router. The vocabulary drifted across three iterations and never got reconciled. Here's exactly what's tangled, why, and the clean structure that resolves it.</p>
+  </div>
+</section>
+
+<!-- ============ EVIDENCE ============ -->
+<section style="padding-top:0;">
+  <div class="wrap">
+    <span class="section-num">2.1</span>
+    <h3 style="margin-top:8px;">What the router actually says</h3>
+    <p class="muted" style="margin-top:10px;">Straight from <code>App.tsx</code> and <code>Navigation.tsx</code>. The nav advertises three places — but four different names all resolve to a single screen, and that screen's component is named after a fifth.</p>
+    <div class="evidence">
+      <div class="ev-head">◆ Routing table · jira-timesheet-report</div>
+      <div class="ev-line"><span class="ev-route">Nav shows</span><span class="ev-arrow">→</span><span class="ev-target">Dashboard&nbsp;·&nbsp;Reports&nbsp;·&nbsp;Settings</span></div>
+      <div class="ev-line"><span class="ev-route">/dashboard</span><span class="ev-arrow">→</span><span class="ev-target">DashboardPage&nbsp;<span style="color:#6b6358">(title: "Dashboard")</span></span></div>
+      <div class="ev-line"><span class="ev-route">/reports</span><span class="ev-arrow">→</span><span class="ev-target">TimesheetPage&nbsp;<span style="color:#6b6358">(title: "Reports")</span></span><span class="ev-flag">⚠ component ≠ route ≠ title</span></div>
+      <div class="ev-line"><span class="ev-route">/team</span><span class="ev-arrow">→</span><span class="ev-target">Navigate to /reports</span><span class="ev-flag">⚠ redirect</span></div>
+      <div class="ev-line"><span class="ev-route">/timesheet</span><span class="ev-arrow">→</span><span class="ev-target">Navigate to /reports</span><span class="ev-flag">⚠ redirect</span></div>
+      <div class="ev-line"><span class="ev-route">TeamPage.tsx</span><span class="ev-arrow">→</span><span class="ev-target">returns &lt;Navigate to="/reports"&gt;</span><span class="ev-flag">⚠ orphan stub</span></div>
+      <p class="ev-note">One destination, five labels: <strong style="color:#e9e2d2">Reports</strong> (title) · <strong style="color:#e9e2d2">Timesheet</strong> (component) · <strong style="color:#e9e2d2">Team</strong> (route + stub) · <strong style="color:#e9e2d2">/timesheet</strong> · <strong style="color:#e9e2d2">/team</strong>. Nobody decided what to call it, so the codebase kept every option.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NOW / PROPOSED MAPS ============ -->
+<section style="padding-top:34px;">
+  <div class="wrap-wide">
+    <span class="section-num">2.2</span>
+    <h3 style="margin-top:8px;">The tangle, and the untangle</h3>
+    <p class="muted" style="margin-top:10px;max-width:70ch;">On the left, today: two screens that overlap in function while one of them collects names. On the right, the same capabilities sorted by a single rule.</p>
+    <div class="maps">
+      <!-- NOW -->
+      <div class="map bad">
+        <div class="map-head"><span class="mh-t">Now</span><span class="mh-tag">Tangled</span></div>
+        <div class="map-body">
+          <div class="navrow">
+            <span class="navchip">Dashboard</span>
+            <span class="navchip">Reports</span>
+            <span class="navchip">Settings</span>
+          </div>
+          <div class="node">
+            <div class="nd-title">Dashboard</div>
+            <div class="nd-scope">my week · personal</div>
+            <div class="nd-feats">
+              <span class="feat">week nav</span>
+              <span class="feat dupe">weekly view</span>
+              <span class="feat dupe">gap days</span>
+              <span class="feat dupe">CSV export</span>
+              <span class="feat">close assistant</span>
+            </div>
+          </div>
+          <div class="node">
+            <div class="nd-title">Reports</div>
+            <div class="nd-scope">team · personal · week · month</div>
+            <div class="nd-feats">
+              <span class="feat">week nav</span>
+              <span class="feat dupe">weekly view</span>
+              <span class="feat dupe">gap days</span>
+              <span class="feat dupe">CSV export</span>
+              <span class="feat">monthly</span>
+              <span class="feat">trends</span>
+              <span class="feat">presets</span>
+            </div>
+            <div class="namepile">
+              <span class="nametag comp">component: TimesheetPage</span>
+              <span class="nametag">/team</span>
+              <span class="nametag">/timesheet</span>
+              <span class="nametag">TeamPage stub</span>
+            </div>
+          </div>
+        </div>
+        <div class="map-foot">Two problems: the red chips are <strong style="color:var(--bad)">duplicated</strong> across both screens, and four extra names pile onto Reports. "Where do I go?" has no clean answer.</div>
+      </div>
+      <!-- PROPOSED -->
+      <div class="map good">
+        <div class="map-head"><span class="mh-t">Proposed</span><span class="mh-tag">By intent</span></div>
+        <div class="map-body">
+          <div class="navrow">
+            <span class="navchip lead">My Week</span>
+            <span class="navchip">Reports</span>
+            <span class="navchip">Settings</span>
+          </div>
+          <div class="node">
+            <div class="nd-title">My Week <span style="font-family:var(--mono);font-size:11px;font-weight:400;color:var(--accent)">· do</span></div>
+            <div class="nd-scope">close my current week</div>
+            <div class="nd-feats">
+              <span class="feat">this week</span>
+              <span class="feat">my gaps</span>
+              <span class="feat">fill &amp; close</span>
+              <span class="feat">export my week</span>
+            </div>
+          </div>
+          <div class="node">
+            <div class="nd-title">Reports <span style="font-family:var(--mono);font-size:11px;font-weight:400;color:var(--accent)">· review</span></div>
+            <div class="nd-scope">analyse any period × any people, export</div>
+            <div class="rail"><span class="rk">Period</span><span class="opts"><span class="opt on">Week</span><span class="opt">Month</span></span></div>
+            <div class="rail"><span class="rk">People</span><span class="opts"><span class="opt">Me</span><span class="opt">A person</span><span class="opt on">Team</span></span></div>
+            <div class="nd-feats" style="margin-top:13px;">
+              <span class="feat">trends</span>
+              <span class="feat">presets</span>
+              <span class="feat">consistency</span>
+              <span class="feat">export</span>
+            </div>
+          </div>
+        </div>
+        <div class="map-foot">Subject (me · a person · the team) becomes a <strong style="color:var(--good)">filter inside Reports</strong>, not a destination. Timesheet / Team / /timesheet all collapse into it.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ THE PRINCIPLE ============ -->
+<section style="padding-top:34px;">
+  <div class="wrap">
+    <span class="section-num">2.3</span>
+    <h3 style="margin-top:8px;">Why this is the right cut</h3>
+    <div class="principle">
+      <div class="pcell">
+        <div class="pk">The mistake</div>
+        <h3>Organised by subject</h3>
+        <p>The app named places after <em>whose</em> hours you're looking at — my timesheet, my team's timesheet, a team page. But "me vs team" is one toggle's worth of difference, not two destinations. So the same features got built twice and the names multiplied.</p>
+        <div class="axis"><span class="pole">my timesheet</span><span class="vs">vs</span><span class="pole">team timesheet</span></div>
+      </div>
+      <div class="pcell">
+        <div class="pk">The fix</div>
+        <h3>Organise by intent</h3>
+        <p>People arrive in one of two moods: <strong>"close my own week"</strong> or <strong>"review and export."</strong> That's the real fork. Make it the navigation. Then <em>whose</em> hours and <em>which</em> period are just filters on the review surface.</p>
+        <div class="axis"><span class="pole">close · do</span><span class="vs">vs</span><span class="pole">review · analyse</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NAMING TABLE ============ -->
+<section style="padding-top:34px;">
+  <div class="wrap">
+    <span class="section-num">2.4</span>
+    <h3 style="margin-top:8px;">Every name, reconciled</h3>
+    <p class="muted" style="margin-top:10px;">A one-line ruling for each term in play today — so there's no ambiguity when this hits the codebase.</p>
+    <table class="namtable">
+      <thead>
+        <tr><th style="width:24%">Today</th><th style="width:20%">Becomes</th><th style="width:14%">Verdict</th><th>Rationale</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="namtable-old">Dashboard</td>
+          <td class="namtable-new">My Week</td>
+          <td><span class="verdict-pill vp-rename">Rename</span></td>
+          <td>"Dashboard" is a generic catch-all. "My Week" names the scope (mine) and the job (this week) at a glance, and reads clearly against Reports.</td>
+        </tr>
+        <tr>
+          <td class="namtable-old">Reports <span style="color:var(--ink-3)">(route /reports)</span></td>
+          <td class="namtable-new">Reports</td>
+          <td><span class="verdict-pill vp-keep">Keep</span></td>
+          <td>The right word for the review-and-export surface. It just needs to absorb the other four names instead of hiding behind them.</td>
+        </tr>
+        <tr>
+          <td class="namtable-old">TimesheetPage <span style="color:var(--ink-3)">(component)</span></td>
+          <td class="namtable-new">ReportsPage</td>
+          <td><span class="verdict-pill vp-rename">Rename</span></td>
+          <td>Component name should match what it renders. The "timesheet" mental model is what started the drift — retire it from the code.</td>
+        </tr>
+        <tr>
+          <td class="namtable-old">/team&nbsp;·&nbsp;/timesheet</td>
+          <td class="namtable-new">→ /reports</td>
+          <td><span class="verdict-pill vp-merge">Merge</span></td>
+          <td>Keep as silent redirects so old links survive, but drop them from the vocabulary. They're aliases, not places.</td>
+        </tr>
+        <tr>
+          <td class="namtable-old">TeamPage.tsx</td>
+          <td class="namtable-new">—</td>
+          <td><span class="verdict-pill vp-retire">Delete</span></td>
+          <td>An orphan stub that only redirects. Dead weight that keeps "Team" alive as a phantom destination.</td>
+        </tr>
+        <tr>
+          <td class="namtable-old">"My team's timesheet"</td>
+          <td class="namtable-new">Reports · People: Team</td>
+          <td><span class="verdict-pill vp-merge">Merge</span></td>
+          <td>Not a screen — a filter state. Becomes the default People filter when you lead a team.</td>
+        </tr>
+        <tr>
+          <td class="namtable-old">"My timesheet"</td>
+          <td class="namtable-new">Reports · People: Me</td>
+          <td><span class="verdict-pill vp-merge">Merge</span></td>
+          <td>Same surface, People filter set to yourself. Solo users land here by default and never see an empty "Team".</td>
+        </tr>
+        <tr>
+          <td class="namtable-old">Weekly / Monthly toggle</td>
+          <td class="namtable-new">Reports · Period</td>
+          <td><span class="verdict-pill vp-keep">Keep</span></td>
+          <td>Stays as the Period filter — but only lives in Reports now, so "weekly" no longer means two different things in two places.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ DECISION TREE ============ -->
+<section style="padding-top:34px;">
+  <div class="wrap">
+    <span class="section-num">2.5</span>
+    <h3 style="margin-top:8px;">The test: "where do I go?"</h3>
+    <p class="muted" style="margin-top:10px;">A clean IA answers this instantly for every user. After the change, it does.</p>
+    <div class="decide">
+      <div class="dpath">
+        <div class="dq">"I forgot to log Thursday and it's Friday afternoon."</div>
+        <div class="darr">→ go to</div>
+        <div class="dgo">My Week</div>
+        <p>Your current week, your gaps, fill and close. The solo freelancer lives here and may never need anything else.</p>
+      </div>
+      <div class="dpath">
+        <div class="dq">"It's the 1st — I need the team's month as a CSV for the client."</div>
+        <div class="darr">→ go to</div>
+        <div class="dgo">Reports</div>
+        <p>Set Period&nbsp;=&nbsp;Month, People&nbsp;=&nbsp;Team, export. Trends, presets and the consistency check all live in this one surface.</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:24px;max-width:64ch;">This also fixes the <strong>solo-vs-agency</strong> tension: a solo freelancer sees <em>My Week</em> + a Reports view quietly defaulted to "Me," with no confusing empty "Team." An agency lead gets the same two doors, with Reports defaulting to the whole team. One structure, both audiences.</p>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<section class="pagefoot">
+  <div class="wrap">
+    <span class="eyebrow">Where this goes next</span>
+    <h2 style="margin-top:14px;max-width:18ch;">Structure settled. Now make it look forged.</h2>
+    <div class="nextlinks">
+      <a class="nextcard" href="index.html">
+        <div class="nl-k">Back to 01</div>
+        <h3>← The diagnosis</h3>
+        <p>The seven surface-level findings, including the brand and color issues.</p>
+      </a>
+      <a class="nextcard" href="directions.html">
+        <div class="nl-k">Section 03</div>
+        <h3>Three branding directions →</h3>
+        <p>With the structure clear, here's how it should feel: Forge, Ledger, Daylight.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

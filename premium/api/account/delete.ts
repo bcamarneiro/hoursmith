@@ -134,6 +134,23 @@ export async function handleDelete(
 		});
 	}
 
+	// Defense-in-depth (ADA-313): deleting auth.users already cascades the
+	// user's sessions in GoTrue, but we ALSO globally sign the token out so a
+	// JWT leaked before deletion (e.g. via third-party XSS) is rejected by
+	// Supabase REST immediately rather than living until natural expiry.
+	// Best-effort: the account is already gone and is the source of truth, so a
+	// revocation failure is logged but never turns a successful delete into a
+	// 500 or blocks the audit log below.
+	try {
+		await admin.signOutUser(token);
+	} catch (err) {
+		logEvent({
+			event: 'account_delete',
+			status: 0,
+			note: `global_signout_failed:${(err as Error).message}`,
+		});
+	}
+
 	try {
 		await logAuditEvent('account_deleted', stripeCustomerId, cancelMeta, admin);
 	} catch (err) {
