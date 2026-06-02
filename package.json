@@ -24,6 +24,7 @@
 		"format": "biome format . --write",
 		"check": "biome check --write --verbose .",
 		"check:premium-boundary": "node scripts/check-premium-boundary.cjs",
+		"gen:og": "node scripts/gen-og-image.cjs",
 		"cors-proxy": "node cors-proxy.js",
 		"cors-proxy:socks": "SOCKS_PROXY=socks5h://127.0.0.1:8080 node cors-proxy.js",
 		"prepare": "husky"
