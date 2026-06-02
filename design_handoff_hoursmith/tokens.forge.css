@@ -1,0 +1,84 @@
+/* ============================================================
+   Hoursmith — Forge × Ledger token override
+   Phase 1 of the redesign. Paste these values over the matching
+   tokens in frontend/react/styles/tokens.css, keeping the EXISTING
+   token NAMES so every component inherits the change.
+
+   Source of the names: the current tokens.css uses --color-primary
+   (#4f46e5), a slate surface ramp, and Inter. This file maps the
+   Forge identity + Ledger numerics onto those same names.
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+	/* ---- Brand (was indigo #4f46e5) → ember. Brand-only, OFF the status ramp ---- */
+	--color-primary: #c8431a; /* ember */
+	--color-primary-hover: #a8380f;
+	--color-primary-soft: #f0d9cd; /* tints / focus rings */
+	--color-on-primary: #fff5ee;
+
+	/* Optional spark accent for small highlights / loading motifs */
+	--color-spark: #ee6b2d;
+
+	/* ---- Surfaces (was slate) → warm iron + paper ---- */
+	--color-bg: #f4efe7; /* paper */
+	--color-surface: #fbf8f2; /* card */
+	--color-surface-raised: #ffffff;
+	--color-iron: #1c1714; /* dark hero / app-icon ground */
+
+	/* ---- Text (was slate-900/500) → warm ink ---- */
+	--color-text: #241d18;
+	--color-text-secondary: #574d43;
+	--color-text-tertiary: #938778;
+
+	/* ---- Lines / borders ---- */
+	--color-border: #e2d8c8;
+	--color-border-strong: #cabda7;
+
+	/* ============================================================
+     SEMANTIC STATUS — keep these meaningful and SEPARATE from brand.
+     "Overtime" must stop being indigo (it collided with the primary).
+     Use the spark/ember only for brand, never for a data state.
+     ============================================================ */
+	--color-success: #4d7c3a;
+	--color-success-bg: #eef3e6; /* complete */
+	--color-warning: #b07d18;
+	--color-warning-bg: #f7efda; /* incomplete */
+	--color-danger: #b23a2e;
+	--color-danger-bg: #f6e4df; /* missing / weekend */
+	--color-info: #3f6b7d;
+	--color-info-bg: #e3edf1; /* overtime — was indigo, now teal-slate */
+
+	/* ---- Typography ---- */
+	--font-display:
+		"Bricolage Grotesque", system-ui, sans-serif; /* headings, numbers-as-display */
+	--font-sans: "Hanken Grotesk", system-ui, sans-serif; /* body */
+	--font-mono:
+		"JetBrains Mono", ui-monospace, monospace; /* ALL hour/number figures, tabular */
+}
+
+/* Dark mode: the repo already flips tokens under a dark scope — mirror these.
+   Adjust to match the existing dark-theme selector (e.g. [data-theme="dark"]). */
+[data-theme="dark"] {
+	--color-bg: #161210;
+	--color-surface: #211b16;
+	--color-surface-raised: #2a221c;
+	--color-text: #f4efe7;
+	--color-text-secondary: #c4b6a5;
+	--color-text-tertiary: #938778;
+	--color-border: #34291f;
+	--color-border-strong: #4a3b2c;
+	--color-primary: #ee6b2d; /* lift ember to spark on dark for contrast */
+	--color-primary-hover: #f4843f;
+	--color-on-primary: #1c1714;
+}
+
+/* Make every numeral tabular + mono wherever hours are shown.
+   Apply via a utility class the components already use, or add one: */
+.num,
+[data-num] {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+}

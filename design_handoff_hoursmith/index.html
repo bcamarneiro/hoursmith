@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hoursmith — Brand & UX Review</title>
+<link rel="stylesheet" href="assets/review.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <a class="mark" href="index.html">
+    <span class="glyph">H</span>
+    <span>Hoursmith&nbsp;<span class="sub">/ brand &amp; ux review</span></span>
+  </a>
+  <nav class="topnav">
+    <a class="active" href="index.html">01 — Diagnosis</a>
+    <a href="ia.html">02 — Structure</a>
+    <a href="directions.html">03 — Directions</a>
+    <a href="screens.html">04 — Screens</a>
+    <a href="logo.html">05 — Logo</a>
+    <a href="settings.html">06 — Settings</a>
+  </nav>
+</header>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <div class="wrap">
+    <div class="cover-grid">
+      <div>
+        <span class="eyebrow">Design review · prepared for Bruno</span>
+        <h1>The product has<br />a point of view.<br />The portal doesn't<br />show it yet.</h1>
+        <p class="lead">A UX &amp; brand review of Hoursmith — what's working, what reads as a default Claude Code build, and three directions to make it feel forged, not generated.</p>
+      </div>
+      <div class="cover-meta">
+        <div class="row"><span class="k">Subject</span><span class="v">hoursmith.io</span></div>
+        <div class="row"><span class="k">Scope</span><span class="v">UX critique · brand · screens</span></div>
+        <div class="row"><span class="k">Reviewed</span><span class="v">Home · Dashboard · Reports<br />Pricing · Settings</span></div>
+        <div class="row"><span class="k">Stack seen</span><span class="v">Inter · #4f46e5 · slate</span></div>
+        <div class="row"><span class="k">Date</span><span class="v">May 2026</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VERDICT ============ -->
+<div class="wrap">
+  <div class="verdict">
+    <div>
+      <div class="v-eyebrow">◆ The good</div>
+      <h4>Real craft underneath</h4>
+      <p>Two clear surfaces, a thoughtful token system, dark mode, PWA, an honest founder story. The information architecture is sound. This is not a weekend project.</p>
+    </div>
+    <div>
+      <div class="v-eyebrow">◆ The problem</div>
+      <h4>It looks auto-generated</h4>
+      <p>Inter, indigo <span style="font-family:var(--mono);color:#a8b4ff">#4f46e5</span>, slate grays and 135° gradients are the default palette of every AI-scaffolded SaaS. The brand is invisible.</p>
+    </div>
+    <div>
+      <div class="v-eyebrow">◆ The opportunity</div>
+      <h4>The name is the brand</h4>
+      <p>"Hour<strong style="color:#fff">smith</strong>" already promises craft, forging, precision tooling. Nothing on screen earns that word. That gap is the entire brief.</p>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <span class="eyebrow">Section 01 — Diagnosis</span>
+    <h2 style="margin-top:16px;max-width:18ch;">Seven things a sharp visitor notices in ten seconds.</h2>
+    <p class="muted" style="margin-top:18px;">Every point below is pulled from the live code, not a vibe. References are to real tokens and components in the repo.</p>
+
+    <!-- F1 -->
+    <div class="finding">
+      <div class="fnum">01</div>
+      <div>
+        <span class="tag brand">Brand · identity</span>
+        <h3>The palette belongs to everyone, so it belongs to no one.</h3>
+        <div class="body">
+          <p>The primary is <span class="chip"><span class="sw" style="background:#4f46e5"></span>#4f46e5</span> — Tailwind's <code>indigo-600</code>, the single most-used accent in AI-generated SaaS. Surfaces are the stock slate ramp (<span class="chip"><span class="sw" style="background:#f8fafc;"></span>#f8fafc</span> <span class="chip"><span class="sw" style="background:#0f172a"></span>#0f172a</span> <span class="chip"><span class="sw" style="background:#64748b"></span>#64748b</span>), and nearly every surface — hero, day cells, cards — wears a <code>135deg</code> linear-gradient. None of it is wrong. All of it is anonymous.</p>
+          <p>Below is a faithful recreation of today's home hero using the exact tokens from <code>tokens.css</code>. Notice how it could be any tool.</p>
+        </div>
+        <div class="cols-2">
+          <div class="beforeafter is-before">
+            <div class="ba-head"><span>● Now — recreated from tokens.css</span><span>default-stack</span></div>
+            <div class="ba-body" style="padding:0;">
+              <div class="now">
+                <div class="now-nav">
+                  <div class="now-brand">Hoursmith</div>
+                  <div class="now-links"><a class="on">Dashboard</a><a>Reports</a><a>Settings</a></div>
+                </div>
+                <div class="now-hero">
+                  <span class="now-eyebrow">For team leads who live in Jira</span>
+                  <div class="now-h1">Chase your team's missing Jira worklogs before invoice day.</div>
+                  <div class="now-p">A team-lead's dashboard that pulls everyone's logged hours into one view.</div>
+                  <div class="now-btns"><span class="now-btn">Try the demo</span><span class="now-btn sec">See pricing</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="beforeafter is-after">
+            <div class="ba-head"><span>● The tell</span><span>why it reads as AI</span></div>
+            <div class="ba-body">
+              <div class="stack-sm" style="gap:14px;">
+                <div><strong>Indigo + slate + Inter</strong><br /><span class="muted" style="font-size:14px;">The exact trio scaffolding tools emit by default. Recognisable on sight.</span></div>
+                <div><strong>Gradient surfaces</strong><br /><span class="muted" style="font-size:14px;">A 135° gradient on the hero <em>and</em> day cells <em>and</em> adoption cards. Gradients as decoration, not meaning.</span></div>
+                <div><strong>Pill eyebrow + 3-up cards</strong><br /><span class="muted" style="font-size:14px;">The uppercase pill badge and three-column feature grid are the most-templated landing pattern in existence.</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- F2 -->
+    <div class="finding">
+      <div class="fnum">02</div>
+      <div>
+        <span class="tag brand">Brand · meaning</span>
+        <h3>The name does heavy lifting the design ignores.</h3>
+        <div class="body">
+          <p><strong>Hoursmith.</strong> Hour + smith — a craftsperson who forges raw material into something finished and accountable. That's <em>exactly</em> what the product does: it takes messy, scattered Jira worklogs and turns them into clean, invoice-ready hours. It's a fantastic name.</p>
+          <p>But the logo is a generic rounded-app-icon — an indigo square with document lines and a small amber clock — that encodes neither hours nor smithing. It would sit unnoticed among a thousand PWA icons. The metaphor is sitting right there, unused.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- F3 -->
+    <div class="finding">
+      <div class="fnum">03</div>
+      <div>
+        <span class="tag ux">UX · narrative</span>
+        <h3>The best asset on the site is buried under three card grids.</h3>
+        <div class="body">
+          <p>The "Why this exists" block — Bruno, a small team in Porto, every Friday at 4pm scanning the week, dreading invoice day — is the most convincing thing on the page. It's specific, human, and earns trust instantly. <strong>It's the reason someone buys.</strong></p>
+          <p>Yet it sits <em>below</em> the fold, after the hero, and is followed by three generic three-up grids ("Two clear surfaces", "Why teams roll this out quickly", "Install it like an app") that say little and look templated. The emotional hook is treated as a footnote; the filler is treated as the headline.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- F4 -->
+    <div class="finding">
+      <div class="fnum">04</div>
+      <div>
+        <span class="tag craft">Craft · color logic</span>
+        <h3>The brand color and the status colors are fighting.</h3>
+        <div class="body">
+          <p>Here the colors carry real meaning: <span class="chip"><span class="sw" style="background:#16a34a"></span>complete</span>, <span class="chip"><span class="sw" style="background:#d97706"></span>incomplete</span>, <span class="chip"><span class="sw" style="background:#a5b4fc"></span>overtime</span>, <span class="chip"><span class="sw" style="background:#fca5a5"></span>weekend</span>. But "overtime" is indigo — the <em>same</em> hue as the primary brand and every button. So a meaningful data state and "this is a link" read as the same thing.</p>
+          <p>When semantic color is this load-bearing, the brand accent must step <em>off</em> the green→amber→red→indigo ramp entirely. Right now it sits on top of it.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- F5 -->
+    <div class="finding">
+      <div class="fnum">05</div>
+      <div>
+        <span class="tag ux">UX · hierarchy</span>
+        <h3>The dashboard toolbar is six equal buttons with no main action.</h3>
+        <div class="body">
+          <p>The dashboard's job is closing the week. But the toolbar is <code>Pinned · Templates · Copy Prev Week · Export MD · Export CSV · ?</code> — six <code>variant="secondary"</code> buttons of identical weight, plus the week navigator and a status bar. The one thing a lead came to do — fill the gaps and close — has no visual priority over a markdown export.</p>
+          <p>This is a flat-hierarchy problem, not a missing-feature problem. A "Weekly Close Assistant" component already exists in the code; the layout just doesn't let it lead.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- F6 -->
+    <div class="finding">
+      <div class="fnum">06</div>
+      <div>
+        <span class="tag craft">Craft · typography</span>
+        <h3>Hours are the whole product, but numbers get no typographic respect.</h3>
+        <div class="body">
+          <p>Body text is <code>0.875rem</code> (14px) Inter throughout, and the hour figures — <code>8h</code>, <code>0h</code>, <code>40h / 40h</code> — render in that same body face at body size. For a product whose entire reason to exist is making numbers trustworthy and scannable, the numerals deserve their own treatment: a confident display or mono face, tabular alignment, real scale. Right now they whisper.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- F7 -->
+    <div class="finding">
+      <div class="fnum">07</div>
+      <div>
+        <span class="tag ux">UX · trust</span>
+        <h3>The trust story is the moat — and it's under-dramatized.</h3>
+        <div class="body">
+          <p>"Browser-only. Your credentials only ever go to Jira. No backend." This is a genuine, rare differentiator for a security-conscious buyer — and it's delivered as one quiet line. For an enterprise / agency audience, this deserves to be a visible, designed promise (a lockup, a diagram, a repeated motif), not a sentence that scrolls by.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider" />
+
+<section class="pagefoot">
+  <div class="wrap">
+    <span class="eyebrow">Where this goes next</span>
+    <h2 style="margin-top:14px;max-width:16ch;">Diagnosis done. Here's the prescription.</h2>
+    <div class="nextlinks">
+      <a class="nextcard" href="ia.html">
+        <div class="nl-k">Section 02</div>
+        <h3>Fix the structure first →</h3>
+        <p>The Dashboard / Reports / Timesheet / Team naming tangle — mapped from the router, with a clean information architecture.</p>
+      </a>
+      <a class="nextcard" href="directions.html">
+        <div class="nl-k">Section 03</div>
+        <h3>Three branding directions →</h3>
+        <p>Forge, Ledger, and Daylight — each a complete system: logo, palette, type, voice. Built to be mixed and matched.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
