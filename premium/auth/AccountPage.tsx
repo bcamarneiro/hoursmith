@@ -23,6 +23,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PremiumWaitlistForm } from '../../frontend/react/components/marketing/PremiumWaitlistForm';
+import { useFlags } from '../../frontend/react/hooks/useFlags';
 import * as styles from './AccountPage.module.css';
 import { getSupabase } from './supabaseClient';
 import { useAuth } from './useAuth';
@@ -86,6 +88,9 @@ export function AccountPage(): JSX.Element {
 		};
 	}, []);
 	const { user, session, signOut } = useAuth();
+	// Operational flags (ADA-341), personalised via the session token so an
+	// allowlisted user during closed launch still sees the real upgrade button.
+	const flags = useFlags(session?.access_token);
 	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const intendedTier = useMemo<'hosted' | 'lead' | null>(() => {
@@ -158,6 +163,8 @@ export function AccountPage(): JSX.Element {
 		if (!user || loadingSub) return;
 		if (subscription?.tier === 'premium' && subscription?.status === 'active')
 			return;
+		// Don't auto-fire a checkout the operational gate would reject (ADA-341).
+		if (!flags.checkoutEnabled || !flags.paywallOpenForMe) return;
 		setAutoUpgradeFired(true);
 		const next = new URLSearchParams(searchParams);
 		next.delete('upgrade');
@@ -172,6 +179,8 @@ export function AccountPage(): JSX.Element {
 		searchParams,
 		setSearchParams,
 		handleUpgrade,
+		flags.checkoutEnabled,
+		flags.paywallOpenForMe,
 	]);
 
 	const handleExport = useCallback(async () => {
@@ -304,36 +313,50 @@ export function AccountPage(): JSX.Element {
 						)}
 
 						<div className={styles.actions}>
-							{(!status || status === 'incomplete' || tier === 'free') && (
-								<button
-									type="button"
-									className={styles.primary}
-									onClick={() =>
-										handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
-									}
-									disabled={actionPending === 'checkout'}
-								>
-									{actionPending === 'checkout'
-										? 'Redirecting…'
-										: `Upgrade to ${
-												UPGRADE_TIER_LABELS[
-													intendedTier ?? DEFAULT_UPGRADE_TIER
-												]
-											}`}
-								</button>
-							)}
-							{status === 'canceled' && (
-								<button
-									type="button"
-									className={styles.primary}
-									onClick={() =>
-										handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
-									}
-									disabled={actionPending === 'checkout'}
-								>
-									Resubscribe
-								</button>
-							)}
+							{(!status || status === 'incomplete' || tier === 'free') &&
+								(!flags.checkoutEnabled ? (
+									<p className={styles.note}>
+										Checkout is temporarily unavailable.
+									</p>
+								) : !flags.paywallOpenForMe ? (
+									<PremiumWaitlistForm source="in-app-settings" />
+								) : (
+									<button
+										type="button"
+										className={styles.primary}
+										onClick={() =>
+											handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
+										}
+										disabled={actionPending === 'checkout'}
+									>
+										{actionPending === 'checkout'
+											? 'Redirecting…'
+											: `Upgrade to ${
+													UPGRADE_TIER_LABELS[
+														intendedTier ?? DEFAULT_UPGRADE_TIER
+													]
+												}`}
+									</button>
+								))}
+							{status === 'canceled' &&
+								(!flags.checkoutEnabled ? (
+									<p className={styles.note}>
+										Checkout is temporarily unavailable.
+									</p>
+								) : !flags.paywallOpenForMe ? (
+									<PremiumWaitlistForm source="in-app-settings" />
+								) : (
+									<button
+										type="button"
+										className={styles.primary}
+										onClick={() =>
+											handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
+										}
+										disabled={actionPending === 'checkout'}
+									>
+										Resubscribe
+									</button>
+								))}
 							{(status === 'active' ||
 								status === 'past_due' ||
 								status === 'trialing' ||

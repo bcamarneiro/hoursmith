@@ -27,8 +27,8 @@ The paid tiers are not launched yet. You can register interest on the [pricing p
 Requirements: Node.js 18+ and a Jira Cloud account with an API token.
 
 ```bash
-git clone https://github.com/bcamarneiro/jira-timesheet-report.git
-cd jira-timesheet-report
+git clone https://github.com/bcamarneiro/hoursmith.git
+cd hoursmith
 npm install
 npm run dev
 ```
@@ -70,7 +70,7 @@ The boundary is enforced in CI via `npm run check:premium-boundary`. If you only
 
 The repo uses two long-lived branches:
 
-- **`staging`** — default branch. PRs merge here. Auto-deploys to a Vercel preview at `jira-timesheet-report-git-staging-bruno-camarneiros-projects.vercel.app` (or a stable `staging.hoursmith.io` once the domain is wired). The `e2e-sandbox` workflow runs against this URL after merge.
+- **`staging`** — default branch. PRs merge here. Auto-deploys to a Vercel preview at `hoursmith-git-staging-bruno-camarneiros-projects.vercel.app` (or a stable `staging.hoursmith.io` once the domain is wired). The `e2e-sandbox` workflow runs against this URL after merge.
 - **`main`** — production. Receives merges only from `staging`. Auto-deploys to `hoursmith.io`.
 
 ### Cutting a release

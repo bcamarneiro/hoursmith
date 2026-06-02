@@ -1,5 +1,8 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import type { PublicFlags } from '../../services/flagsService';
+import { PremiumWaitlistForm } from '../components/marketing/PremiumWaitlistForm';
+import { useFlags } from '../hooks/useFlags';
 import { usePageTitle } from '../hooks/usePageTitle';
 import * as styles from './PricingPage.module.css';
 
@@ -46,8 +49,38 @@ const LEAD_V2_ROADMAP = [
 
 const TRUST_LINE = 'Cancel anytime · EU VAT handled · Powered by Polar';
 
+/**
+ * Paid-tier CTA, gated by the operational flags (ADA-341):
+ *   - checkout disabled → an inline "temporarily unavailable" note
+ *   - paywall not open for me → the waitlist embed ("Coming soon")
+ *   - open → the real checkout CTA (routes to /account → Polar)
+ */
+const PaidCta: React.FC<{
+	flags: PublicFlags;
+	href: string;
+	label: string;
+}> = ({ flags, href, label }) => {
+	if (!flags.checkoutEnabled) {
+		return (
+			<p className={styles.trustLine}>Checkout is temporarily unavailable.</p>
+		);
+	}
+	if (!flags.paywallOpenForMe) {
+		return <PremiumWaitlistForm source="pricing" />;
+	}
+	return (
+		<>
+			<a href={href} className={styles.primaryCta}>
+				{label}
+			</a>
+			<p className={styles.trustLine}>{TRUST_LINE}</p>
+		</>
+	);
+};
+
 export const PricingPage: React.FC = () => {
 	usePageTitle('Pricing');
+	const flags = useFlags();
 
 	return (
 		<div className={styles.page}>
@@ -123,10 +156,11 @@ export const PricingPage: React.FC = () => {
 						))}
 					</ul>
 					<div className={styles.ctaSlot}>
-						<a href="/account?upgrade=hosted" className={styles.primaryCta}>
-							Get Hosted — €29/year
-						</a>
-						<p className={styles.trustLine}>{TRUST_LINE}</p>
+						<PaidCta
+							flags={flags}
+							href="/account?upgrade=hosted"
+							label="Get Hosted — €29/year"
+						/>
 					</div>
 				</article>
 
@@ -166,10 +200,11 @@ export const PricingPage: React.FC = () => {
 						))}
 					</ul>
 					<div className={styles.ctaSlot}>
-						<a href="/account?upgrade=lead" className={styles.primaryCta}>
-							Get Lead — €60/year (founding)
-						</a>
-						<p className={styles.trustLine}>{TRUST_LINE}</p>
+						<PaidCta
+							flags={flags}
+							href="/account?upgrade=lead"
+							label="Get Lead — €60/year (founding)"
+						/>
 					</div>
 				</article>
 			</section>

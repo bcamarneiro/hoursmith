@@ -9,10 +9,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseAdminClient } from '../../_lib/supabaseAdmin';
 import { handlePolarWebhook } from '../webhook';
 
-function makeRequest(rawBody: string, method = 'POST'): Request {
+function makeRequest(
+	rawBody: string,
+	method = 'POST',
+	headers: Record<string, string> = {},
+): Request {
 	return new Request('https://hoursmith.io/api/polar/webhook', {
 		method,
-		headers: { 'content-type': 'application/json' },
+		headers: {
+			'content-type': 'application/json',
+			// Default delivery id so the dedup guard has a key (ADA-308). Override
+			// per-test to simulate replays of the same delivery.
+			'webhook-id': 'evt_default',
+			...headers,
+		},
 		body: method === 'POST' ? rawBody : undefined,
 	});
 }
@@ -24,6 +34,8 @@ function makeSupabase(
 		upsertSubscription: vi.fn().mockResolvedValue(undefined),
 		getSubscription: vi.fn().mockResolvedValue(null),
 		getSubscriptionByCustomerId: vi.fn().mockResolvedValue(null),
+		// Default: every delivery id is new (not a duplicate).
+		recordBillingEvent: vi.fn().mockResolvedValue(true),
 		...overrides,
 	} as unknown as SupabaseAdminClient;
 }
@@ -197,6 +209,64 @@ describe('handlePolarWebhook', () => {
 		);
 		expect(res.status).toBe(200);
 		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('records the delivery id and processes a first-seen event (ADA-308)', async () => {
+		const supabase = makeSupabase();
+		const res = await handlePolarWebhook(
+			makeRequest(event('subscription.active', ACTIVE), 'POST', {
+				'webhook-id': 'evt_111',
+			}),
+			{ supabase, verify: accept, secret: SECRET },
+		);
+		expect(res.status).toBe(200);
+		expect(supabase.recordBillingEvent).toHaveBeenCalledWith('evt_111');
+		expect(supabase.upsertSubscription).toHaveBeenCalled();
+	});
+
+	it('ignores a duplicate delivery without re-upserting (ADA-308)', async () => {
+		const supabase = makeSupabase({
+			recordBillingEvent: vi.fn().mockResolvedValue(false),
+		});
+		const res = await handlePolarWebhook(
+			makeRequest(event('subscription.active', ACTIVE), 'POST', {
+				'webhook-id': 'evt_dup',
+			}),
+			{ supabase, verify: accept, secret: SECRET },
+		);
+		expect(res.status).toBe(200);
+		expect(supabase.recordBillingEvent).toHaveBeenCalledWith('evt_dup');
+		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('rejects a wrong-environment event before any write (ADA-308)', async () => {
+		const supabase = makeSupabase();
+		const res = await handlePolarWebhook(
+			makeRequest(event('subscription.active', ACTIVE)),
+			{
+				supabase,
+				verify: accept,
+				secret: SECRET,
+				env: { VERCEL_ENV: 'production', POLAR_SERVER: 'sandbox' },
+			},
+		);
+		expect(res.status).toBe(200);
+		expect(supabase.recordBillingEvent).not.toHaveBeenCalled();
+		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('processes normally when the environment matches (ADA-308)', async () => {
+		const supabase = makeSupabase();
+		await handlePolarWebhook(
+			makeRequest(event('subscription.active', ACTIVE)),
+			{
+				supabase,
+				verify: accept,
+				secret: SECRET,
+				env: { VERCEL_ENV: 'production', POLAR_SERVER: 'production' },
+			},
+		);
+		expect(supabase.upsertSubscription).toHaveBeenCalled();
 	});
 
 	it('ignores a stale event (older than the stored row)', async () => {

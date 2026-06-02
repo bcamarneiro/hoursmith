@@ -6,7 +6,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { buildDemoTeam, DEMO_WEEKDAYS } from './demoFixture';
 import * as styles from './HomePage.module.css';
 
-const GITHUB_URL = 'https://github.com/bcamarneiro/jira-timesheet-report';
+const GITHUB_URL = 'https://github.com/bcamarneiro/hoursmith';
 const DAY_INITIALS = ['M', 'T', 'W', 'T', 'F'];
 
 // First name only — keeps the hero preview compact and scannable.
@@ -87,8 +87,8 @@ export const HomePage: React.FC = () => {
 					<div className={styles.buttonContainer}>
 						{isConfigured ? (
 							<>
-								<Link to="/dashboard" className={styles.primaryButton}>
-									Open Dashboard
+								<Link to="/my-week" className={styles.primaryButton}>
+									Open My Week
 								</Link>
 								<Link to="/pricing" className={styles.secondaryButton}>
 									See pricing
@@ -112,7 +112,7 @@ export const HomePage: React.FC = () => {
 
 					<div className={styles.tertiaryLinks}>
 						{!isConfigured && (
-							<Link to="/dashboard" className={styles.tertiaryLink}>
+							<Link to="/my-week" className={styles.tertiaryLink}>
 								Open the app
 							</Link>
 						)}
@@ -147,13 +147,13 @@ export const HomePage: React.FC = () => {
 				<div className={styles.sectionHeading}>
 					<h2 className={styles.sectionTitle}>Two clear surfaces</h2>
 					<p className={styles.sectionDescription}>
-						Dashboard is your personal home base for closing the week; Reports
-						is the shared surface for team compliance and month-end exports.
+						My Week is your personal home base for closing the week; Reports is
+						the shared surface for team compliance and month-end exports.
 					</p>
 				</div>
 				<div className={styles.featureGrid}>
 					<div className={styles.featureItem}>
-						<div className={styles.featureTitle}>Dashboard</div>
+						<div className={styles.featureTitle}>My Week</div>
 						<div className={styles.featureDescription}>
 							Weekly gap triage, copy-previous-week flows, suggestions,
 							templates, pins, notes, and quick exports.
@@ -208,7 +208,7 @@ export const HomePage: React.FC = () => {
 							Trust comes from consistency
 						</div>
 						<div className={styles.adoptionDescription}>
-							Dashboard and Reports keep matching on real data, not just looking
+							My Week and Reports keep matching on real data, not just looking
 							polished in isolation.
 						</div>
 					</div>
@@ -249,7 +249,7 @@ export const HomePage: React.FC = () => {
 						<li className={styles.step}>
 							<span className={styles.stepNumber}>3</span>
 							<span className={styles.stepText}>
-								Use Dashboard for the weekly close and Reports for team/month
+								Use My Week for the weekly close and Reports for team/month
 								visibility
 							</span>
 						</li>
@@ -264,8 +264,8 @@ export const HomePage: React.FC = () => {
 						<li className={styles.step}>
 							<span className={styles.stepNumber}>1</span>
 							<span className={styles.stepText}>
-								Open <Link to="/dashboard">Dashboard</Link> to close the week,
-								fill gaps, and reuse prior work
+								Open <Link to="/my-week">My Week</Link> to close the week, fill
+								gaps, and reuse prior work
 							</span>
 						</li>
 						<li className={styles.step}>
