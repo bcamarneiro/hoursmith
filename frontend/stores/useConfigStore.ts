@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { migrateStorageKey } from './migrateStorageKeys';
 import { getPersistStorage } from './persistStorage';
 
 export interface CalendarFeed {
@@ -309,6 +310,9 @@ export function migratePersistedConfigState(
 	return { config: normalizeConfig(legacyConfig) };
 }
 
+// Carry existing users' data across the jira-timesheet-report → hoursmith rename.
+migrateStorageKey('jira-timesheet-config', 'hoursmith-config');
+
 export const useConfigStore = create<ConfigState>()(
 	persist(
 		(set) => ({
@@ -316,7 +320,7 @@ export const useConfigStore = create<ConfigState>()(
 			setConfig: (newConfig) => set({ config: normalizeConfig(newConfig) }),
 		}),
 		{
-			name: 'jira-timesheet-config',
+			name: 'hoursmith-config',
 			storage: createJSONStorage(getPersistStorage),
 			version: CONFIG_STORAGE_VERSION,
 			migrate: (persistedState, version) =>

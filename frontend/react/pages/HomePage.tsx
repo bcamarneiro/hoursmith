@@ -6,7 +6,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { buildDemoTeam, DEMO_WEEKDAYS } from './demoFixture';
 import * as styles from './HomePage.module.css';
 
-const GITHUB_URL = 'https://github.com/bcamarneiro/jira-timesheet-report';
+const GITHUB_URL = 'https://github.com/bcamarneiro/hoursmith';
 const DAY_INITIALS = ['M', 'T', 'W', 'T', 'F'];
 
 // First name only — keeps the hero preview compact and scannable.
