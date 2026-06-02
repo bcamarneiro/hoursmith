@@ -30,7 +30,7 @@ test.describe('Smoke rollout paths', () => {
 		await expect(page.getByText('Setup & readiness')).toBeVisible();
 
 		const downloadPromise = page.waitForEvent('download');
-		await page.getByRole('button', { name: 'Backup' }).click();
+		await page.getByRole('button', { name: 'Backup', exact: true }).click();
 		const download = await downloadPromise;
 		expect(download.suggestedFilename()).toBe('jira-timesheet-settings.json');
 	});
