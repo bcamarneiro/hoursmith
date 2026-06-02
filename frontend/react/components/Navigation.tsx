@@ -9,7 +9,7 @@ import * as styles from './Navigation.module.css';
  * (ADA-299).
  */
 const NAV_ITEMS: ReadonlyArray<{ to: string; label: string }> = [
-	{ to: '/dashboard', label: 'Dashboard' },
+	{ to: '/my-week', label: 'My Week' },
 	{ to: '/reports', label: 'Reports' },
 	{ to: '/pricing', label: 'Pricing' },
 	{ to: '/settings', label: 'Settings' },

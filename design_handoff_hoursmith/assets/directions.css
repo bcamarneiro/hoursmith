@@ -1,0 +1,635 @@
+/* ============================================================
+   Hoursmith — Branding Directions
+   Three self-contained systems. Each .dir.* wrapper redefines
+   --d-* tokens; the specimen markup is identical across all
+   three so they're honestly comparable.
+   ============================================================ */
+
+.dir-intro {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 40px;
+	align-items: start;
+}
+.dir-intro .matrix {
+	border-top: 2px solid var(--ink);
+}
+.dir-intro .matrix .row {
+	display: grid;
+	grid-template-columns: 90px 1fr;
+	gap: 14px;
+	padding: 13px 0;
+	border-bottom: 1px solid var(--line);
+	font-size: 14px;
+}
+.dir-intro .matrix .row .lab {
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--accent);
+	letter-spacing: 0.04em;
+}
+.dir-intro .matrix .row .val {
+	color: var(--ink-2);
+}
+
+/* ---- The direction block shell ---- */
+.dir {
+	border-radius: 18px;
+	overflow: hidden;
+	border: 1px solid var(--d-line);
+	background: var(--d-paper);
+	color: var(--d-ink);
+	font-family: var(--d-body);
+	margin-top: 30px;
+}
+.dir-banner {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 24px;
+	padding: 40px 44px 34px;
+	background: var(--d-banner);
+	border-bottom: 1px solid var(--d-line);
+}
+.dir-banner .letter {
+	font-family: var(--d-display);
+	font-weight: 800;
+	font-size: 80px;
+	line-height: 0.8;
+	color: var(--d-accent);
+	letter-spacing: -0.04em;
+}
+.dir-banner .label {
+	font-family: var(--mono);
+	font-size: 12px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--d-ink-3);
+}
+.dir-banner h2 {
+	font-family: var(--d-display);
+	font-size: 46px;
+	font-weight: 800;
+	color: var(--d-ink);
+	letter-spacing: -0.03em;
+	margin-top: 6px;
+}
+.dir-banner .thesis {
+	font-family: var(--d-body);
+	font-size: 17px;
+	color: var(--d-ink-2);
+	max-width: 42ch;
+	text-align: right;
+	line-height: 1.5;
+}
+
+.dir-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+}
+.dir-cell {
+	padding: 34px 44px;
+	border-top: 1px solid var(--d-line);
+}
+.dir-cell.full {
+	grid-column: 1 / -1;
+}
+.dir-cell + .dir-cell:nth-child(even) {
+	border-left: 1px solid var(--d-line);
+}
+.cell-label {
+	font-family: var(--mono);
+	font-size: 11px;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--d-ink-3);
+	margin-bottom: 20px;
+}
+
+/* ---- Logo lockup ---- */
+.lockup {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+}
+.glyphbox {
+	width: 64px;
+	height: 64px;
+	flex: none;
+	display: grid;
+	place-items: center;
+	position: relative;
+}
+.glyphbox .H {
+	font-family: var(--d-display);
+	font-weight: 800;
+	font-size: 38px;
+	line-height: 1;
+}
+.wordmark {
+	font-family: var(--d-wordmark);
+	font-weight: 700;
+	font-size: 32px;
+	letter-spacing: var(--d-wm-track);
+	color: var(--d-ink);
+}
+.wordmark .smith {
+	color: var(--d-accent);
+}
+.logo-variants {
+	display: flex;
+	gap: 14px;
+	align-items: center;
+	margin-top: 24px;
+	flex-wrap: wrap;
+}
+.logo-variants .mini {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	font-family: var(--d-wordmark);
+	font-weight: 700;
+	font-size: 15px;
+}
+.logo-note {
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--d-ink-3);
+	margin-top: 18px;
+	line-height: 1.5;
+	max-width: 46ch;
+}
+
+/* ---- Palette ---- */
+.pal {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: 0;
+	border: 1px solid var(--d-line);
+	border-radius: 10px;
+	overflow: hidden;
+}
+.pal .sw {
+	padding: 14px 12px 12px;
+	min-height: 92px;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+}
+.pal .sw .role {
+	font-family: var(--mono);
+	font-size: 10px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	opacity: 0.8;
+}
+.pal .sw .hex {
+	font-family: var(--mono);
+	font-size: 11px;
+	margin-top: 3px;
+}
+.pal-note {
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--d-ink-3);
+	margin-top: 14px;
+	line-height: 1.5;
+}
+
+/* ---- Type specimen ---- */
+.spec-display {
+	font-family: var(--d-display);
+	font-weight: 800;
+	font-size: 40px;
+	line-height: 1;
+	letter-spacing: -0.03em;
+	color: var(--d-ink);
+}
+.spec-meta {
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--d-ink-3);
+	margin: 14px 0 18px;
+}
+.spec-body {
+	font-family: var(--d-body);
+	font-size: 15px;
+	line-height: 1.6;
+	color: var(--d-ink-2);
+	max-width: 50ch;
+}
+.spec-nums {
+	font-family: var(--d-num);
+	font-weight: 600;
+	font-size: 34px;
+	color: var(--d-ink);
+	margin-top: 22px;
+	letter-spacing: -0.01em;
+	font-variant-numeric: tabular-nums;
+	display: flex;
+	gap: 22px;
+	align-items: baseline;
+	flex-wrap: wrap;
+}
+.spec-nums .lo {
+	color: var(--d-accent);
+}
+.spec-nums small {
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--d-ink-3);
+	font-weight: 400;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+/* ---- Voice ---- */
+.voice {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+.voice .vline {
+	font-family: var(--d-display);
+	font-weight: 700;
+	font-size: 22px;
+	letter-spacing: -0.01em;
+	color: var(--d-ink);
+	line-height: 1.2;
+}
+.voice .vsub {
+	font-family: var(--d-body);
+	font-size: 14px;
+	color: var(--d-ink-2);
+	margin-top: 3px;
+}
+.voice .vtag {
+	font-family: var(--mono);
+	font-size: 11px;
+	color: var(--d-ink-3);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+/* ---- Application preview (a hero + a stat tile, in-direction) ---- */
+.app-preview {
+	display: grid;
+	grid-template-columns: 1.5fr 1fr;
+	gap: 22px;
+}
+.app-hero {
+	padding: 30px;
+	border-radius: 14px;
+	background: var(--d-hero-bg);
+	border: 1px solid var(--d-line);
+	position: relative;
+	overflow: hidden;
+}
+.app-hero .eb {
+	font-family: var(--mono);
+	font-size: 11px;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--d-accent);
+}
+.app-hero h3 {
+	font-family: var(--d-display);
+	font-weight: 800;
+	font-size: 30px;
+	line-height: 1.05;
+	letter-spacing: -0.02em;
+	color: var(--d-ink);
+	margin: 12px 0;
+	max-width: 15ch;
+}
+.app-hero p {
+	font-family: var(--d-body);
+	font-size: 14px;
+	color: var(--d-ink-2);
+	max-width: 40ch;
+	line-height: 1.55;
+}
+.app-hero .cta {
+	display: inline-flex;
+	margin-top: 18px;
+	font-family: var(--d-body);
+	font-weight: 700;
+	font-size: 14px;
+	padding: 11px 20px;
+	border-radius: var(--d-btn-r);
+	background: var(--d-accent);
+	color: var(--d-on-accent);
+}
+.stat-tile {
+	padding: 24px;
+	border-radius: 14px;
+	background: var(--d-card);
+	border: 1px solid var(--d-line);
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	justify-content: center;
+}
+.stat-tile .st-lab {
+	font-family: var(--mono);
+	font-size: 11px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: var(--d-ink-3);
+}
+.stat-tile .st-big {
+	font-family: var(--d-num);
+	font-weight: 700;
+	font-size: 46px;
+	color: var(--d-ink);
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.02em;
+	line-height: 1;
+}
+.stat-tile .st-sub {
+	font-family: var(--d-body);
+	font-size: 13px;
+	color: var(--d-accent);
+	font-weight: 600;
+}
+.stat-tile .bars {
+	display: flex;
+	gap: 4px;
+	align-items: flex-end;
+	height: 38px;
+	margin-top: 6px;
+}
+.stat-tile .bars i {
+	flex: 1;
+	background: var(--d-accent);
+	border-radius: 2px 2px 0 0;
+	opacity: 0.85;
+}
+.stat-tile .bars i.miss {
+	background: var(--d-line-strong);
+	opacity: 1;
+}
+
+/* ============================================================
+   DIRECTION A — FORGE  (hot metal, struck bars, distinctive)
+   ============================================================ */
+.dir.forge {
+	--d-display: "Bricolage Grotesque", sans-serif;
+	--d-body: "Hanken Grotesk", sans-serif;
+	--d-wordmark: "Bricolage Grotesque", sans-serif;
+	--d-num: "JetBrains Mono", monospace;
+	--d-wm-track: -0.02em;
+	--d-ink: #1c1714;
+	--d-ink-2: #524a42;
+	--d-ink-3: #938778;
+	--d-paper: #f4efe7;
+	--d-card: #fbf8f2;
+	--d-line: #ddd3c4;
+	--d-line-strong: #c3b6a1;
+	--d-accent: #c8431a; /* molten ember */
+	--d-on-accent: #fff5ee;
+	--d-banner: linear-gradient(180deg, #f7f2ea 0%, #efe7da 100%);
+	--d-hero-bg: #1c1714; /* iron hero */
+	--d-btn-r: 9px;
+}
+.dir.forge .glyphbox {
+	background: #1c1714;
+	border-radius: 13px;
+}
+.dir.forge .glyphbox .H {
+	color: #ee6b2d;
+}
+.dir.forge .glyphbox::after {
+	/* ember strike-spark */
+	content: "";
+	position: absolute;
+	width: 13px;
+	height: 13px;
+	right: -5px;
+	bottom: -5px;
+	background: #ee6b2d;
+	transform: rotate(45deg);
+	border-radius: 2px;
+	box-shadow: 0 0 0 3px var(--d-paper);
+}
+.dir.forge .app-hero {
+}
+.dir.forge .app-hero .eb {
+	color: #ee8a3d;
+}
+.dir.forge .app-hero h3,
+.dir.forge .app-hero p {
+	color: #f4efe7;
+}
+.dir.forge .app-hero p {
+	color: #b8ab9a;
+}
+.dir.forge .app-hero::before {
+	/* hot edge */
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 5px;
+	background: linear-gradient(180deg, #ee6b2d, #c8431a);
+}
+
+/* ============================================================
+   DIRECTION B — LEDGER  (audit-grade, precise, financial)
+   ============================================================ */
+.dir.ledger {
+	--d-display: "IBM Plex Sans", sans-serif;
+	--d-body: "IBM Plex Sans", sans-serif;
+	--d-wordmark: "IBM Plex Sans", sans-serif;
+	--d-num: "IBM Plex Mono", monospace;
+	--d-wm-track: -0.01em;
+	--d-ink: #14223b;
+	--d-ink-2: #45556b;
+	--d-ink-3: #8b97a8;
+	--d-paper: #f5f3ec;
+	--d-card: #fcfbf6;
+	--d-line: #d9d5c7;
+	--d-line-strong: #beb9a6;
+	--d-accent: #11675f; /* deep audit teal */
+	--d-on-accent: #f1f7f5;
+	--d-banner: #f5f3ec;
+	--d-hero-bg: #fcfbf6;
+	--d-btn-r: 4px;
+}
+.dir.ledger .dir-banner h2,
+.dir.ledger h3,
+.dir.ledger .spec-display,
+.dir.ledger .wordmark {
+	letter-spacing: -0.02em;
+}
+.dir.ledger .glyphbox {
+	background: transparent;
+	border: 2px solid #14223b;
+	border-radius: 6px;
+}
+.dir.ledger .glyphbox .H {
+	color: #14223b;
+}
+.dir.ledger .glyphbox::after {
+	content: "";
+	position: absolute;
+	bottom: 8px;
+	width: 24px;
+	height: 2px;
+	background: #11675f;
+}
+.dir.ledger .wordmark .smith {
+	color: #11675f;
+}
+.dir.ledger .app-hero {
+	border: 1px solid var(--d-line);
+}
+.dir.ledger .app-hero::after {
+	/* ledger rule */
+	content: "";
+	position: absolute;
+	left: 30px;
+	right: 30px;
+	bottom: 64px;
+	border-top: 1px solid var(--d-line);
+}
+.dir.ledger .cta {
+	border-radius: 4px;
+}
+
+/* ============================================================
+   DIRECTION C — DAYLIGHT  (friendly, calm, low-dread)
+   ============================================================ */
+.dir.daylight {
+	--d-display: "Hanken Grotesk", sans-serif;
+	--d-body: "Hanken Grotesk", sans-serif;
+	--d-wordmark: "Hanken Grotesk", sans-serif;
+	--d-num: "Hanken Grotesk", sans-serif;
+	--d-wm-track: -0.02em;
+	--d-ink: #2b2823;
+	--d-ink-2: #5f594f;
+	--d-ink-3: #9a9183;
+	--d-paper: #faf5ec;
+	--d-card: #fffdf8;
+	--d-line: #e8dfcd;
+	--d-line-strong: #d3c7af;
+	--d-accent: #5f7d54; /* warm sage */
+	--d-on-accent: #f6faf2;
+	--d-banner: linear-gradient(180deg, #fbf7ef 0%, #f6efe1 100%);
+	--d-hero-bg: #eef3e6;
+	--d-btn-r: 999px;
+}
+.dir.daylight h1,
+.dir.daylight h2,
+.dir.daylight h3,
+.dir.daylight .dir-banner h2,
+.dir.daylight .spec-display,
+.dir.daylight .app-hero h3 {
+	font-weight: 700;
+}
+.dir.daylight .glyphbox {
+	background: #5f7d54;
+	border-radius: 18px;
+}
+.dir.daylight .glyphbox .H {
+	color: #f6faf2;
+	font-weight: 700;
+}
+.dir.daylight .glyphbox::after {
+	/* daylight sun dot */
+	content: "";
+	position: absolute;
+	top: -4px;
+	right: -4px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #e8a85c;
+	box-shadow: 0 0 0 3px var(--d-paper);
+}
+.dir.daylight .wordmark .smith {
+	color: #5f7d54;
+}
+.dir.daylight .stat-tile,
+.dir.daylight .app-hero {
+	border-radius: 20px;
+}
+
+/* recommendation band */
+.reco {
+	background: var(--ink);
+	color: var(--paper);
+	border-radius: 18px;
+	padding: 44px;
+	margin-top: 34px;
+	display: grid;
+	grid-template-columns: 1.1fr 1fr;
+	gap: 40px;
+	align-items: center;
+}
+.reco .r-eyebrow {
+	font-family: var(--mono);
+	font-size: 12px;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: #d8a78f;
+}
+.reco h2 {
+	color: #fff;
+	margin: 12px 0 16px;
+}
+.reco p {
+	color: #cfc8ba;
+	font-size: 16px;
+}
+.reco .recipe {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.reco .ri {
+	display: flex;
+	gap: 14px;
+	align-items: baseline;
+	padding: 14px 16px;
+	background: rgba(255, 255, 255, 0.05);
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.09);
+}
+.reco .ri .rk {
+	font-family: var(--mono);
+	font-size: 11px;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	color: #d8a78f;
+	flex: none;
+	width: 78px;
+}
+.reco .ri .rv {
+	font-size: 14px;
+	color: #eee7da;
+}
+
+@media (max-width: 900px) {
+	.dir-intro,
+	.dir-grid,
+	.app-preview,
+	.reco {
+		grid-template-columns: 1fr;
+	}
+	.dir-cell + .dir-cell:nth-child(even) {
+		border-left: none;
+	}
+	.dir-banner {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 14px;
+	}
+	.dir-banner .thesis {
+		text-align: left;
+	}
+	.pal {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}

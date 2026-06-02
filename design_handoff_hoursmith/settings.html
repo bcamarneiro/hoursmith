@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hoursmith — Settings Redesign</title>
+<link rel="stylesheet" href="assets/review.css" />
+<link rel="stylesheet" href="assets/settings.css" />
+</head>
+<body class="settings-page">
+
+<header class="topbar">
+  <a class="mark" href="index.html">
+    <span class="glyph">H</span>
+    <span>Hoursmith&nbsp;<span class="sub">/ brand &amp; ux review</span></span>
+  </a>
+  <nav class="topnav">
+    <a href="index.html">01 — Diagnosis</a>
+    <a href="ia.html">02 — Structure</a>
+    <a href="directions.html">03 — Directions</a>
+    <a href="screens.html">04 — Screens</a>
+    <a href="logo.html">05 — Logo</a>
+    <a class="active" href="settings.html">06 — Settings</a>
+  </nav>
+</header>
+
+<!-- ============ INTRO + DIAGNOSIS ============ -->
+<section>
+  <div class="wrap-wide">
+    <span class="eyebrow">Section 06 — Settings</span>
+    <h2 style="margin-top:16px;max-width:22ch;">One endless page doing five jobs at once.</h2>
+    <p class="muted" style="margin-top:18px;max-width:72ch;">You're right that Settings is the messiest surface. It isn't the <em>fields</em> — those are thoughtful. It's the <strong>architecture</strong>: a hero, a Setup Wizard, and a Diagnostics panel (which largely repeat each other) all stack on top of a six-fieldset mega-form with editors nested three levels deep. There's no navigation, status lives in four different places, and a returning user who just wants to flip the theme scrolls past the entire first-run wizard to get there. Below: why it reads as a mess, then a redesign that keeps <strong>100% of the fields and behaviour</strong> — verified in a ledger at the bottom.</p>
+
+    <div class="why-grid">
+      <div class="why">
+        <div class="wn">Mess 01</div>
+        <h4>The Wizard and Diagnostics say the same thing twice</h4>
+        <p>Both panels render status badges, a "run checks" button, Dashboard/Reports readiness, the Jira access-path guidance, and "jump to section" links — before you reach a single field. Two large cards, one message.</p>
+      </div>
+      <div class="why">
+        <div class="wn">Mess 02</div>
+        <h4>No navigation on a very tall page</h4>
+        <p>Six fieldsets stack vertically with no rail, no anchors you can see, no sense of "where am I / what's left." The only way through is the scrollbar.</p>
+      </div>
+      <div class="why">
+        <div class="wn">Mess 03</div>
+        <h4>Status is scattered across four places</h4>
+        <p>Per-section Test buttons, per-service badges, the wizard's step states, and a form-status bar all report readiness independently. No single source of truth.</p>
+      </div>
+      <div class="why">
+        <div class="wn">Mess 04</div>
+        <h4>"Services" is a fieldset hiding a whole app</h4>
+        <p>One optional section contains GitLab, RescueTime, three calendar-feed types, a calendar-mappings editor, and a team-absence-assignment editor — each with its own composer. It needs room to breathe, not a single accordion-less block.</p>
+      </div>
+      <div class="why span2">
+        <div class="wn">Mess 05</div>
+        <h4>First-run setup and everyday maintenance are the same view</h4>
+        <p>The wizard is invaluable on day one and pure noise on day 400. A returning admin who wants to add one teammate or toggle CSV columns has to wade through "Connect to Jira → run a check → verify and save" every single time. Setup and settings are two different jobs wearing one page.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ THE REDESIGN ============ -->
+<section style="padding-top:10px;">
+  <div class="wrap-wide">
+    <h3 style="font-size:15px;font-family:var(--p-num);letter-spacing:0.06em;text-transform:uppercase;color:var(--ember);">The redesign <span style="color:var(--ink-3);text-transform:none;letter-spacing:0">· click the left rail to move between sections</span></h3>
+
+    <div class="frame">
+      <div class="frame-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="url">hoursmith.io/settings</span>
+        <span class="frame-tag">Redesign · Forge × Ledger</span>
+      </div>
+      <div class="hs">
+        <!-- app nav -->
+        <div class="hs-nav">
+          <div class="hs-brand">
+            <span class="hs-glyph"><svg viewBox="0 0 64 64"><rect x="16" y="12" width="9" height="40" rx="2.2" fill="#1c1714"></rect><rect x="39" y="12" width="9" height="40" rx="2.2" fill="#1c1714"></rect><rect x="16" y="27" width="32" height="10" rx="2.2" fill="#c8431a"></rect><circle cx="52.5" cy="24.5" r="2" fill="#ee6b2d"></circle><circle cx="56" cy="29.5" r="1.3" fill="#ee6b2d"></circle></svg></span>
+            <span class="hs-word">Hour<span class="s">smith</span></span>
+          </div>
+          <div class="hs-navlinks"><a>My Week</a><a>Reports</a><a class="on">Settings</a></div>
+        </div>
+
+        <div class="set">
+          <!-- ===== consolidated readiness header (wizard + diagnostics merged) ===== -->
+          <div class="ready-head">
+            <div class="rh-top">
+              <div>
+                <div class="rh-eb">Setup status · first-run guide</div>
+                <div class="rh-title">Core setup is ready for daily use.</div>
+                <div class="rh-detail">The app is ready for weekly logging and reporting. Optional signals are already helping suggestions — one source still needs review.</div>
+              </div>
+              <button class="rh-run">Refresh checks</button>
+            </div>
+
+            <div class="rh-progress">
+              <span class="rh-pct">3 / 4 steps</span>
+              <div class="rh-bar"><i style="width:75%"></i></div>
+              <span class="rh-pct">75%</span>
+            </div>
+
+            <div class="rh-facts">
+              <div class="fact"><b>2</b><span>team members</span></div>
+              <div class="fact"><b>2</b><span>optional signals</span></div>
+              <div class="fact"><b>1</b><span>suggestion feed</span></div>
+              <div class="fact"><b>1</b><span>time off calendar</span></div>
+            </div>
+
+            <div class="rh-steps">
+              <div class="rstep done"><div class="rs-h"><span class="rs-no">✓</span><span class="rs-t">Connect to Jira</span></div><div class="rs-d">Account connected directly from the browser — no proxy needed.</div></div>
+              <div class="rstep done"><div class="rs-h"><span class="rs-no">✓</span><span class="rs-t">Report scope</span><span class="rs-opt">Optional</span></div><div class="rs-d">JQL set and scoped to 2 team members.</div></div>
+              <div class="rstep warn"><div class="rs-h"><span class="rs-no">!</span><span class="rs-t">Optional signals</span><span class="rs-opt">Optional</span></div><div class="rs-d">GitLab + RescueTime configured; calendar feeds need a recheck.</div></div>
+              <div class="rstep done"><div class="rs-h"><span class="rs-no">✓</span><span class="rs-t">Verify &amp; save</span></div><div class="rs-d">Saved settings match a verified Jira configuration.</div></div>
+            </div>
+
+            <div class="rh-aux">
+              <div class="aux">
+                <div class="ax-k">Jira access path</div>
+                <div class="ax-row"><span class="ax-t">Direct browser access</span><span class="sb ready">Ready</span></div>
+                <div class="ax-d">Working without a proxy. Add a local proxy only if checks later fail.</div>
+              </div>
+              <div class="aux">
+                <div class="ax-k">My Week</div>
+                <div class="ax-row"><span class="ax-t">Surface</span><span class="sb ready">Ready</span></div>
+                <div class="ax-d">Ready for weekly triage and quick logging.</div>
+              </div>
+              <div class="aux">
+                <div class="ax-k">Reports</div>
+                <div class="ax-row"><span class="ax-t">Surface</span><span class="sb ready">Ready</span></div>
+                <div class="ax-d">Scoped to 2 team members.</div>
+              </div>
+            </div>
+            <div class="rh-meta">Last refreshed: Jun 1, 2026, 9:41 AM · 3/4 checks passed</div>
+          </div>
+
+          <!-- ===== rail + panels ===== -->
+          <div class="set-body">
+            <div class="rail" id="rail">
+              <div class="rail-label">Configuration</div>
+              <button class="rail-item on" data-sec="connection"><span class="ri-dot ready"></span><span class="ri-t">Connection</span><span class="sb ready">Ready</span></button>
+              <button class="rail-item" data-sec="scope"><span class="ri-dot ready"></span><span class="ri-t">Reports Scope</span><span class="ri-meta">2</span></button>
+              <button class="rail-item" data-sec="permissions"><span class="ri-dot warn"></span><span class="ri-t">Permissions</span><span class="sb warn">Review</span></button>
+              <button class="rail-item" data-sec="services"><span class="ri-dot warn"></span><span class="ri-t">Services</span><span class="ri-meta">2</span></button>
+              <button class="rail-item" data-sec="preferences"><span class="ri-dot ready"></span><span class="ri-t">Preferences</span></button>
+              <div class="rail-sep"></div>
+              <div class="rail-label">Saved state</div>
+              <button class="rail-item" data-sec="data"><span class="ri-dot ready"></span><span class="ri-t">Data &amp; backup</span></button>
+            </div>
+
+            <div class="panels" id="panels">
+
+              <!-- ===== CONNECTION ===== -->
+              <div class="panel on" data-sec="connection">
+                <div class="sec-card">
+                  <div class="sec-head">
+                    <div>
+                      <div class="sec-kicker">Step 1 · required</div>
+                      <h3>Connection</h3>
+                      <p class="sec-sub">Connect Jira once. Try direct browser access first — leave the proxy blank unless a check later fails. Your token never leaves the browser.</p>
+                    </div>
+                    <button class="test-btn">Test connection</button>
+                  </div>
+                  <div class="test-result ok">Connected as bruno@futuresketches.com. Detected add, edit, and delete worklog permissions.</div>
+                  <div class="fg">
+                    <label>Jira Host</label>
+                    <input class="inp" type="text" value="futuresketches.atlassian.net" placeholder="your-company.atlassian.net" />
+                    <small>Hostname only is ideal, but pasted <code>https://</code> URLs are normalized for you.</small>
+                  </div>
+                  <div class="fg-row">
+                    <div class="fg">
+                      <label>Email</label>
+                      <input class="inp" type="email" value="bruno@futuresketches.com" placeholder="your-email@example.com" />
+                    </div>
+                    <div class="fg">
+                      <label>API Token</label>
+                      <input class="inp" type="password" value="ATATT3xFfGF0..." />
+                    </div>
+                  </div>
+                  <div class="fg">
+                    <span class="fg-label">CORS Proxy <span class="opt">optional</span><span class="badge-inline badge-neut">Self-hosted</span></span>
+                    <input class="inp" type="text" value="" placeholder="http://localhost:8081" />
+                    <small>Leave blank on the first attempt. Only fill it in if the Jira check fails because your browser or network blocks direct access.</small>
+                    <small>Start with <code>npm run cors-proxy</code>. If your environment needs SOCKS5, run <code>npm run cors-proxy:socks</code> and keep the same local proxy URL here.</small>
+                  </div>
+                  <div class="waitlist">
+                    <p>Tired of running the local proxy? Premium hosted-proxy is coming soon — leave your email and we'll let you know.</p>
+                    <div class="wl-row">
+                      <input class="inp" type="email" placeholder="you@company.com" />
+                      <button class="wl-btn">Notify me</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ===== SCOPE ===== -->
+              <div class="panel" data-sec="scope">
+                <div class="sec-card">
+                  <div class="sec-head">
+                    <div>
+                      <div class="sec-kicker">Step 2 · optional</div>
+                      <h3>Reports Scope <span class="sec-opt">optional</span></h3>
+                      <p class="sec-sub">Narrow which issues and people Reports covers. Leave both blank to include everyone this Jira account can see.</p>
+                    </div>
+                  </div>
+                  <div class="fg">
+                    <span class="fg-label">JQL Filter <span class="opt">optional</span></span>
+                    <input class="inp" type="text" value="project = FS" placeholder="project = MYPROJECT" />
+                    <small>Applied to all timesheet queries.</small>
+                  </div>
+                  <div class="fg">
+                    <span class="fg-label">Team Members <span class="opt">optional</span></span>
+                    <div class="chips">
+                      <span class="chip-i">bruno@futuresketches.com <span class="x">×</span></span>
+                      <span class="chip-i">marta@futuresketches.com <span class="x">×</span></span>
+                      <span class="chip-ph">Add teammate…</span>
+                    </div>
+                    <small>Add the teammates you want in scope for Reports and shared time-off assignments. Press <code>Enter</code>, <code>Tab</code>, or paste a list to create chips.</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ===== PERMISSIONS ===== -->
+              <div class="panel" data-sec="permissions">
+                <div class="sec-card">
+                  <div class="sec-head">
+                    <div>
+                      <div class="sec-kicker">Worklog permissions</div>
+                      <h3>Permissions</h3>
+                      <p class="sec-sub">Auto-detected when you test the connection. Override manually if needed.</p>
+                    </div>
+                    <span class="sb warn">Needs review</span>
+                  </div>
+                  <label class="chk"><input type="checkbox" checked /><span><span class="chk-t">Allow adding worklogs</span><span class="chk-d">Enables quick logging from My Week.</span></span></label>
+                  <label class="chk"><input type="checkbox" checked /><span><span class="chk-t">Allow editing worklogs</span><span class="chk-d">Lets you adjust existing entries in place.</span></span></label>
+                  <label class="chk"><input type="checkbox" /><span><span class="chk-t">Allow deleting worklogs</span><span class="chk-d">Currently off — delete is disabled by these permissions.</span></span></label>
+                  <label class="chk"><input type="checkbox" checked /><span><span class="chk-t">Enable timesheet reminders</span><span class="chk-d">Nudges teammates whose week still has gaps.</span></span></label>
+                </div>
+              </div>
+
+              <!-- ===== SERVICES ===== -->
+              <div class="panel" data-sec="services">
+                <div class="sec-card">
+                  <div class="sec-head">
+                    <div>
+                      <div class="sec-kicker">Step 3 · optional</div>
+                      <h3>Services <span class="sec-opt">optional</span></h3>
+                      <p class="sec-sub">Each service helps a different way. Keep them separate so it's obvious what powers suggestions, what reduces target hours, and what still needs review.</p>
+                    </div>
+                  </div>
+
+                  <div class="svc-grid">
+                    <div class="svc">
+                      <div class="svc-head">
+                        <div><div class="svc-kicker">GitLab</div><h4>Recent GitLab activity</h4></div>
+                        <span class="sb ready">Ready</span>
+                      </div>
+                      <p class="svc-p">Suggest time from pushes, merge-request actions, and reviews that already reference Jira keys.</p>
+                      <div class="fg"><label>GitLab Host</label><input class="inp" type="text" value="gitlab.com" placeholder="gitlab.com or vcs.company.net" /></div>
+                      <div class="fg"><label>GitLab Token</label><input class="inp" type="password" value="glpat-xxxx" /><small>Personal access token with <code>read_user</code> or <code>api</code> scope.</small></div>
+                      <div class="fg"><button class="test-btn ghost">Test GitLab</button></div>
+                    </div>
+                    <div class="svc">
+                      <div class="svc-head">
+                        <div><div class="svc-kicker">RescueTime</div><h4>Personal activity signal</h4></div>
+                        <span class="sb ready">Ready</span>
+                      </div>
+                      <p class="svc-p">Add a productivity signal when Jira and calendar data alone can't explain a day.</p>
+                      <div class="fg"><label>RescueTime API Key</label><input class="inp" type="password" value="••••••••" /><small>Requires the CORS proxy to be running.</small></div>
+                      <div class="fg"><button class="test-btn ghost">Test RescueTime</button></div>
+                    </div>
+                  </div>
+
+                  <!-- suggestion calendars -->
+                  <div class="feed-block">
+                    <div class="feed-block-head">
+                      <div><h4>Suggestion calendars</h4><p>Subscribe to calendars whose event titles contain a Jira key — or can be mapped to one below. Suggestions appear in My Week.</p></div>
+                      <button class="add-btn">+ Suggestion feed</button>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-card-head"><span class="feed-type">Suggestion feed</span><strong>Team calendar</strong><button class="feed-x">×</button></div>
+                      <div class="feed-fields">
+                        <div><span class="ff-label">Label</span><input class="inp" type="text" value="Team" placeholder="Team, Work, PrimeIT" /></div>
+                        <div class="wide"><span class="ff-label">Feed URL</span><input class="inp" type="text" value="https://calendar.google.com/...basic.ics" placeholder="https://calendar.google.com/...basic.ics" /></div>
+                      </div>
+                    </div>
+                    <!-- calendar mappings editor -->
+                    <div class="mini-ed">
+                      <div class="mini-ed-head">
+                        <div><h4>Calendar mappings</h4><p>Map a Jira issue to the event titles that should log to it. Matching is case-insensitive substring.</p></div>
+                        <span class="count-badge">1 mapping</span>
+                      </div>
+                      <div class="map-row">
+                        <div class="mr-key"><code>FS-128</code><small>Weekly rituals</small></div>
+                        <div class="mr-pats"><span class="pat-chip">daily standup</span><span class="pat-chip">weekly sync</span><span class="pat-chip">retro</span></div>
+                        <button class="mr-act">Edit</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- time off & holidays -->
+                  <div class="feed-block">
+                    <div class="feed-block-head">
+                      <div><h4>Time off &amp; holidays</h4><p>Time off calendars reduce target hours for the matched teammate. Holiday feeds apply to everyone by default.</p></div>
+                    </div>
+                    <div class="feed-block-head" style="margin-top:4px;">
+                      <div><h4 style="font-size:14px;">Time off calendars</h4><p>Each calendar can count only for you, or act as a shared team calendar using title-to-user assignments.</p></div>
+                      <button class="add-btn">+ Time off calendar</button>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-card-head"><span class="feed-type">Time off calendar</span><strong>Team vacations</strong><button class="feed-x">×</button></div>
+                      <div class="feed-fields">
+                        <div><span class="ff-label">Label</span><input class="inp" type="text" value="Team vacations" placeholder="Team vacations" /></div>
+                        <div class="wide"><span class="ff-label">Feed URL</span><input class="inp" type="text" value="https://outlook.office365.com/...ics" placeholder="https://outlook.office365.com/...ics" /></div>
+                        <div><span class="ff-label">Who should this affect?</span>
+                          <select class="inp"><option>Only me</option><option selected>Shared team calendar</option></select>
+                        </div>
+                        <div><span class="ff-label">Attribution rules</span><p class="fg-hint" style="margin-top:0;">Shared calendars use the assignment rules below to match titles to teammates.</p></div>
+                      </div>
+                    </div>
+
+                    <div class="feed-block-head" style="margin-top:16px;">
+                      <div><h4 style="font-size:14px;">Public holidays</h4><p>Holiday feeds apply to <strong>everyone</strong> — no assignment rules. A Thursday holiday drops the team's weekly target by 8h.</p></div>
+                      <button class="add-btn">+ Holiday calendar</button>
+                    </div>
+                    <div class="feed-card">
+                      <div class="feed-card-head"><span class="feed-type">Public holidays</span><strong>Portugal holidays</strong><button class="feed-x">×</button></div>
+                      <div class="feed-fields">
+                        <div><span class="ff-label">Label</span><input class="inp" type="text" value="Portugal holidays" placeholder="Portugal holidays" /></div>
+                        <div class="wide"><span class="ff-label">Feed URL</span><input class="inp" type="text" value="https://www.officeholidays.com/ics/portugal" placeholder="https://www.officeholidays.com/ics/portugal" /></div>
+                      </div>
+                    </div>
+
+                    <!-- shared assignment editor -->
+                    <div class="mini-ed">
+                      <div class="mini-ed-head">
+                        <div><h4>Shared calendar assignments</h4><p>Use when one calendar mixes several people, or a holiday only applies to a region. One pattern can route to one or many teammates.</p></div>
+                        <span class="count-badge">1 assignment</span>
+                      </div>
+                      <div class="map-row">
+                        <div class="mr-key"><strong style="font-family:var(--p-body);font-size:14px;color:var(--ink);">Lisbon Holiday</strong><small>title contains</small></div>
+                        <div class="mr-pats"><span class="pat-chip">marta@futuresketches.com</span></div>
+                        <button class="mr-act">Edit</button>
+                      </div>
+                    </div>
+
+                    <div class="fg"><button class="test-btn ghost">Test calendars</button><small>Confirms every feed URL (suggestions, time off, holidays) is reachable and parses as ICS/iCal.</small></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ===== PREFERENCES ===== -->
+              <div class="panel" data-sec="preferences">
+                <div class="sec-card">
+                  <div class="sec-head">
+                    <div>
+                      <div class="sec-kicker">Preferences</div>
+                      <h3>Preferences</h3>
+                      <p class="sec-sub">Local display and export options. These never touch an external service.</p>
+                    </div>
+                  </div>
+                  <div class="fg-row">
+                    <div class="fg"><label>Theme</label><select class="inp"><option>System</option><option selected>Light</option><option>Dark</option></select><small>Choose light, dark, or follow your system preference.</small></div>
+                    <div class="fg"><label>Time Rounding</label><select class="inp"><option selected>Off</option><option>15 minutes</option><option>30 minutes</option></select><small>Round suggestion durations to the nearest interval.</small></div>
+                  </div>
+                  <label class="chk" style="margin-top:18px;"><input type="checkbox" checked /><span><span class="chk-t">Include absence columns in CSV exports</span><span class="chk-d">Adds <span class="mono-inline">IsAbsence</span>, <span class="mono-inline">AbsenceKind</span>, and an <span class="mono-inline">AbsenceDays</span> subtotal so finance/HR can reconcile reduced targets. Turn off for byte-stable legacy CSVs.</span></span></label>
+                </div>
+              </div>
+
+              <!-- ===== DATA & BACKUP ===== -->
+              <div class="panel" data-sec="data">
+                <div class="sec-card">
+                  <div class="sec-head">
+                    <div>
+                      <div class="sec-kicker">Saved state</div>
+                      <h3>Data &amp; backup</h3>
+                      <p class="sec-sub">Everything lives in your browser. Export a full backup, share a team setup without secrets, or import either back into the form.</p>
+                    </div>
+                    <span class="sb ready">Up to date</span>
+                  </div>
+                  <div class="svc-grid" style="margin-top:18px;">
+                    <div class="svc">
+                      <div class="svc-kicker">Backup</div><h4 style="font-family:var(--p-display);font-weight:700;font-size:17px;color:var(--ink);margin:5px 0 6px;">Full backup</h4>
+                      <p class="svc-p">Exports config, calendar mappings, favorites, templates, comment presets, day notes, and report presets to a JSON file.</p>
+                      <div class="fg"><button class="test-btn ghost">Export backup</button></div>
+                    </div>
+                    <div class="svc">
+                      <div class="svc-kicker">Share pack</div><h4 style="font-family:var(--p-display);font-weight:700;font-size:17px;color:var(--ink);margin:5px 0 6px;">Share pack</h4>
+                      <p class="svc-p">Exports a team setup <strong>without local secrets</strong> — safe to hand to a teammate so they can mirror the configuration.</p>
+                      <div class="fg"><button class="test-btn ghost">Export share pack</button></div>
+                    </div>
+                  </div>
+                  <div class="fg"><button class="test-btn ghost">Import from file…</button><small>Drop in a backup or share pack — it loads into the form so you can review before saving.</small></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ===== sticky save bar ===== -->
+          <div class="save-bar">
+            <div class="save-status dirty" id="saveStatus">
+              <strong>Unsaved changes</strong>
+              <span>Review and save when you're ready.</span>
+            </div>
+            <div class="save-actions">
+              <button class="btn-sec">Backup</button>
+              <button class="btn-sec">Share Pack</button>
+              <button class="btn-sec">Import</button>
+              <button class="btn-sec">Discard</button>
+              <button class="btn-pri">Save</button>
+            </div>
+          </div>
+        </div>
+        <div style="height:24px;"></div>
+      </div>
+    </div>
+
+    <div class="changelist">
+      <div class="changeitem"><div class="ci-k">Fixes mess 01 · 03</div><div class="ci-t">One status, not four</div><p>The Wizard and Diagnostics merge into a single readiness header: progress, quick facts, the four steps, access path, and surface readiness — with the five checks now living as dots on the rail.</p></div>
+      <div class="changeitem"><div class="ci-k">Fixes mess 02 · 04</div><div class="ci-t">A real left rail</div><p>Every section is one click away with a live status dot. "Services" gets its own roomy panel instead of being buried at the bottom of an endless scroll.</p></div>
+      <div class="changeitem"><div class="ci-k">Fixes mess 05</div><div class="ci-t">Setup guides, settings stay</div><p>The readiness header is the first-run guide and collapses once you're set up; the rail is the everyday tool. A returning admin jumps straight to one section.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PARITY LEDGER ============ -->
+<section style="padding-top:20px;">
+  <div class="wrap-wide">
+    <span class="eyebrow">Parity check</span>
+    <h2 style="margin-top:14px;max-width:22ch;">Nothing dropped. Every field, accounted for.</h2>
+    <p class="muted" style="margin-top:14px;max-width:64ch;">You asked for 100% parity of functionality and information. Here's the full inventory of the current Settings page, mapped to where each control now lives. Same fields, same behaviour, same helper copy — reorganised, not removed.</p>
+    <table class="parity">
+      <thead><tr><th style="width:18%">New home</th><th style="width:42%">Controls &amp; info preserved</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td class="pg">Readiness header</td><td>Setup headline + detail · progress (X/4 steps, %) · quick facts (team members, optional signals, suggestion feeds, time-off calendars) · 4 setup steps with states · Jira access-path guidance · Dashboard &amp; Reports readiness · last-refreshed meta · Run/Refresh checks</td><td class="pc"><span class="keep">✓ merged</span> from Wizard + Diagnostics</td></tr>
+        <tr><td class="pg">Connection</td><td>Test button + result banner · Jira Host (+ normalize hint) · Email · API Token · CORS Proxy (optional, Self-hosted / Hosted-by-Premium badges, override link) · proxy + SOCKS hints · Premium waitlist form</td><td class="pc"><span class="keep">✓ kept</span></td></tr>
+        <tr><td class="pg">Reports Scope</td><td>JQL Filter (optional) + "applied to all queries" · Team Members chip editor (optional) + Enter/Tab/paste hint</td><td class="pc"><span class="keep">✓ kept</span></td></tr>
+        <tr><td class="pg">Permissions</td><td>Auto-detect hint · Allow adding / editing / deleting worklogs · Enable timesheet reminders</td><td class="pc"><span class="keep">✓ kept</span></td></tr>
+        <tr><td class="pg">Services</td><td>GitLab (host, token, scope hint, Test, status, troubleshooting) · RescueTime (key, proxy hint, Test, status) · Suggestion feeds (label, URL, add/remove) · Calendar mappings editor (issue, patterns, search, composer) · Time-off calendars (label, URL, self/shared attribution, title filter) · Public holidays (label, URL) · Shared-calendar assignments editor (pattern, emails, select-all/clear) · Test calendars</td><td class="pc"><span class="keep">✓ kept</span></td></tr>
+        <tr><td class="pg">Preferences</td><td>Theme (system/light/dark) · Time Rounding (off/15m/30m) · Include absence columns in CSV (+ IsAbsence/AbsenceKind/AbsenceDays note)</td><td class="pc"><span class="keep">✓ kept</span></td></tr>
+        <tr><td class="pg">Data &amp; backup</td><td>Backup · Share Pack (no secrets) · Import · Discard · Save · Unsaved-changes status</td><td class="pc"><span class="keep">✓ kept</span> · now persistent save bar</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<section class="pagefoot">
+  <div class="wrap">
+    <span class="eyebrow">End of review</span>
+    <h2 style="margin-top:14px;max-width:20ch;">That's the full sweep — diagnosis to settings.</h2>
+    <p class="muted" style="margin-top:14px;max-width:60ch;">Six sections, one system. Whenever you're ready, the build-side follow-ups are the production Billet H SVG, a <span class="mono-inline">tokens.css</span> handoff sheet, and rolling Forge × Ledger across the remaining marketing pages (Pricing, Privacy, Legal).</p>
+    <div class="nextlinks">
+      <a class="nextcard" href="screens.html"><div class="nl-k">Section 04</div><h3>← The core screens</h3><p>My Week and Reports in the same system.</p></a>
+      <a class="nextcard" href="index.html"><div class="nl-k">Section 01</div><h3>↺ Back to the diagnosis</h3><p>Where the whole review started.</p></a>
+    </div>
+  </div>
+</section>
+
+<template id="__bundler_thumbnail">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1c1714"></rect><rect x="20" y="18" width="7" height="28" rx="2" fill="#f4efe7"></rect><rect x="37" y="18" width="7" height="28" rx="2" fill="#f4efe7"></rect><rect x="20" y="28" width="24" height="8" rx="2" fill="#c8431a"></rect></svg>
+</template>
+
+<script>
+(() => {
+  var rail = document.getElementById('rail');
+  var panels = document.getElementById('panels');
+  rail.addEventListener('click', (e) => {
+    var btn = e.target.closest('.rail-item');
+    if (!btn) return;
+    var sec = btn.getAttribute('data-sec');
+    rail.querySelectorAll('.rail-item').forEach((b) => { b.classList.toggle('on', b === btn); });
+    panels.querySelectorAll('.panel').forEach((p) => {
+      p.classList.toggle('on', p.getAttribute('data-sec') === sec);
+    });
+    panels.scrollIntoView({ block: 'nearest' });
+  });
+})();
+</script>
+
+</body>
+</html>
