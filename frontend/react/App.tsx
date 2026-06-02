@@ -14,7 +14,9 @@ import { Navigation } from './components/Navigation';
 import { BuildInfoFooter } from './components/ui/BuildInfoFooter';
 import { Spinner } from './components/ui/Spinner';
 import { ToastContainer } from './components/ui/Toast';
+import { useFlags } from './hooks/useFlags';
 import { useTheme } from './hooks/useTheme';
+import { MaintenancePage } from './pages/MaintenancePage';
 import { appBasePath, isHashRouterMode } from './utils/runtimeConfig';
 
 const HomePage = lazy(() =>
@@ -176,6 +178,14 @@ const AppShell: React.FC = () => {
 
 export const App: React.FC = () => {
 	useTheme();
+	const flags = useFlags();
+
+	// Operational kill switch (ADA-341): when maintenance mode is on, render the
+	// static maintenance screen instead of the route table. The Polar webhook and
+	// /api/version are separate functions and keep responding.
+	if (flags.maintenanceMode) {
+		return <MaintenancePage />;
+	}
 
 	return isHashRouterMode ? (
 		<HashRouter>
