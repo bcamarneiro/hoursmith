@@ -54,16 +54,13 @@ export const MyWeekPage: React.FC = () => {
 	const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
 	const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
 
-	// Gap-first: the day you still owe rises to the top so the close surface leads
-	// with what's unfinished; completed days settle to the bottom. Stable by date
-	// within equal gaps. The week overview above stays chronological (Mon→Fri).
+	// Day cards stay in chronological (Mon→Fri) order so they never reshuffle
+	// while you log time. The earlier gap-first sort (ADA-349) re-ranked days by
+	// remaining gap on every worklog change, so logging a block dropped that day
+	// below others even when it wasn't finished. The gap is surfaced by the lead
+	// close panel + the week-overview bars instead, not by reordering the cards.
 	const orderedWeekdays = useMemo(
-		() =>
-			daySummaries
-				.filter((d) => !d.isWeekend)
-				.sort(
-					(a, b) => b.gapSeconds - a.gapSeconds || a.date.localeCompare(b.date),
-				),
+		() => daySummaries.filter((d) => !d.isWeekend),
 		[daySummaries],
 	);
 	const { focusedDayIndex, focusedSuggestionIndex, showHelp, setShowHelp } =
