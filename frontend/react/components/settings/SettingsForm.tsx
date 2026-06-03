@@ -171,6 +171,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const timeRoundingId = useId();
 	const themeId = useId();
 	const includeAbsenceInCsvId = useId();
+	const includeCsvProvenanceId = useId();
 	const isDirty = JSON.stringify(formData) !== JSON.stringify(savedConfig);
 	const canTestJira =
 		!!formData.jiraHost.trim() &&
@@ -532,11 +533,13 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							theme={formData.theme}
 							timeRounding={formData.timeRounding}
 							includeAbsenceInCsv={formData.includeAbsenceInCsv}
+							includeCsvProvenance={formData.includeCsvProvenance}
 							handleSelectChange={handleSelectChange}
 							handleChange={handleChange}
 							themeId={themeId}
 							timeRoundingId={timeRoundingId}
 							includeAbsenceInCsvId={includeAbsenceInCsvId}
+							includeCsvProvenanceId={includeCsvProvenanceId}
 						/>
 					</div>
 

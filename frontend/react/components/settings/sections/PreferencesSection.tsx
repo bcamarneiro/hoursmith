@@ -6,11 +6,13 @@ type Props = {
 	theme: 'system' | 'light' | 'dark';
 	timeRounding: 'off' | '15m' | '30m';
 	includeAbsenceInCsv: boolean;
+	includeCsvProvenance: boolean;
 	handleSelectChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 	handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 	themeId: string;
 	timeRoundingId: string;
 	includeAbsenceInCsvId: string;
+	includeCsvProvenanceId: string;
 };
 
 /**
@@ -21,11 +23,13 @@ export const PreferencesSection: React.FC<Props> = ({
 	theme,
 	timeRounding,
 	includeAbsenceInCsv,
+	includeCsvProvenance,
 	handleSelectChange,
 	handleChange,
 	themeId,
 	timeRoundingId,
 	includeAbsenceInCsvId,
+	includeCsvProvenanceId,
 }) => {
 	return (
 		<fieldset id={SETTINGS_SECTION_IDS.preferences} className={styles.section}>
@@ -73,6 +77,23 @@ export const PreferencesSection: React.FC<Props> = ({
 					Adds `IsAbsence`, `AbsenceKind`, and an `AbsenceDays` subtotal so
 					finance/HR can reconcile reduced targets. Turn off for byte-stable
 					legacy CSVs.
+				</small>
+			</div>
+			<div className={styles.formGroup}>
+				<label>
+					<input
+						type="checkbox"
+						id={includeCsvProvenanceId}
+						name="includeCsvProvenance"
+						checked={includeCsvProvenance}
+						onChange={handleChange}
+					/>{' '}
+					Add a provenance footer to CSV exports
+				</label>
+				<small>
+					Appends a `# generated=… jira=… policy=… period=…` line for
+					audit/traceability. Off by default so exports stay clean and don't
+					expose the Jira host or build version.
 				</small>
 			</div>
 		</fieldset>

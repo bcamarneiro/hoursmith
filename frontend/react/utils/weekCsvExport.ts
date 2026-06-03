@@ -39,6 +39,8 @@ function isEntryBackdated(entry: WeekWorklogEntry): boolean {
 
 export interface GenerateWeeklyCsvOptions {
 	provenance?: WeeklyCsvProvenance;
+	/** Append the `# generated=…` provenance footer line. Default true. */
+	includeProvenance?: boolean;
 	absenceDays?: Map<string, AbsenceDay>;
 	includeAbsenceColumns?: boolean;
 }
@@ -55,12 +57,18 @@ export function generateWeeklyCsv(
 	const isOptionsShape =
 		provenanceOrOptions !== undefined &&
 		('provenance' in provenanceOrOptions ||
+			'includeProvenance' in provenanceOrOptions ||
 			'absenceDays' in provenanceOrOptions ||
 			'includeAbsenceColumns' in provenanceOrOptions);
 	const opts: GenerateWeeklyCsvOptions = isOptionsShape
 		? (provenanceOrOptions as GenerateWeeklyCsvOptions)
 		: { provenance: provenanceOrOptions as WeeklyCsvProvenance | undefined };
-	const { provenance, absenceDays, includeAbsenceColumns = false } = opts;
+	const {
+		provenance,
+		includeProvenance = true,
+		absenceDays,
+		includeAbsenceColumns = false,
+	} = opts;
 
 	const baseHeaders = [
 		'Date',
@@ -160,17 +168,19 @@ export function generateWeeklyCsv(
 				})()
 			: null;
 
-	const provenanceFooter = buildProvenanceFooter({
-		policy: 'logged',
-		period: `${weekStart}..${weekEnd}`,
-		provenance,
-		omitMissingVersion: true,
-	});
-
 	const subtotalRows = [backdatedRow, nonBackdatedRow, totalRow];
 	if (absenceSubtotalRow) subtotalRows.push(absenceSubtotalRow);
 
-	return [metadata, headers, ...rows, ...subtotalRows, provenanceFooter].join(
-		'\n',
-	);
+	const lines = [metadata, headers, ...rows, ...subtotalRows];
+	if (includeProvenance) {
+		lines.push(
+			buildProvenanceFooter({
+				policy: 'logged',
+				period: `${weekStart}..${weekEnd}`,
+				provenance,
+				omitMissingVersion: true,
+			}),
+		);
+	}
+	return lines.join('\n');
 }

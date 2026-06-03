@@ -115,6 +115,7 @@ export const MyWeekPage: React.FC = () => {
 		const configSnapshot = useConfigStore.getState().config;
 		const csv = generateWeeklyCsv(weekStart, weekEnd, weekWorklogs, {
 			provenance: { jiraHost: configSnapshot.jiraHost },
+			includeProvenance: configSnapshot.includeCsvProvenance,
 			absenceDays,
 			includeAbsenceColumns: configSnapshot.includeAbsenceInCsv,
 		});

@@ -24,6 +24,8 @@ export interface BuildTimesheetCsvOptions {
 	period?: { year: number; month: number };
 	classifierOptions?: ClassifierOptions;
 	provenance?: TimesheetCsvProvenance;
+	/** Append the `# generated=…` provenance footer line. Default true. */
+	includeProvenance?: boolean;
 	/**
 	 * When provided AND `includeAbsenceColumns` is true, adds an
 	 * `IsAbsence` / `AbsenceKind` column pair per row plus an `AbsenceDays`
@@ -91,6 +93,7 @@ export function buildTimesheetCsv(opts: BuildTimesheetCsvOptions): string {
 		period,
 		classifierOptions,
 		provenance,
+		includeProvenance = true,
 		absenceDays,
 		includeAbsenceColumns = false,
 	} = opts;
@@ -182,21 +185,25 @@ export function buildTimesheetCsv(opts: BuildTimesheetCsvOptions): string {
 			? makeTotalRow('AbsenceDays', periodAbsenceDays.toString())
 			: null;
 
-	const periodLabel = period
-		? `${period.year}-${String(period.month + 1).padStart(2, '0')}`
-		: 'all';
-	const provenanceLine = buildProvenanceFooter({
-		policy,
-		period: periodLabel,
-		provenance,
-		jiraHostFallback: 'unknown',
-		versionFallback: 'dev',
-	});
-
 	const subtotalRows = [backdatedRow, nonBackdatedRow, totalRow];
 	if (absenceSubtotalRow) subtotalRows.push(absenceSubtotalRow);
 
-	return [headerLine, ...dataLines, ...subtotalRows, provenanceLine].join('\n');
+	const lines = [headerLine, ...dataLines, ...subtotalRows];
+	if (includeProvenance) {
+		const periodLabel = period
+			? `${period.year}-${String(period.month + 1).padStart(2, '0')}`
+			: 'all';
+		lines.push(
+			buildProvenanceFooter({
+				policy,
+				period: periodLabel,
+				provenance,
+				jiraHostFallback: 'unknown',
+				versionFallback: 'dev',
+			}),
+		);
+	}
+	return lines.join('\n');
 }
 
 export function buildTimesheetFilename(
@@ -222,10 +229,18 @@ export interface BuildSummaryCsvOptions {
 	policy: AggregationPolicy;
 	period: { year: number; month: number };
 	provenance?: TimesheetCsvProvenance;
+	/** Append the `# generated=…` provenance footer line. Default true. */
+	includeProvenance?: boolean;
 }
 
 export function buildSummaryCsv(opts: BuildSummaryCsvOptions): string {
-	const { summaries, policy, period, provenance } = opts;
+	const {
+		summaries,
+		policy,
+		period,
+		provenance,
+		includeProvenance = true,
+	} = opts;
 
 	const monthName = new Date(
 		Date.UTC(period.year, period.month, 1),
@@ -280,16 +295,20 @@ export function buildSummaryCsv(opts: BuildSummaryCsvOptions): string {
 		grandBackdatedHours.toFixed(2),
 	].join(SEP);
 
-	const periodLabel = `${period.year}-${String(period.month + 1).padStart(2, '0')}`;
-	const provenanceLine = buildProvenanceFooter({
-		policy,
-		period: periodLabel,
-		provenance,
-		jiraHostFallback: 'unknown',
-		versionFallback: 'dev',
-	});
-
-	return [titleRow, '', headers, ...rows, totalRow, provenanceLine].join('\n');
+	const lines = [titleRow, '', headers, ...rows, totalRow];
+	if (includeProvenance) {
+		const periodLabel = `${period.year}-${String(period.month + 1).padStart(2, '0')}`;
+		lines.push(
+			buildProvenanceFooter({
+				policy,
+				period: periodLabel,
+				provenance,
+				jiraHostFallback: 'unknown',
+				versionFallback: 'dev',
+			}),
+		);
+	}
+	return lines.join('\n');
 }
 
 export function download(filename: string, content: string) {

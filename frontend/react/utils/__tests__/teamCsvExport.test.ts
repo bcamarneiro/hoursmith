@@ -65,6 +65,14 @@ describe('buildTeamCsv', () => {
 		expect(csv.split('\n')[0]).not.toContain('Absence (h)');
 	});
 
+	it('omits the provenance footer when includeProvenance is false', () => {
+		const csv = buildTeamCsv([makeMember()], weekdays, {
+			provenance: fixedProvenance,
+			includeProvenance: false,
+		});
+		expect(csv).not.toContain('# generated=');
+	});
+
 	it('includes Backdated (h) column in the header', () => {
 		const csv = buildTeamCsv([makeMember()], weekdays, fixedProvenance);
 		const headerLine = csv.split('\n')[0];
