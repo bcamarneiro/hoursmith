@@ -2,9 +2,10 @@
 /**
  * Generate the 1200x630 social-preview (og:image) asset for Hoursmith.
  *
- * Hand-authors a branded, deterministic SVG (Hoursmith wordmark + clock mark,
- * a one-line tagline, and the signature worklog-heatmap motif in the brand
- * indigo) and rasterizes it to PNG with rsvg-convert (librsvg), falling back
+ * Hand-authors a branded, deterministic SVG (Hoursmith wordmark + Billet H mark,
+ * a one-line tagline, and the signature worklog-heatmap motif in the Forge ×
+ * Ledger paper→ember ramp) and rasterizes it to PNG with rsvg-convert (librsvg),
+ * falling back
  * to ImageMagick (magick / convert). The SVG is byte-stable across runs so the
  * committed PNG is fully reproducible. No npm rasterizer dependency is added.
  *
@@ -27,12 +28,16 @@ const OUT_PNG = path.join(FRONTEND_PUBLIC, 'og-image.png');
 const W = 1200;
 const H = 630;
 
-// Brand palette: indigo ramp anchored on the brand color (#4f46e5).
-const BRAND = '#4f46e5';
-const PALETTE = ['#e7e9ff', '#c7ccff', '#a5b4fc', '#6366f1', '#4338ca'];
-const INK = '#1e1b2e';
+// Forge × Ledger palette: ember brand (#c8431a) with a paper→ember heatmap ramp.
+const BRAND = '#c8431a';
+const SPARK = '#ee6b2d';
+const PALETTE = ['#ece3d6', '#f0c8ad', '#e89e72', '#d4622f', '#c8431a'];
+const INK = '#1c1714';
+const PAPER = '#f4efe7';
 const FONT =
-	"-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+	"'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const FONT_DISPLAY =
+	"'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 // Deterministic GitHub-style contribution grid (byte-stable across runs).
 function buildHeatmap(x0, y0, cols, rows, cell, gap) {
@@ -61,17 +66,17 @@ function buildHeatmap(x0, y0, cols, rows, cell, gap) {
 	return rects.join('\n      ');
 }
 
-const heatmap = buildHeatmap(672, 214, 11, 7, 38, 12);
+const heatmap = buildHeatmap(720, 196, 8, 7, 40, 11);
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#eef0ff"/>
+      <stop offset="0" stop-color="#faf6f0"/>
+      <stop offset="1" stop-color="#efe6d9"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="${BRAND}"/>
-      <stop offset="1" stop-color="#4338ca"/>
+      <stop offset="1" stop-color="${SPARK}"/>
     </linearGradient>
   </defs>
 
@@ -79,45 +84,49 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
   <rect x="0" y="0" width="${W}" height="10" fill="url(#accent)"/>
 
   <g transform="translate(80,80)">
-    <rect width="76" height="76" rx="20" fill="url(#accent)"/>
-    <g transform="translate(38,40)" fill="none" stroke="#ffffff"
-       stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="0" cy="0" r="17"/>
-      <path d="M0 0 L0 -10"/>
-      <path d="M0 0 L7 4"/>
-    </g>
+    <!-- Billet H mark -->
+    <rect width="76" height="76" rx="18" fill="${INK}"/>
+    <rect x="19" y="14" width="11" height="48" rx="3" fill="${PAPER}"/>
+    <rect x="46" y="14" width="11" height="48" rx="3" fill="${PAPER}"/>
+    <rect x="19" y="32" width="38" height="12" rx="3" fill="${BRAND}"/>
+    <circle cx="62" cy="29" r="2.4" fill="${SPARK}"/>
+    <circle cx="66" cy="35" r="1.6" fill="${SPARK}"/>
   </g>
-  <text x="176" y="134" font-family="${FONT}"
-    font-size="50" font-weight="800" fill="${INK}">Hoursmith</text>
+  <text x="176" y="134" font-family="${FONT_DISPLAY}"
+    font-size="50" font-weight="800"><tspan fill="${INK}">Hour</tspan><tspan fill="${BRAND}">smith</tspan></text>
 
-  <text x="80" y="312" font-family="${FONT}"
-    font-size="58" font-weight="800" fill="${INK}">Chase missing Jira</text>
-  <text x="80" y="384" font-family="${FONT}"
-    font-size="58" font-weight="800" fill="url(#accent)">worklogs before invoice day.</text>
+  <text x="80" y="290" font-family="${FONT_DISPLAY}"
+    font-size="48" font-weight="800" fill="${INK}">Chase missing Jira</text>
+  <text x="80" y="346" font-family="${FONT_DISPLAY}"
+    font-size="48" font-weight="800" fill="url(#accent)">worklogs before</text>
+  <text x="80" y="402" font-family="${FONT_DISPLAY}"
+    font-size="48" font-weight="800" fill="url(#accent)">invoice day.</text>
 
-  <text x="82" y="452" font-family="${FONT}"
-    font-size="28" font-weight="500" fill="#4b4869">A team-lead&#39;s dashboard. Browser-only &#8212; your data never leaves.</text>
+  <text x="82" y="456" font-family="${FONT}"
+    font-size="26" font-weight="500" fill="#574d43">A team-lead&#39;s dashboard.</text>
+  <text x="82" y="492" font-family="${FONT}"
+    font-size="26" font-weight="500" fill="#574d43">Browser-only &#8212; your data never leaves.</text>
 
-  <g transform="translate(80,504)">
+  <g transform="translate(80,512)">
     <rect width="232" height="54" rx="27" fill="${INK}"/>
     <text x="116" y="36" text-anchor="middle" font-family="${FONT}"
-      font-size="25" font-weight="600" fill="#ffffff">hoursmith.io</text>
+      font-size="25" font-weight="600" fill="${PAPER}">hoursmith.io</text>
   </g>
 
   <g>
-    <text x="672" y="188" font-family="${FONT}"
-      font-size="22" font-weight="600" fill="#6b6890">Logged hours, at a glance</text>
+    <text x="720" y="176" font-family="${FONT}"
+      font-size="22" font-weight="600" fill="#938778">Logged hours, at a glance</text>
     ${heatmap}
   </g>
 
-  <g transform="translate(672,548)">
-    <text x="0" y="15" font-family="${FONT}" font-size="18" font-weight="500" fill="#6b6890">Less</text>
+  <g transform="translate(720,572)">
+    <text x="0" y="15" font-family="${FONT}" font-size="18" font-weight="500" fill="#938778">Less</text>
     <rect x="52" y="2" width="18" height="18" rx="4" fill="${PALETTE[0]}"/>
     <rect x="76" y="2" width="18" height="18" rx="4" fill="${PALETTE[1]}"/>
     <rect x="100" y="2" width="18" height="18" rx="4" fill="${PALETTE[2]}"/>
     <rect x="124" y="2" width="18" height="18" rx="4" fill="${PALETTE[3]}"/>
     <rect x="148" y="2" width="18" height="18" rx="4" fill="${PALETTE[4]}"/>
-    <text x="176" y="15" font-family="${FONT}" font-size="18" font-weight="500" fill="#6b6890">More</text>
+    <text x="176" y="15" font-family="${FONT}" font-size="18" font-weight="500" fill="#938778">More</text>
   </g>
 </svg>
 `;
