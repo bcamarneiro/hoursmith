@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#eef0ff"/>
+      <stop offset="0" stop-color="#faf6f0"/>
+      <stop offset="1" stop-color="#efe6d9"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#4f46e5"/>
-      <stop offset="1" stop-color="#4338ca"/>
+      <stop offset="0" stop-color="#c8431a"/>
+      <stop offset="1" stop-color="#ee6b2d"/>
     </linearGradient>
   </defs>
 
@@ -14,120 +14,103 @@
   <rect x="0" y="0" width="1200" height="10" fill="url(#accent)"/>
 
   <g transform="translate(80,80)">
-    <rect width="76" height="76" rx="20" fill="url(#accent)"/>
-    <g transform="translate(38,40)" fill="none" stroke="#ffffff"
-       stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="0" cy="0" r="17"/>
-      <path d="M0 0 L0 -10"/>
-      <path d="M0 0 L7 4"/>
-    </g>
+    <!-- Billet H mark -->
+    <rect width="76" height="76" rx="18" fill="#1c1714"/>
+    <rect x="19" y="14" width="11" height="48" rx="3" fill="#f4efe7"/>
+    <rect x="46" y="14" width="11" height="48" rx="3" fill="#f4efe7"/>
+    <rect x="19" y="32" width="38" height="12" rx="3" fill="#c8431a"/>
+    <circle cx="62" cy="29" r="2.4" fill="#ee6b2d"/>
+    <circle cx="66" cy="35" r="1.6" fill="#ee6b2d"/>
   </g>
-  <text x="176" y="134" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-    font-size="50" font-weight="800" fill="#1e1b2e">Hoursmith</text>
+  <text x="176" y="134" font-family="'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    font-size="50" font-weight="800"><tspan fill="#1c1714">Hour</tspan><tspan fill="#c8431a">smith</tspan></text>
 
-  <text x="80" y="312" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-    font-size="58" font-weight="800" fill="#1e1b2e">Chase missing Jira</text>
-  <text x="80" y="384" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-    font-size="58" font-weight="800" fill="url(#accent)">worklogs before invoice day.</text>
+  <text x="80" y="290" font-family="'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    font-size="48" font-weight="800" fill="#1c1714">Chase missing Jira</text>
+  <text x="80" y="346" font-family="'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    font-size="48" font-weight="800" fill="url(#accent)">worklogs before</text>
+  <text x="80" y="402" font-family="'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    font-size="48" font-weight="800" fill="url(#accent)">invoice day.</text>
 
-  <text x="82" y="452" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-    font-size="28" font-weight="500" fill="#4b4869">A team-lead&#39;s dashboard. Browser-only &#8212; your data never leaves.</text>
+  <text x="82" y="456" font-family="'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    font-size="26" font-weight="500" fill="#574d43">A team-lead&#39;s dashboard.</text>
+  <text x="82" y="492" font-family="'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    font-size="26" font-weight="500" fill="#574d43">Browser-only &#8212; your data never leaves.</text>
 
-  <g transform="translate(80,504)">
-    <rect width="232" height="54" rx="27" fill="#1e1b2e"/>
-    <text x="116" y="36" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-      font-size="25" font-weight="600" fill="#ffffff">hoursmith.io</text>
+  <g transform="translate(80,512)">
+    <rect width="232" height="54" rx="27" fill="#1c1714"/>
+    <text x="116" y="36" text-anchor="middle" font-family="'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+      font-size="25" font-weight="600" fill="#f4efe7">hoursmith.io</text>
   </g>
 
   <g>
-    <text x="672" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
-      font-size="22" font-weight="600" fill="#6b6890">Logged hours, at a glance</text>
-    <rect x="672" y="214" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="672" y="264" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="672" y="314" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="672" y="364" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="672" y="414" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="672" y="464" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="672" y="514" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="722" y="214" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="722" y="264" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="722" y="314" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="722" y="364" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="722" y="414" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="722" y="464" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="722" y="514" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="772" y="214" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="772" y="264" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="772" y="314" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="772" y="364" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="772" y="414" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="772" y="464" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="772" y="514" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="822" y="214" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="822" y="264" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="822" y="314" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="822" y="364" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="822" y="414" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="822" y="464" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="822" y="514" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="872" y="214" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="872" y="264" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="872" y="314" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="872" y="364" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="872" y="414" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="872" y="464" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="872" y="514" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="922" y="214" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="922" y="264" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="922" y="314" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="922" y="364" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="922" y="414" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="922" y="464" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="922" y="514" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="972" y="214" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="972" y="264" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="972" y="314" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="972" y="364" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="972" y="414" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="972" y="464" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="972" y="514" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="1022" y="214" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1022" y="264" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1022" y="314" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="1022" y="364" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="1022" y="414" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1022" y="464" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1022" y="514" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="1072" y="214" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="1072" y="264" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1072" y="314" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1072" y="364" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="1072" y="414" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1072" y="464" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="1072" y="514" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="1122" y="214" width="38" height="38" rx="5" fill="#6366f1"/>
-      <rect x="1122" y="264" width="38" height="38" rx="5" fill="#a5b4fc"/>
-      <rect x="1122" y="314" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1122" y="364" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1122" y="414" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1122" y="464" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1122" y="514" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1172" y="214" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1172" y="264" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1172" y="314" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1172" y="364" width="38" height="38" rx="5" fill="#4338ca"/>
-      <rect x="1172" y="414" width="38" height="38" rx="5" fill="#c7ccff"/>
-      <rect x="1172" y="464" width="38" height="38" rx="5" fill="#e7e9ff"/>
-      <rect x="1172" y="514" width="38" height="38" rx="5" fill="#6366f1"/>
+    <text x="720" y="176" font-family="'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+      font-size="22" font-weight="600" fill="#938778">Logged hours, at a glance</text>
+    <rect x="720" y="196" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="720" y="247" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="720" y="298" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="720" y="349" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="720" y="400" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="720" y="451" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="720" y="502" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="771" y="196" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="771" y="247" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="771" y="298" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="771" y="349" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="771" y="400" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="771" y="451" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="771" y="502" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="822" y="196" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="822" y="247" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="822" y="298" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="822" y="349" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="822" y="400" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="822" y="451" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="822" y="502" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="873" y="196" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="873" y="247" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="873" y="298" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="873" y="349" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="873" y="400" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="873" y="451" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="873" y="502" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="924" y="196" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="924" y="247" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="924" y="298" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="924" y="349" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="924" y="400" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="924" y="451" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="924" y="502" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="975" y="196" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="975" y="247" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="975" y="298" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="975" y="349" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="975" y="400" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="975" y="451" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="975" y="502" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="1026" y="196" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="1026" y="247" width="40" height="40" rx="5" fill="#e89e72"/>
+      <rect x="1026" y="298" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="1026" y="349" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="1026" y="400" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="1026" y="451" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="1026" y="502" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="1077" y="196" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="1077" y="247" width="40" height="40" rx="5" fill="#ece3d6"/>
+      <rect x="1077" y="298" width="40" height="40" rx="5" fill="#d4622f"/>
+      <rect x="1077" y="349" width="40" height="40" rx="5" fill="#c8431a"/>
+      <rect x="1077" y="400" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="1077" y="451" width="40" height="40" rx="5" fill="#f0c8ad"/>
+      <rect x="1077" y="502" width="40" height="40" rx="5" fill="#d4622f"/>
   </g>
 
-  <g transform="translate(672,548)">
-    <text x="0" y="15" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#6b6890">Less</text>
-    <rect x="52" y="2" width="18" height="18" rx="4" fill="#e7e9ff"/>
-    <rect x="76" y="2" width="18" height="18" rx="4" fill="#c7ccff"/>
-    <rect x="100" y="2" width="18" height="18" rx="4" fill="#a5b4fc"/>
-    <rect x="124" y="2" width="18" height="18" rx="4" fill="#6366f1"/>
-    <rect x="148" y="2" width="18" height="18" rx="4" fill="#4338ca"/>
-    <text x="176" y="15" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#6b6890">More</text>
+  <g transform="translate(720,572)">
+    <text x="0" y="15" font-family="'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#938778">Less</text>
+    <rect x="52" y="2" width="18" height="18" rx="4" fill="#ece3d6"/>
+    <rect x="76" y="2" width="18" height="18" rx="4" fill="#f0c8ad"/>
+    <rect x="100" y="2" width="18" height="18" rx="4" fill="#e89e72"/>
+    <rect x="124" y="2" width="18" height="18" rx="4" fill="#d4622f"/>
+    <rect x="148" y="2" width="18" height="18" rx="4" fill="#c8431a"/>
+    <text x="176" y="15" font-family="'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="18" font-weight="500" fill="#938778">More</text>
   </g>
 </svg>
