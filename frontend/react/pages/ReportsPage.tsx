@@ -339,6 +339,7 @@ export const ReportsPage: React.FC = () => {
 	const handleExportTeamCsv = () => {
 		const csv = buildTeamCsv(sortedMembers, weekdays, {
 			provenance: { jiraHost: config.jiraHost },
+			includeProvenance: config.includeCsvProvenance,
 			includeAbsenceColumns: config.includeAbsenceInCsv,
 		});
 		const filename = `team-report-${weekStart}.csv`;

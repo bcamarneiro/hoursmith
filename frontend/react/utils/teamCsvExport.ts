@@ -21,6 +21,8 @@ export interface TeamCsvProvenance {
 
 export interface BuildTeamCsvOptions {
 	provenance?: TeamCsvProvenance;
+	/** Append the `# generated=…` provenance footer line. Default true. */
+	includeProvenance?: boolean;
 	/** Adds an "Absence (h)" column showing how much each member's target was
 	 *  reduced for PTO/holidays in the period. Off by default. */
 	includeAbsenceColumns?: boolean;
@@ -36,11 +38,16 @@ export function buildTeamCsv(
 	const isOptionsShape =
 		provenanceOrOptions !== undefined &&
 		('provenance' in provenanceOrOptions ||
+			'includeProvenance' in provenanceOrOptions ||
 			'includeAbsenceColumns' in provenanceOrOptions);
 	const opts: BuildTeamCsvOptions = isOptionsShape
 		? (provenanceOrOptions as BuildTeamCsvOptions)
 		: { provenance: provenanceOrOptions as TeamCsvProvenance | undefined };
-	const { provenance, includeAbsenceColumns = false } = opts;
+	const {
+		provenance,
+		includeProvenance = true,
+		includeAbsenceColumns = false,
+	} = opts;
 
 	const dayHeaders = weekdays.map(formatDayLabel);
 
@@ -113,14 +120,18 @@ export function buildTeamCsv(
 		);
 	}
 
-	const periodStart = weekdays[0] ?? '';
-	const periodEnd = weekdays[weekdays.length - 1] ?? '';
-	const provenanceFooter = buildProvenanceFooter({
-		policy: 'logged',
-		period: `${periodStart}..${periodEnd}`,
-		provenance,
-		omitMissingVersion: true,
-	});
-
-	return [headers, ...rows, provenanceFooter].join('\n');
+	const lines = [headers, ...rows];
+	if (includeProvenance) {
+		const periodStart = weekdays[0] ?? '';
+		const periodEnd = weekdays[weekdays.length - 1] ?? '';
+		lines.push(
+			buildProvenanceFooter({
+				policy: 'logged',
+				period: `${periodStart}..${periodEnd}`,
+				provenance,
+				omitMissingVersion: true,
+			}),
+		);
+	}
+	return lines.join('\n');
 }

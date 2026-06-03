@@ -54,6 +54,12 @@ export interface Config {
 	 * for new installs would silently strip data — keep on.
 	 */
 	includeAbsenceInCsv: boolean;
+	/**
+	 * When true, CSV exports append a `# generated=… jira=… policy=… period=…`
+	 * provenance footer line (traceability for finance/audit). Off by default
+	 * so exports are clean and don't leak the Jira host / build version.
+	 */
+	includeCsvProvenance: boolean;
 }
 
 interface ConfigState {
@@ -171,6 +177,7 @@ export function createDefaultConfig(): Config {
 		theme: 'system',
 		timeRounding: 'off',
 		includeAbsenceInCsv: true,
+		includeCsvProvenance: false,
 	};
 }
 
@@ -267,6 +274,10 @@ export function normalizeConfig(
 			typeof config?.includeAbsenceInCsv === 'boolean'
 				? config.includeAbsenceInCsv
 				: fallback.includeAbsenceInCsv,
+		includeCsvProvenance:
+			typeof config?.includeCsvProvenance === 'boolean'
+				? config.includeCsvProvenance
+				: fallback.includeCsvProvenance,
 	};
 }
 

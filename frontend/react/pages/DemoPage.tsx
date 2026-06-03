@@ -78,7 +78,7 @@ export const DemoPage: React.FC = () => {
 
 	const handleExportCsv = () => {
 		const csv = buildTeamCsv(sortedMembers, DEMO_WEEKDAYS, {
-			provenance: { jiraHost: 'demo.hoursmith.io' },
+			includeProvenance: false,
 		});
 		downloadAsFile(csv, 'hoursmith-demo-team.csv', 'text/csv;charset=utf-8');
 		toast.success('Demo CSV exported');

@@ -28,6 +28,16 @@ describe('generateWeeklyCsv', () => {
 		);
 	});
 
+	it('omits the provenance footer when includeProvenance is false', () => {
+		const result = generateWeeklyCsv(weekStart, weekEnd, [], {
+			provenance: fixedProvenance,
+			includeProvenance: false,
+		});
+		const lines = result.split('\n');
+		expect(lines).toHaveLength(5); // meta + header + 3 totals, no footer
+		expect(result).not.toContain('# generated=');
+	});
+
 	it('should export a single worklog correctly', () => {
 		const worklogs: WeekWorklogEntry[] = [
 			{
