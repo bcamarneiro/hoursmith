@@ -141,9 +141,9 @@ export const MyWeekPage: React.FC = () => {
 			<div className={styles.container}>
 				<section className={styles.emptySetup}>
 					<div className={styles.emptySetupText}>
-						<h2>Set up Jira before you use Dashboard</h2>
+						<h2>Set up Jira before you use My Week</h2>
 						<p>
-							Dashboard works best once Jira is connected and the core checks
+							My Week works best once Jira is connected and the core checks
 							pass. After that, this becomes the fastest place to close the
 							week.
 						</p>
@@ -180,7 +180,7 @@ export const MyWeekPage: React.FC = () => {
 					<SourceStatusBar />
 				</div>
 				<div className={styles.error}>
-					<h2>Unable to load dashboard</h2>
+					<h2>Unable to load My Week</h2>
 					<p>{worklogsError}</p>
 					<Link to="/settings">Check your settings</Link>
 				</div>

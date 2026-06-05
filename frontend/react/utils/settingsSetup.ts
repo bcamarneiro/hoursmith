@@ -225,7 +225,7 @@ export function buildSettingsSetupModel(
 
 	const signalsDetail =
 		configuredSignalCount === 0
-			? 'Dashboard can still work with Jira only, but suggestions stay lighter until you add calendar feeds, GitLab, or RescueTime.'
+			? 'My Week can still work with Jira only, but suggestions stay lighter until you add calendar feeds, GitLab, or RescueTime.'
 			: configuredSourceFailures.length > 0
 				? `${joinList(configuredSources)} configured, but ${joinList(configuredSourceFailures)} still need attention.`
 				: `${joinList(configuredSources)} configured for richer suggestions and absence handling.`;
@@ -270,7 +270,7 @@ export function buildSettingsSetupModel(
 			status: signalsStatus,
 			summary:
 				signalsStatus === 'ready'
-					? 'Dashboard has richer sources available.'
+					? 'My Week has richer sources available.'
 					: configuredSignalCount > 0
 						? 'Some optional sources are configured but still need review.'
 						: 'You can improve suggestions later with optional sources.',
@@ -325,7 +325,7 @@ export function buildSettingsSetupModel(
 		},
 		{
 			id: 'signals',
-			label: 'Dashboard signals',
+			label: 'My Week signals',
 			status: signalsStatus,
 			detail: signalsDetail,
 			sectionId: SETTINGS_SECTION_IDS.integrations,
@@ -345,12 +345,12 @@ export function buildSettingsSetupModel(
 			? 'ready'
 			: 'warning';
 	const dashboardDetail = !coreReady
-		? 'Finish verifying Jira and save the current form before relying on Dashboard actions.'
+		? 'Finish verifying Jira and save the current form before relying on My Week actions.'
 		: config.canAddWorklogs
 			? configuredSignalCount > 0
 				? 'Ready for weekly triage, quick logging, and richer suggestions.'
 				: 'Ready for weekly triage and quick logging. Add optional sources later if you want smarter suggestions.'
-			: 'Dashboard is usable in read-only mode, but quick logging is disabled by the current permissions.';
+			: 'My Week is usable in read-only mode, but quick logging is disabled by the current permissions.';
 
 	const reportsStatus: SetupStatus = !coreReady ? overallStatus : 'ready';
 	const reportsDetail = !coreReady
@@ -409,7 +409,7 @@ export function buildSettingsSetupModel(
 
 	const detail = coreReady
 		? configuredSignalCount > 0
-			? 'The app is ready for daily use, and your optional signals are already helping Dashboard stay useful.'
+			? 'The app is ready for daily use, and your optional signals are already helping My Week stay useful.'
 			: 'The app is ready for weekly logging and reporting. Optional sources can come later without blocking you.'
 		: hasConnectionCredentials
 			? 'The essentials are almost there. A successful Jira check plus a clean save is what turns this into a trustworthy daily tool.'
@@ -428,7 +428,7 @@ export function buildSettingsSetupModel(
 		diagnostics,
 		surfaces: {
 			dashboard: {
-				label: 'Dashboard',
+				label: 'My Week',
 				status: dashboardStatus,
 				detail: dashboardDetail,
 			},
