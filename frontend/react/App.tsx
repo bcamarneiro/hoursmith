@@ -12,6 +12,7 @@ import * as styles from './App.module.css';
 
 import { Navigation } from './components/Navigation';
 import { BuildInfoFooter } from './components/ui/BuildInfoFooter';
+import { SiteFooter } from './components/ui/SiteFooter';
 import { Spinner } from './components/ui/Spinner';
 import { ToastContainer } from './components/ui/Toast';
 import { useFlags } from './hooks/useFlags';
@@ -164,6 +165,7 @@ const AppShell: React.FC = () => {
 				</Routes>
 			</Suspense>
 			<ToastContainer />
+			<SiteFooter />
 			<BuildInfoFooter />
 		</div>
 	);
