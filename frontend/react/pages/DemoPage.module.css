@@ -12,10 +12,10 @@
 	gap: 0.75rem;
 	padding: 0.75rem 1rem;
 	margin-bottom: 1.5rem;
-	border: 1px solid #c7d2fe;
+	border: 1px solid var(--color-info-border);
 	border-radius: 10px;
-	background: #eef2ff;
-	color: #3730a3;
+	background: var(--color-info-bg);
+	color: var(--color-info);
 	font-size: 0.9rem;
 }
 
@@ -24,7 +24,7 @@
 }
 
 .bannerText a {
-	color: #4338ca;
+	color: var(--color-text-link);
 	font-weight: 600;
 	text-decoration: underline;
 }
@@ -32,17 +32,17 @@
 .exportButton {
 	flex-shrink: 0;
 	padding: 0.5rem 0.9rem;
-	border: 1px solid #4f46e5;
+	border: 1px solid var(--color-primary);
 	border-radius: 8px;
-	background: #4f46e5;
-	color: #fff;
+	background: var(--color-primary);
+	color: var(--color-text-inverse);
 	font-size: 0.85rem;
 	font-weight: 600;
 	cursor: pointer;
 }
 
 .exportButton:hover {
-	background: #4338ca;
+	background: var(--color-primary-hover);
 }
 
 .header {
@@ -57,6 +57,6 @@
 
 .subtitle {
 	margin: 0.25rem 0 0;
-	color: #6b7280;
+	color: var(--color-text-secondary);
 	font-size: 0.95rem;
 }

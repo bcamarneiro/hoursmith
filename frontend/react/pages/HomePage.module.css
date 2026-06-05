@@ -393,7 +393,7 @@
 }
 
 .rollupCellMissed {
-	color: var(--color-danger, #dc2626);
+	color: var(--color-error);
 	font-weight: var(--font-bold);
 	background-color: var(--color-day-incomplete-bg);
 }
