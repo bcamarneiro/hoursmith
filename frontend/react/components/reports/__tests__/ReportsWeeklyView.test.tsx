@@ -82,6 +82,17 @@ describe('ReportsWeeklyView', () => {
 		expect(screen.queryByLabelText(/Worked on time off/)).toBeNull();
 	});
 
+	it('shows the connect-Jira guard when notConfigured, not the empty-team state', () => {
+		render(
+			<MemoryRouter>
+				<ReportsWeeklyView {...baseProps} notConfigured />
+			</MemoryRouter>,
+		);
+		expect(screen.getByText('Connect Jira to see reports')).toBeTruthy();
+		expect(screen.getByText('Go to Settings')).toBeTruthy();
+		expect(screen.queryByText('No team data found')).toBeNull();
+	});
+
 	it('renders the team error block when teamError is provided', () => {
 		render(
 			<MemoryRouter>

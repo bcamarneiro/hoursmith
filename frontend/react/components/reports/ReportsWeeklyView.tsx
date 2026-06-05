@@ -179,6 +179,13 @@ type Props = {
 	hasNoFilteredWeeklyResults: boolean;
 	weeklySummary: { totalSeconds: number; totalGapSeconds: number } | null;
 	onMemberClick: (name: string) => void;
+	/**
+	 * True when Jira isn't connected yet (no host/API token). Shows a "connect
+	 * Jira" guard instead of the misleading empty-team state, matching the
+	 * monthly view's not-configured branch. Optional + defaults off so the demo
+	 * (sample data, intentionally unconfigured) renders normally.
+	 */
+	notConfigured?: boolean;
 };
 
 export const ReportsWeeklyView: React.FC<Props> = ({
@@ -200,8 +207,22 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 	hasNoFilteredWeeklyResults,
 	weeklySummary,
 	onMemberClick,
+	notConfigured,
 }) => {
 	const weekdays = getWeekdays(weekStart);
+
+	if (notConfigured) {
+		return (
+			<div className={styles.error}>
+				<h2>Connect Jira to see reports</h2>
+				<p>
+					Add your Jira host and API token in Settings to load your team's
+					weekly worklogs.
+				</p>
+				<Link to="/settings">Go to Settings</Link>
+			</div>
+		);
+	}
 
 	return (
 		<>

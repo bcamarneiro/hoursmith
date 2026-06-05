@@ -805,6 +805,7 @@ export const ReportsPage: React.FC = () => {
 					hasNoFilteredWeeklyResults={hasNoFilteredWeeklyResults}
 					weeklySummary={weeklySummary}
 					onMemberClick={handleMemberClick}
+					notConfigured={!config.jiraHost || !config.apiToken}
 				/>
 			) : (
 				<ReportsMonthlyView
