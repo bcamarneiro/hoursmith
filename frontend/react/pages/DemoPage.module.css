@@ -60,3 +60,36 @@
 	color: var(--color-text-secondary);
 	font-size: 0.95rem;
 }
+
+.demoFooter {
+	margin-top: 2rem;
+	padding-top: 1.5rem;
+	border-top: 1px solid var(--color-border);
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	align-items: flex-start;
+}
+
+.demoFooterText {
+	margin: 0;
+	color: var(--color-text-secondary);
+	font-size: 0.95rem;
+}
+
+.demoFooterActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: center;
+}
+
+.ctaLink {
+	color: var(--color-text-link);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.ctaLink:hover {
+	text-decoration: underline;
+}

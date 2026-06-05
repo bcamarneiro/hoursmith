@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { isPremiumBuild } from '../../buildTier';
 import type { TeamMemberSummary } from '../../services/teamService';
 import { ReportsWeeklyView } from '../components/reports/ReportsWeeklyView';
 import { toast } from '../components/ui/Toast';
@@ -130,6 +131,23 @@ export const DemoPage: React.FC = () => {
 				weeklySummary={weeklySummary}
 				onMemberClick={handleMemberClick}
 			/>
+
+			<footer className={styles.demoFooter}>
+				<p className={styles.demoFooterText}>
+					This is demo data. Connect your own Jira to chase your team's real
+					worklogs before invoice day.
+				</p>
+				<div className={styles.demoFooterActions}>
+					{isPremiumBuild() && (
+						<Link to="/auth/sign-up" className={styles.exportButton}>
+							Create account
+						</Link>
+					)}
+					<Link to="/pricing" className={styles.ctaLink}>
+						See pricing
+					</Link>
+				</div>
+			</footer>
 		</div>
 	);
 };

@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import { isPremiumBuild } from '../../buildTier';
 import type { PublicFlags } from '../../services/flagsService';
 import { PremiumWaitlistForm } from '../components/marketing/PremiumWaitlistForm';
 import { useFlags } from '../hooks/useFlags';
@@ -90,6 +91,17 @@ export const PricingPage: React.FC = () => {
 					Hoursmith replaces ~2 hours of month-end timesheet chasing per client.
 					Worth €29 — or €60 if you serve multiple clients.
 				</p>
+				{isPremiumBuild() && (
+					<div className={styles.heroCta}>
+						<Link to="/auth/sign-up" className={styles.primaryCta}>
+							Create account
+						</Link>
+						<p className={styles.trustLine}>
+							Free to start — no card required. Pick a paid plan whenever you're
+							ready.
+						</p>
+					</div>
+				)}
 			</header>
 
 			<section className={styles.tiers}>

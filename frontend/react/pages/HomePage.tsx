@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import { isPremiumBuild } from '../../buildTier';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { PWAInstallCard } from '../components/home/PWAInstallCard';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -69,6 +70,9 @@ export const HomePage: React.FC = () => {
 	usePageTitle('Home');
 	const jiraHost = useConfigStore((state) => state.config.jiraHost);
 	const isConfigured = !!jiraHost;
+	// Only hosted builds have accounts. In a free/self-host build /auth/sign-up
+	// isn't a registered route, so the CTA is gated to avoid a dead link.
+	const isPremium = isPremiumBuild();
 
 	return (
 		<div className={styles.container}>
@@ -85,9 +89,19 @@ export const HomePage: React.FC = () => {
 					</p>
 
 					<div className={styles.buttonContainer}>
+						{isPremium && (
+							<Link to="/auth/sign-up" className={styles.primaryButton}>
+								Create account
+							</Link>
+						)}
 						{isConfigured ? (
 							<>
-								<Link to="/my-week" className={styles.primaryButton}>
+								<Link
+									to="/my-week"
+									className={
+										isPremium ? styles.secondaryButton : styles.primaryButton
+									}
+								>
 									Open My Week
 								</Link>
 								<Link to="/pricing" className={styles.secondaryButton}>
@@ -96,7 +110,12 @@ export const HomePage: React.FC = () => {
 							</>
 						) : (
 							<>
-								<Link to="/demo" className={styles.primaryButton}>
+								<Link
+									to="/demo"
+									className={
+										isPremium ? styles.secondaryButton : styles.primaryButton
+									}
+								>
 									Try the demo
 								</Link>
 								<Link to="/pricing" className={styles.secondaryButton}>
