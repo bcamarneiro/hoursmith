@@ -21,6 +21,7 @@
 
 import { getEntitlement } from '../_lib/entitlement.js';
 import { corsHeaders, forwardToJira } from '../_lib/jiraForward.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
 
 // Pin to Frankfurt for GDPR residency. Mirrors vercel.json.
 export const config = {
@@ -64,10 +65,31 @@ export default async function handler(request: Request): Promise<Response> {
 		});
 	}
 
-	// 3. Extract catch-all path from the URL (everything after `/api/proxy/`).
+	// 3. Per-user rate limit (ADA-302). Fails open if the counter store is
+	//    unavailable, so a transient backend issue never blocks a paying user.
+	const rate = await checkRateLimit(entitlement.userId);
+	if (!rate.allowed) {
+		logProxy({
+			userId: entitlement.userId,
+			upstreamStatus: 429,
+			durationMs: Date.now() - start,
+			note: 'rate_limited',
+		});
+		return jsonResponse(
+			429,
+			{
+				error: 'rate_limited',
+				detail: 'Too many requests. Please retry shortly.',
+				retry_after: rate.retryAfterSeconds,
+			},
+			{ 'retry-after': String(rate.retryAfterSeconds) },
+		);
+	}
+
+	// 4. Extract catch-all path from the URL (everything after `/api/proxy/`).
 	const path = extractPath(request.url);
 
-	// 4. Forward. TODO(ADA-272): add rate limiting here (per user_id, sliding window).
+	// 5. Forward.
 	const upstream = await forwardToJira({
 		request,
 		path,
@@ -96,12 +118,17 @@ function extractPath(requestUrl: string): string {
 	return pathname.slice(idx + marker.length);
 }
 
-function jsonResponse(status: number, body: Record<string, unknown>): Response {
+function jsonResponse(
+	status: number,
+	body: Record<string, unknown>,
+	extraHeaders: Record<string, string> = {},
+): Response {
 	return new Response(JSON.stringify(body), {
 		status,
 		headers: {
 			'content-type': 'application/json',
 			...corsHeaders(),
+			...extraHeaders,
 		},
 	});
 }
