@@ -89,7 +89,8 @@ export const PricingPage: React.FC = () => {
 				<h1 className={styles.title}>Pricing.</h1>
 				<p className={styles.timeCost}>
 					Hoursmith replaces ~2 hours of month-end timesheet chasing per client.
-					Worth €29 — or €60 if you serve multiple clients.
+					Worth €29 — yours at the €19/year founding rate — or €60/year for Lead
+					if you serve multiple clients.
 				</p>
 				{isPremiumBuild() && (
 					<div className={styles.heroCta}>
@@ -171,7 +172,7 @@ export const PricingPage: React.FC = () => {
 						<PaidCta
 							flags={flags}
 							href="/account?upgrade=hosted"
-							label="Get Hosted — €29/year"
+							label="Get Hosted — €19/year (founding)"
 						/>
 					</div>
 				</article>

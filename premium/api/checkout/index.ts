@@ -8,9 +8,11 @@
  *
  * Pricing model (fixed annual, ADA-304): the amount lives on the Polar product,
  * not in the request — the caller only picks a tier. Each tier maps to a Polar
- * product id via env:
- *   - hosted → POLAR_PRODUCT_HOSTED  (€29/yr)
- *   - lead   → POLAR_PRODUCT_LEAD    (€60/yr)
+ * product id via env. During the founding window these env vars point at the
+ * founding-rate products; swap them to the public-rate products when it ends
+ * (ADA-363 — no code change, the price is on the product):
+ *   - hosted → POLAR_PRODUCT_HOSTED  (€19/yr founding; €29 public list)
+ *   - lead   → POLAR_PRODUCT_LEAD    (€60/yr founding; €120 public list)
  *
  * Customer linkage: we pass `customer_external_id = <supabase user id>`, so
  * Polar creates/links the customer for us — no pre-provisioning, no stub row.
