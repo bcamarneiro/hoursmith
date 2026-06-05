@@ -75,8 +75,8 @@ async function postJson(
 const DEFAULT_UPGRADE_TIER: 'hosted' | 'lead' = 'hosted';
 
 const UPGRADE_TIER_LABELS: Record<'hosted' | 'lead', string> = {
-	hosted: 'Hosted (€29/year)',
-	lead: 'Lead (€60/year)',
+	hosted: 'Hosted (€19/year, founding)',
+	lead: 'Lead (€60/year, founding)',
 };
 
 // The `subscriptions` row only stores 'free' | 'premium' (DB CHECK) — the Polar
