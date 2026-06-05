@@ -4,8 +4,8 @@
 	align-items: center;
 	justify-content: center;
 	padding: 2rem;
-	background: var(--color-bg, #0b1020);
-	color: var(--color-text, #e7ecf3);
+	background: var(--color-bg, #f4efe7);
+	color: var(--color-text, #1c1714);
 }
 
 .card {
@@ -33,7 +33,7 @@
 }
 
 .link {
-	color: var(--color-primary, #6ea8fe);
+	color: var(--color-primary, #c8431a);
 	text-decoration: none;
 }
 

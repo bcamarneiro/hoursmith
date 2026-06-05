@@ -88,8 +88,8 @@
 }
 
 .gitlab {
-	background: var(--color-primary-light);
-	color: var(--color-primary);
+	background: var(--color-surface-sunken);
+	color: var(--color-text-secondary);
 }
 
 .calendar {
@@ -108,8 +108,8 @@
 }
 
 .template {
-	background: var(--color-primary-light);
-	color: var(--color-primary);
+	background: var(--color-surface-sunken);
+	color: var(--color-text-secondary);
 }
 
 .previousWeek {
@@ -338,43 +338,4 @@
 	outline: none;
 	border-color: var(--color-primary);
 	box-shadow: 0 0 0 2px var(--color-primary-focus);
-}
-
-@media (prefers-color-scheme: dark) {
-	.jiraActivity {
-		background: #312e81;
-		color: #c7d2fe;
-	}
-	.gitlab {
-		background: #1e3a5f;
-		color: #93c5fd;
-	}
-	.calendar {
-		background: #064e3b;
-		color: #6ee7b7;
-	}
-	.rescuetime {
-		background: #78350f;
-		color: #fde68a;
-	}
-	.favorite {
-		background: #831843;
-		color: #fbcfe8;
-	}
-	.template {
-		background: #0c4a6e;
-		color: #bae6fd;
-	}
-	.previousWeek {
-		background: #4c1d95;
-		color: #ddd6fe;
-	}
-	.high {
-		background: #14532d;
-		color: #86efac;
-	}
-	.medium {
-		background: #713f12;
-		color: #fde047;
-	}
 }

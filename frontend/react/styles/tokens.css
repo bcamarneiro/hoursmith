@@ -47,6 +47,7 @@
 
 	/* Colors - Semantic (worklog status ramp — meaningful, separate from brand) */
 	--color-success: #4d7c3a;
+	--color-success-strong: #2f5226;
 	--color-success-bg: #eef3e6;
 	--color-success-border: #b9cfa3;
 	--color-warning: #b07d18;
@@ -180,6 +181,7 @@
 		--color-text-link: #f4843f;
 
 		--color-success: #8fbf6e;
+		--color-success-strong: #aede8d;
 		--color-success-bg: #1d2a15;
 		--color-success-border: #3f5a2c;
 		--color-warning: #d9ad4f;
@@ -241,6 +243,7 @@
 	--color-text-link: #f4843f;
 
 	--color-success: #8fbf6e;
+	--color-success-strong: #aede8d;
 	--color-success-bg: #1d2a15;
 	--color-success-border: #3f5a2c;
 	--color-warning: #d9ad4f;
@@ -297,6 +300,7 @@
 	--color-text-link: #c8431a;
 
 	--color-success: #4d7c3a;
+	--color-success-strong: #2f5226;
 	--color-success-bg: #eef3e6;
 	--color-success-border: #b9cfa3;
 	--color-warning: #b07d18;
