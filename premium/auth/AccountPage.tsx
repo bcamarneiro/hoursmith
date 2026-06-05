@@ -399,7 +399,14 @@ export function AccountPage(): JSX.Element {
 										Checkout is temporarily unavailable.
 									</p>
 								) : !flags.paywallOpenForMe ? (
-									<PremiumWaitlistForm source="in-app-settings" />
+									<>
+										<p className={styles.note}>
+											Hoursmith is in private beta — paid upgrades are
+											invite-only right now. Join the list and we'll email you
+											the moment your account is enabled.
+										</p>
+										<PremiumWaitlistForm source="in-app-settings" />
+									</>
 								) : (
 									<button
 										type="button"
@@ -424,7 +431,14 @@ export function AccountPage(): JSX.Element {
 										Checkout is temporarily unavailable.
 									</p>
 								) : !flags.paywallOpenForMe ? (
-									<PremiumWaitlistForm source="in-app-settings" />
+									<>
+										<p className={styles.note}>
+											Hoursmith is in private beta — paid upgrades are
+											invite-only right now. Join the list and we'll email you
+											the moment your account is enabled.
+										</p>
+										<PremiumWaitlistForm source="in-app-settings" />
+									</>
 								) : (
 									<button
 										type="button"
