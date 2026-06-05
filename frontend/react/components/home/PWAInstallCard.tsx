@@ -43,8 +43,8 @@ export const PWAInstallCard: React.FC = () => {
 				<h3>Keep this workspace one click away</h3>
 			</div>
 			<p>
-				Installing the app makes GitHub Pages feel much closer to a desktop app.
-				It keeps Dashboard and Reports easy to reopen without hunting for a tab.
+				Installing the app makes Hoursmith feel much closer to a desktop app. It
+				keeps My Week and Reports easy to reopen without hunting for a tab.
 			</p>
 			<ul className={styles.list}>
 				<li>Local settings stay in the browser on this device</li>
