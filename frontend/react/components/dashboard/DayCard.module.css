@@ -204,8 +204,15 @@
 	min-width: 0;
 }
 
-.cloneButton {
+/* Right-aligned group of per-worklog actions (Edit · Clone · Delete). */
+.worklogActions {
 	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.cloneButton {
 	background: none;
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
@@ -222,6 +229,30 @@
 	background: var(--color-primary);
 	color: white;
 	border-color: var(--color-primary);
+}
+
+.cloneButton:disabled {
+	opacity: 0.5;
+	cursor: progress;
+}
+
+.deleteWorklogButton {
+	background: none;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	padding: var(--space-1) var(--space-3);
+	font-size: var(--text-xs);
+	font-weight: var(--font-semibold);
+	color: var(--color-error);
+	cursor: pointer;
+	white-space: nowrap;
+	transition: all var(--transition-fast);
+}
+
+.deleteWorklogButton:hover {
+	background: var(--color-error);
+	color: var(--color-text-inverse);
+	border-color: var(--color-error);
 }
 
 .fillButton {
