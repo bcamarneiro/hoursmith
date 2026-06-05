@@ -1,9 +1,13 @@
-const CACHE_NAME = 'hoursmith-shell-v2';
+const CACHE_NAME = 'hoursmith-shell-v3';
+// Stable, fixed-name shell assets only. The JS/CSS bundles are content-hashed
+// (`main.<hash>.js`, etc.) and change every build, so they are NOT precached
+// here — listing them would 404 and, because `addAll` is atomic, abort the
+// whole install (the prior `./bundle.js` / `./bundle.css` entries never existed
+// in production, so the SW never installed). Hashed assets are cached at runtime
+// by the fetch handler below.
 const APP_SHELL = [
 	'./',
 	'./index.html',
-	'./bundle.js',
-	'./bundle.css',
 	'./manifest.webmanifest',
 	'./favicon.svg',
 	'./pwa-icon.svg',
@@ -12,7 +16,11 @@ const APP_SHELL = [
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
-		caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
+		caches.open(CACHE_NAME).then((cache) =>
+			// Resilient precache: a single missing asset must not abort the install
+			// (unlike `addAll`, which rejects the whole batch on any failure).
+			Promise.allSettled(APP_SHELL.map((url) => cache.add(url))),
+		),
 	);
 	self.skipWaiting();
 });
