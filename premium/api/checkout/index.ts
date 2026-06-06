@@ -45,6 +45,11 @@ export const config = {
 
 export type CheckoutTier = 'hosted' | 'lead';
 
+// Mirror of frontend/featureFlags.ts LEAD_TIER_ENABLED — the edge bundle can't
+// import frontend code, so keep these two in sync. Lead is sold-but-unbuilt
+// (ADA-358); refuse checkout for it until the tier ships (ADA-376).
+const LEAD_TIER_ENABLED = false;
+
 /** Maps the chosen tier to the env var holding its Polar product id. */
 const TIER_PRODUCT_ENV: Record<CheckoutTier, string> = {
 	hosted: 'POLAR_PRODUCT_HOSTED',
@@ -230,7 +235,9 @@ export async function handleCheckout(
 function parseTier(body: unknown): CheckoutTier | null {
 	if (!body || typeof body !== 'object') return null;
 	const raw = (body as { tier?: unknown }).tier;
-	return raw === 'hosted' || raw === 'lead' ? raw : null;
+	if (raw === 'hosted') return 'hosted';
+	if (raw === 'lead' && LEAD_TIER_ENABLED) return 'lead';
+	return null;
 }
 
 function extractBearer(header: string | null): string | null {

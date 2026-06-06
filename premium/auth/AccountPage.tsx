@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { LEAD_TIER_ENABLED } from '../../frontend/featureFlags';
 import { PremiumWaitlistForm } from '../../frontend/react/components/marketing/PremiumWaitlistForm';
 import { useFlags } from '../../frontend/react/hooks/useFlags';
 import * as styles from './AccountPage.module.css';
@@ -120,7 +121,11 @@ export function AccountPage(): JSX.Element {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const intendedTier = useMemo<'hosted' | 'lead' | null>(() => {
 		const v = searchParams.get('upgrade');
-		return v === 'hosted' || v === 'lead' ? v : null;
+		if (v === 'hosted') return 'hosted';
+		// Lead is hidden until it ships (ADA-376) — ignore ?upgrade=lead so a
+		// stale link can't auto-fire a checkout for the unbuilt tier.
+		if (v === 'lead' && LEAD_TIER_ENABLED) return 'lead';
+		return null;
 	}, [searchParams]);
 	const [subscription, setSubscription] = useState<SubscriptionRow | null>(
 		null,

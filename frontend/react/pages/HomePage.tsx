@@ -1,6 +1,7 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
 import { isPremiumBuild } from '../../buildTier';
+import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { PWAInstallCard } from '../components/home/PWAInstallCard';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -126,7 +127,9 @@ export const HomePage: React.FC = () => {
 					</div>
 
 					<p className={styles.priceAnchor}>
-						Free to self-host · Hosted €29/year · Lead from €60/year
+						{LEAD_TIER_ENABLED
+							? 'Free to self-host · Hosted €29/year · Lead from €60/year'
+							: 'Free to self-host · Hosted €29/year'}
 					</p>
 
 					<div className={styles.tertiaryLinks}>

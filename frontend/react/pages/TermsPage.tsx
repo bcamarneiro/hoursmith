@@ -1,4 +1,5 @@
 import type React from 'react';
+import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import { usePageTitle } from '../hooks/usePageTitle';
 import * as styles from './LegalPage.module.css';
 
@@ -70,10 +71,15 @@ export const TermsPage: React.FC = () => {
 					<strong>fixed-price annual subscription</strong>: the Hosted tier is{' '}
 					<strong>€29/year</strong> (with a founding rate of{' '}
 					<strong>€19/year</strong> for early subscribers, kept for as long as
-					the subscription stays active), and the Lead tier is{' '}
-					<strong>€60/year</strong>, rising to <strong>€120/year</strong> as
-					further Lead features ship. The subscription renews automatically each
-					year at your subscription's price, unless you cancel.
+					the subscription stays active)
+					{LEAD_TIER_ENABLED ? (
+						<>
+							, and the Lead tier is <strong>€60/year</strong>, rising to{' '}
+							<strong>€120/year</strong> as further Lead features ship
+						</>
+					) : null}
+					. The subscription renews automatically each year at your
+					subscription's price, unless you cancel.
 				</p>
 				<p className={styles.body}>
 					<strong>14-day right of withdrawal (EU):</strong> Under the EU
