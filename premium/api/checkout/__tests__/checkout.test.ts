@@ -125,13 +125,13 @@ describe('handleCheckout (Polar)', () => {
 		});
 	});
 
-	it('uses the lead product id for the lead tier', async () => {
+	it('rejects the lead tier while it is hidden (ADA-376)', async () => {
+		// Lead is sold-but-unbuilt (ADA-358); checkout refuses it until it ships.
 		const deps = makeDeps();
 		const res = await handleCheckout(makeRequest({ tier: 'lead' }), deps);
-		expect(res.status).toBe(200);
-		expect(deps.createCheckout).toHaveBeenCalledWith(
-			expect.objectContaining({ productId: 'prod_lead' }),
-		);
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({ error: 'invalid_tier' });
+		expect(deps.createCheckout).not.toHaveBeenCalled();
 	});
 
 	it('returns 502 when the Polar checkout call throws', async () => {
