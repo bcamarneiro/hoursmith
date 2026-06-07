@@ -16,6 +16,7 @@ import { SiteFooter } from './components/ui/SiteFooter';
 import { Spinner } from './components/ui/Spinner';
 import { ToastContainer } from './components/ui/Toast';
 import { useFlags } from './hooks/useFlags';
+import { usePageViewTracking } from './hooks/usePageViewTracking';
 import { useTheme } from './hooks/useTheme';
 import { MaintenancePage } from './pages/MaintenancePage';
 import { appBasePath, isHashRouterMode } from './utils/runtimeConfig';
@@ -94,6 +95,7 @@ function loadPremiumRoutes(): Promise<PremiumRoutesModule> {
 }
 
 const AppShell: React.FC = () => {
+	usePageViewTracking();
 	const [premium, setPremium] = useState<PremiumRoutesModule | null>(null);
 
 	useEffect(() => {

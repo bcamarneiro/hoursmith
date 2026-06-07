@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { trackEvent } from '../../frontend/analytics';
 import { LEAD_TIER_ENABLED } from '../../frontend/featureFlags';
 import { PremiumWaitlistForm } from '../../frontend/react/components/marketing/PremiumWaitlistForm';
 import { useFlags } from '../../frontend/react/hooks/useFlags';
@@ -174,6 +175,7 @@ export function AccountPage(): JSX.Element {
 	useEffect(() => {
 		if (searchParams.get('upgrade') !== 'success') return;
 		setJustUpgraded(true);
+		trackEvent('checkout_succeeded');
 		const next = new URLSearchParams(searchParams);
 		next.delete('upgrade');
 		setSearchParams(next, { replace: true });
@@ -207,6 +209,7 @@ export function AccountPage(): JSX.Element {
 		async (tier: 'hosted' | 'lead' = DEFAULT_UPGRADE_TIER) => {
 			setActionPending('checkout');
 			setActionError(null);
+			trackEvent('checkout_started', { tier });
 			try {
 				const res = await postJson('/api/checkout', session?.access_token, {
 					tier,
