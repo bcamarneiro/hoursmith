@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import { trackEvent } from '../../analytics';
 import { isPremiumBuild } from '../../buildTier';
 import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import { useConfigStore } from '../../stores/useConfigStore';
@@ -91,7 +92,13 @@ export const HomePage: React.FC = () => {
 
 					<div className={styles.buttonContainer}>
 						{isPremium && (
-							<Link to="/auth/sign-up" className={styles.primaryButton}>
+							<Link
+								to="/auth/sign-up"
+								className={styles.primaryButton}
+								onClick={() =>
+									trackEvent('cta_create_account', { location: 'home' })
+								}
+							>
 								Create account
 							</Link>
 						)}

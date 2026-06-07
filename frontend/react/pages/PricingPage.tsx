@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import { trackEvent } from '../../analytics';
 import { isPremiumBuild } from '../../buildTier';
 import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import type { PublicFlags } from '../../services/flagsService';
@@ -96,7 +97,13 @@ export const PricingPage: React.FC = () => {
 				</p>
 				{isPremiumBuild() && (
 					<div className={styles.heroCta}>
-						<Link to="/auth/sign-up" className={styles.primaryCta}>
+						<Link
+							to="/auth/sign-up"
+							className={styles.primaryCta}
+							onClick={() =>
+								trackEvent('cta_create_account', { location: 'pricing' })
+							}
+						>
 							Create account
 						</Link>
 						<p className={styles.trustLine}>
