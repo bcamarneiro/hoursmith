@@ -4,7 +4,6 @@ import { trackEvent } from '../../analytics';
 import { isPremiumBuild } from '../../buildTier';
 import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { PWAInstallCard } from '../components/home/PWAInstallCard';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { buildDemoTeam, DEMO_WEEKDAYS } from './demoFixture';
 import * as styles from './HomePage.module.css';
@@ -242,19 +241,6 @@ export const HomePage: React.FC = () => {
 						</div>
 					</div>
 				</div>
-			</section>
-
-			<section className={styles.section}>
-				<div className={styles.sectionHeading}>
-					<h2 className={styles.sectionTitle}>
-						Install it like a lightweight app
-					</h2>
-					<p className={styles.sectionDescription}>
-						A hosted workspace gets much more usable when it can live in a dock,
-						launcher, or home screen instead of a random browser tab.
-					</p>
-				</div>
-				<PWAInstallCard />
 			</section>
 
 			{!isConfigured && (
