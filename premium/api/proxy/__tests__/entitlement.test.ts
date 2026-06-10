@@ -101,8 +101,8 @@ describe('getEntitlement', () => {
 		expect(result.code).toBe('subscription_required');
 	});
 
-	it('returns 403 for past_due / incomplete / trialing (only "active" passes v1)', async () => {
-		for (const status of ['past_due', 'incomplete', 'trialing'] as const) {
+	it('returns 403 for revoked / not-yet-active statuses (canceled / unpaid / incomplete)', async () => {
+		for (const status of ['canceled', 'unpaid', 'incomplete'] as const) {
 			const client = makeClient({
 				getSubscription: vi.fn().mockResolvedValue({ tier: 'premium', status }),
 			});
@@ -113,7 +113,43 @@ describe('getEntitlement', () => {
 			expect(result.ok).toBe(false);
 			if (result.ok) return;
 			expect(result.status).toBe(403);
+			expect(result.code).toBe('subscription_required');
 		}
+	});
+
+	it('stays entitled during the past_due dunning grace window (ADA-371)', async () => {
+		// Polar retries the failed renewal for ~2 weeks before emitting
+		// `subscription.revoked`; until then proxy access must survive a
+		// transient card decline. Must agree with the client useSubscription
+		// check, which also treats `past_due` as active.
+		const client = makeClient({
+			getSubscription: vi
+				.fn()
+				.mockResolvedValue({ tier: 'premium', status: 'past_due' }),
+		});
+		const result = await getEntitlement(
+			makeRequest({ authorization: 'Bearer valid' }),
+			{ client },
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.status).toBe('past_due');
+		expect(result.tier).toBe('premium');
+	});
+
+	it('returns Entitlement for trialing subscriptions', async () => {
+		const client = makeClient({
+			getSubscription: vi
+				.fn()
+				.mockResolvedValue({ tier: 'premium', status: 'trialing' }),
+		});
+		const result = await getEntitlement(
+			makeRequest({ authorization: 'Bearer valid' }),
+			{ client },
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.status).toBe('trialing');
 	});
 
 	it('returns Entitlement on valid JWT + active subscription', async () => {
