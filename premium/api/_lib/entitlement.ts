@@ -113,7 +113,7 @@ export async function getEntitlement(
 	}
 
 	const subscription = await client.getSubscription(userId);
-	if (!subscription || subscription.status !== 'active') {
+	if (!subscription || !isEntitledStatus(subscription.status)) {
 		return {
 			ok: false,
 			status: 403,
@@ -128,6 +128,19 @@ export async function getEntitlement(
 		tier: subscription.tier,
 		status: subscription.status,
 	};
+}
+
+/**
+ * Statuses that grant proxy access. `past_due` is included for the dunning
+ * grace window (ADA-371): Polar retries the failed renewal over ~2 weeks and
+ * only then emits `subscription.revoked`, which our webhook maps to
+ * `tier:'free'`. That revoke — not the first failed charge — is the real
+ * cutoff, so `past_due` stays entitled until revoked. `canceled`/`unpaid`/
+ * `incomplete` are NOT entitled. Kept identical to the client check in
+ * `premium/auth/useSubscription.ts`.
+ */
+function isEntitledStatus(status: SubscriptionStatus): boolean {
+	return status === 'active' || status === 'trialing' || status === 'past_due';
 }
 
 function extractBearer(header: string | null): string | null {
