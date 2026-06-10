@@ -14,6 +14,8 @@
  * Linear: ADA-271.
  */
 
+import { corsHeaders } from './cors.js';
+
 /** Headers we drop before forwarding to Jira (browser-injected, leaky, or ours). */
 const REQUEST_HEADER_BLOCKLIST = new Set([
 	'host',
@@ -102,16 +104,6 @@ export function validateJiraBase(
 }
 
 /** Permissive CORS headers. TODO(ADA-271): lock down to https://hoursmith.io. */
-export function corsHeaders(): Record<string, string> {
-	return {
-		'access-control-allow-origin': '*',
-		'access-control-allow-methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-		'access-control-allow-headers':
-			'Authorization, Content-Type, Accept, X-Jira-Base, X-Jira-Auth, X-Atlassian-Token',
-		'access-control-expose-headers': 'Content-Type, Content-Length',
-		'access-control-max-age': '86400',
-	};
-}
 
 /**
  * Build the outbound request to Jira and stream the response back.
@@ -119,12 +111,17 @@ export function corsHeaders(): Record<string, string> {
 export async function forwardToJira(
 	input: JiraForwardInput,
 ): Promise<Response> {
+	const origin = input.request.headers.get('origin');
 	const baseCheck = validateJiraBase(input.jiraBase);
 	if (!baseCheck.ok) {
-		return jsonError(400, {
-			error: 'bad_request',
-			detail: baseCheck.reason,
-		});
+		return jsonError(
+			400,
+			{
+				error: 'bad_request',
+				detail: baseCheck.reason,
+			},
+			origin,
+		);
 	}
 
 	// Build target URL: base + path + original query string.
@@ -159,10 +156,14 @@ export async function forwardToJira(
 			...(hasBody ? ({ duplex: 'half' } as Record<string, unknown>) : {}),
 		});
 	} catch (err) {
-		return jsonError(502, {
-			error: 'upstream_error',
-			detail: (err as Error).message,
-		});
+		return jsonError(
+			502,
+			{
+				error: 'upstream_error',
+				detail: (err as Error).message,
+			},
+			origin,
+		);
 	}
 
 	// Strip CORS + hop-by-hop headers from upstream; add our own CORS.
@@ -172,7 +173,7 @@ export async function forwardToJira(
 			responseHeaders.set(key, value);
 		}
 	});
-	for (const [k, v] of Object.entries(corsHeaders())) {
+	for (const [k, v] of Object.entries(corsHeaders(origin))) {
 		responseHeaders.set(k, v);
 	}
 
@@ -205,12 +206,13 @@ function buildOutboundHeaders(
 function jsonError(
 	status: 400 | 502 | 504,
 	body: { error: string; detail?: string },
+	origin: string | null,
 ): Response {
 	return new Response(JSON.stringify(body), {
 		status,
 		headers: {
 			'content-type': 'application/json',
-			...corsHeaders(),
+			...corsHeaders(origin),
 		},
 	});
 }
