@@ -18,6 +18,8 @@
  *   DO NOT log: the email value, IP address, or any other request body field.
  */
 
+import { corsHeaders } from '../_lib/cors.js';
+
 // Pin to Frankfurt for GDPR residency. Mirrors vercel.json.
 export const config = {
 	runtime: 'edge',
@@ -56,8 +58,15 @@ export async function waitlistHandler(
 	request: Request,
 	options: WaitlistHandlerOptions = {},
 ): Promise<Response> {
+	const origin = request.headers.get('origin');
+	const json = (status: number, body: Record<string, unknown>): Response =>
+		new Response(JSON.stringify(body), {
+			status,
+			headers: { 'content-type': 'application/json', ...corsHeaders(origin) },
+		});
+
 	if (request.method === 'OPTIONS') {
-		return new Response(null, { status: 204, headers: corsHeaders() });
+		return new Response(null, { status: 204, headers: corsHeaders(origin) });
 	}
 	if (request.method !== 'POST') {
 		return json(405, { error: 'method_not_allowed' });
@@ -123,21 +132,6 @@ function parseBody(body: unknown): ParsedBody {
 		return { ok: false, reason: 'invalid_source' };
 	}
 	return { ok: true, value: { email, source: rawSource as WaitlistSource } };
-}
-
-function json(status: number, body: Record<string, unknown>): Response {
-	return new Response(JSON.stringify(body), {
-		status,
-		headers: { 'content-type': 'application/json', ...corsHeaders() },
-	});
-}
-
-function corsHeaders(): Record<string, string> {
-	return {
-		'access-control-allow-origin': '*',
-		'access-control-allow-methods': 'POST, OPTIONS',
-		'access-control-allow-headers': 'content-type',
-	};
 }
 
 /**
