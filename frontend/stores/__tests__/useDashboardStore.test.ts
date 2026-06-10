@@ -30,6 +30,7 @@ function makeDay(suggestions: WorklogSuggestion[]): DaySummary {
 		targetSeconds: 8 * 3600,
 		gapSeconds: 8 * 3600,
 		suggestions,
+		loggedWorklogs: [],
 	};
 }
 

@@ -21,6 +21,7 @@
 		"test:e2e:ui": "playwright test --ui",
 		"test:e2e:headed": "playwright test --headed",
 		"lint": "biome lint .",
+		"typecheck": "tsc --noEmit",
 		"format": "biome format . --write",
 		"check": "biome check --write --verbose .",
 		"check:premium-boundary": "node scripts/check-premium-boundary.cjs",

@@ -12,6 +12,7 @@ function createDay(overrides: Partial<DaySummary>): DaySummary {
 		gapSeconds: 0,
 		suggestions: [],
 		...overrides,
+		loggedWorklogs: [],
 	};
 }
 

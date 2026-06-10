@@ -41,6 +41,7 @@ function makeDay(
 		gapSeconds: 8 * 3600,
 		suggestions,
 		...overrides,
+		loggedWorklogs: [],
 	};
 }
 

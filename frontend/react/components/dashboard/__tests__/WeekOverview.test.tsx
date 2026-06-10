@@ -13,6 +13,7 @@ function makeDay(date: string, dayOfWeek: number): DaySummary {
 		targetSeconds: 28800,
 		gapSeconds: 25200,
 		suggestions: [],
+		loggedWorklogs: [],
 	};
 }
 
