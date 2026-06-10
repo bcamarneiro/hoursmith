@@ -18,6 +18,7 @@ import {
 	emailFromToken,
 	type Jwk,
 	userIdFromToken,
+	type VerifiedToken,
 	verifyJwt,
 } from '../auth.js';
 
@@ -73,7 +74,7 @@ async function es256() {
 	return {
 		sign,
 		fetchJwks: vi.fn(async (): Promise<Jwk[]> => [jwk]),
-		restVerify: vi.fn(async () => null),
+		restVerify: vi.fn(async (): Promise<VerifiedToken | null> => null),
 	};
 }
 

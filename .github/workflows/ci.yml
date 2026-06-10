@@ -32,6 +32,9 @@ jobs:
       - name: Run formatter check
         run: npx biome check . --linter-enabled=false --assist-enabled=false
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Run unit tests
         run: npm run test:run
 

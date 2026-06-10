@@ -10,6 +10,8 @@ const baseProps = {
 	themeId: 'theme',
 	timeRoundingId: 'round',
 	includeAbsenceInCsvId: 'include-absence',
+	includeCsvProvenance: false,
+	includeCsvProvenanceId: 'include-csv-provenance',
 };
 
 describe('PreferencesSection', () => {

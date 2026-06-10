@@ -23,6 +23,7 @@ const baseConfig = {
 	theme: 'system' as const,
 	timeRounding: 'off' as const,
 	includeAbsenceInCsv: true,
+	includeCsvProvenance: false,
 };
 
 describe('useSettingsFormStore', () => {

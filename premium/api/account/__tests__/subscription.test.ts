@@ -37,7 +37,9 @@ function makeAdmin(
 		deleteSubscription: vi.fn(),
 		deleteProfile: vi.fn(),
 		deleteAuthUser: vi.fn(),
+		signOutUser: vi.fn().mockResolvedValue(undefined),
 		insertAuditLog: vi.fn(),
+		recordBillingEvent: vi.fn().mockResolvedValue(true),
 		...overrides,
 	};
 }
