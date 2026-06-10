@@ -45,6 +45,24 @@ function formatHoursDecimal(hours: number): string {
 		: `${hours.toFixed(1)}h`;
 }
 
+// Compliance banner copy is derived from the members' actual targets — the
+// figure must reflect part-time/prorated targets and short weeks, never a
+// hardcoded 40h. When every rendered member shares the same target we can name
+// the hours; when targets differ we fall back to neutral, number-free copy.
+function getComplianceMessage(members: TeamMemberSummary[]): string {
+	const targets = members.map((m) => m.targetSeconds);
+	const allShareTarget = targets.every((t) => t === targets[0]);
+	if (allShareTarget && targets[0] > 0) {
+		const target = formatHours(targets[0]);
+		return members.length === 1
+			? `The team member has logged ${target}+ this week.`
+			: `Every team member has logged ${target}+ this week.`;
+	}
+	return members.length === 1
+		? 'The team member hit their logging target this week.'
+		: 'Every team member hit their logging target this week.';
+}
+
 function TeamMemberRow({
 	member,
 	weekdays,
@@ -114,7 +132,10 @@ function SummaryRow({
 		<tr className={styles.summaryRow}>
 			<td>
 				<span className={styles.summaryLabel}>Team Average</span>
-				<span className={styles.memberCount}> ({count} members)</span>
+				<span className={styles.memberCount}>
+					{' '}
+					({count} {count === 1 ? 'member' : 'members'})
+				</span>
 			</td>
 			{weekdays.map((day) => {
 				const avg =
@@ -385,7 +406,7 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 									Full team compliance!
 								</div>
 								<div className={styles.allCompliantText}>
-									Every team member has logged 40+ hours this week.
+									{getComplianceMessage(sortedMembers)}
 								</div>
 							</div>
 						)}
