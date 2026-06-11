@@ -1,7 +1,6 @@
 import type { WorklogSuggestion } from '../../types/Suggestion';
 import type { Config } from '../stores/useConfigStore';
-import { rewriteForHostedProxy } from './jiraGateway';
-import { fromHttpResponse } from './serviceErrors';
+import { fetchSearchPage } from './jiraSearch';
 
 const JIRA_KEY_RE = /([A-Z][A-Z0-9]+-\d+)/;
 
@@ -17,37 +16,6 @@ interface JiraIssueWithChangelog {
 	key: string;
 	fields: { summary?: string };
 	changelog?: JiraChangelog;
-}
-
-function buildUrl(config: Config, path: string): string {
-	const base = config.corsProxy
-		? `${config.corsProxy.replace(/\/$/, '')}/https://${config.jiraHost}`
-		: `https://${config.jiraHost}`;
-	return `${base}${path}`;
-}
-
-async function jiraFetch(
-	config: Config,
-	path: string,
-	signal?: AbortSignal,
-): Promise<unknown> {
-	const url = buildUrl(config, path);
-	const headers = {
-		Authorization: `Bearer ${config.apiToken}`,
-		Accept: 'application/json',
-		'X-Atlassian-Token': 'no-check',
-	};
-	const rewritten = rewriteForHostedProxy(url, headers, {
-		jiraHost: config.jiraHost,
-		email: config.email,
-		apiToken: config.apiToken,
-	});
-	const res = await fetch(rewritten.url, {
-		headers: rewritten.headers,
-		signal,
-	});
-	if (!res.ok) throw fromHttpResponse('Jira activity', res.status);
-	return res.json();
 }
 
 function dateOnly(iso: string): string {
@@ -66,18 +34,16 @@ export async function fetchJiraActivitySuggestions(
 ): Promise<WorklogSuggestion[]> {
 	if (!config.jiraHost || !config.apiToken) return [];
 
-	const jql = encodeURIComponent(
-		`(assignee = currentUser() OR worklogAuthor = currentUser()) AND updated >= "${weekStart}" AND updated <= "${weekEnd}"`,
-	);
-	const searchResult = (await jiraFetch(
+	const jql = `(assignee = currentUser() OR worklogAuthor = currentUser()) AND updated >= "${weekStart}" AND updated <= "${weekEnd}"`;
+	const { issues } = await fetchSearchPage<JiraIssueWithChangelog>(
 		config,
-		`/rest/api/2/search?jql=${jql}&maxResults=20&fields=summary&expand=changelog`,
+		{ jql, fields: 'summary', maxResults: 20, expand: 'changelog' },
 		signal,
-	)) as { issues: JiraIssueWithChangelog[] };
+	);
 
 	const suggestions: WorklogSuggestion[] = [];
 
-	const issueDetails = searchResult.issues;
+	const issueDetails = issues;
 
 	const userEmail = config.email.toLowerCase();
 

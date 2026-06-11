@@ -168,9 +168,87 @@ function parseWorklogDateRange(
 	};
 }
 
+/**
+ * Build the issue list for a search request, honouring the `worklogDate` window
+ * and embedding worklogs when the `fields` csv requests them. Shared by the v2
+ * (`/rest/api/2/search`, Server/DC) and v3 (`/rest/api/3/search/jql`, Cloud)
+ * handlers so both endpoints return identical issue shapes.
+ */
+function buildSearchIssues(jql: string, fields: string) {
+	const dateRange = parseWorklogDateRange(jql);
+	const inRange = (started: string | undefined): boolean => {
+		if (!dateRange) return true;
+		const day = (started ?? '').slice(0, 10);
+		if (!day) return false;
+		if (dateRange.from && day < dateRange.from) return false;
+		if (dateRange.to && day > dateRange.to) return false;
+		return true;
+	};
+
+	// Step 1: filter each issue's worklogs by the date range, then drop
+	// issues that have no surviving worklogs (mirrors Jira's behaviour:
+	// `worklogDate` constrains issues, not just embedded worklogs).
+	const filteredIssues = mockIssues
+		.map((issue) => ({
+			issue,
+			worklogs: (worklogsByIssue[issue.key] ?? []).filter((wl) =>
+				inRange(wl.started),
+			),
+		}))
+		.filter(({ worklogs }) => worklogs.length > 0);
+
+	// If the request asks for worklog fields, embed them in the response
+	const includeWorklogs = fields.includes('worklog');
+
+	const issues = filteredIssues.map(({ issue, worklogs }) => {
+		if (!includeWorklogs) return issue;
+		return {
+			...issue,
+			fields: {
+				...issue.fields,
+				worklog: {
+					startAt: 0,
+					maxResults: 50,
+					total: worklogs.length,
+					worklogs,
+				},
+			},
+		};
+	});
+
+	return { issues, includeWorklogs, dateRange };
+}
+
 // ── MSW Handlers ────────────────────────────────────────────────────
 export const handlers = [
-	// Search issues — returns worklog data embedded when fields include "worklog".
+	// Cloud search — `/rest/api/3/search/jql` (CHANGE-2046 replacement for the
+	// removed v2 `/search`). Cursor-paginated in production; the mock returns a
+	// single page with `isLast: true` (no `nextPageToken`). The dev/offline host
+	// is `mock.atlassian.net`, so `isCloudJira` routes here.
+	http.get('https://*.atlassian.net/rest/api/3/search/jql', ({ request }) => {
+		const url = new URL(request.url);
+		const jql = url.searchParams.get('jql') || '';
+		const fields = url.searchParams.get('fields') || '';
+
+		logger.debug('[MSW] Intercepted Jira v3 search/jql:', { jql, fields });
+
+		const { issues, includeWorklogs, dateRange } = buildSearchIssues(
+			jql,
+			fields,
+		);
+
+		logger.debug(
+			`[MSW] v3 returning ${issues.length} issues (worklogs embedded: ${includeWorklogs}, dateRange: ${JSON.stringify(dateRange)})`,
+		);
+
+		return HttpResponse.json({
+			issues,
+			isLast: true,
+		});
+	}),
+
+	// Server/DC search — classic `/rest/api/2/search` with `startAt`/`total`.
+	// Kept for the non-Cloud code path and as a safety net.
 	// Honours `worklogDate >= … AND worklogDate <= …` JQL clauses by filtering
 	// the embedded worklogs to that window (so production + offline tests
 	// exercise the same JQL escaping path).
@@ -181,46 +259,10 @@ export const handlers = [
 
 		logger.debug('[MSW] Intercepted Jira issue search:', { jql, fields });
 
-		const dateRange = parseWorklogDateRange(jql);
-		const inRange = (started: string | undefined): boolean => {
-			if (!dateRange) return true;
-			const day = (started ?? '').slice(0, 10);
-			if (!day) return false;
-			if (dateRange.from && day < dateRange.from) return false;
-			if (dateRange.to && day > dateRange.to) return false;
-			return true;
-		};
-
-		// Step 1: filter each issue's worklogs by the date range, then drop
-		// issues that have no surviving worklogs (mirrors Jira's behaviour:
-		// `worklogDate` constrains issues, not just embedded worklogs).
-		const filteredIssues = mockIssues
-			.map((issue) => ({
-				issue,
-				worklogs: (worklogsByIssue[issue.key] ?? []).filter((wl) =>
-					inRange(wl.started),
-				),
-			}))
-			.filter(({ worklogs }) => worklogs.length > 0);
-
-		// If the request asks for worklog fields, embed them in the response
-		const includeWorklogs = fields.includes('worklog');
-
-		const issues = filteredIssues.map(({ issue, worklogs }) => {
-			if (!includeWorklogs) return issue;
-			return {
-				...issue,
-				fields: {
-					...issue.fields,
-					worklog: {
-						startAt: 0,
-						maxResults: 50,
-						total: worklogs.length,
-						worklogs,
-					},
-				},
-			};
-		});
+		const { issues, includeWorklogs, dateRange } = buildSearchIssues(
+			jql,
+			fields,
+		);
 
 		logger.debug(
 			`[MSW] Returning ${issues.length} issues (worklogs embedded: ${includeWorklogs}, dateRange: ${JSON.stringify(dateRange)})`,
