@@ -1,6 +1,7 @@
 import type React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { isPremiumBuild } from '../../buildTier';
+import { useIsAuthenticated } from '../hooks/useIsAuthenticated';
 import * as styles from './Navigation.module.css';
 
 /**
@@ -26,6 +27,7 @@ export const Navigation: React.FC = () => {
 	// (the paths premium/auth/routes.tsx registers), so frontend/ never imports
 	// premium/* and check:premium-boundary stays green.
 	const showAuth = isPremiumBuild();
+	const isAuthed = useIsAuthenticated();
 
 	return (
 		<nav className={styles.nav} aria-label="Primary">
@@ -95,20 +97,23 @@ export const Navigation: React.FC = () => {
 				</div>
 				{showAuth && (
 					<div className={styles.authCluster}>
-						<Link
-							to="/auth/sign-in"
-							className={linkClass('/auth/sign-in')}
-							aria-current={isActive('/auth/sign-in') ? 'page' : undefined}
-						>
-							Sign in
-						</Link>
-						<Link
-							to="/account"
-							className={linkClass('/account')}
-							aria-current={isActive('/account') ? 'page' : undefined}
-						>
-							Account
-						</Link>
+						{isAuthed ? (
+							<Link
+								to="/account"
+								className={linkClass('/account')}
+								aria-current={isActive('/account') ? 'page' : undefined}
+							>
+								Account
+							</Link>
+						) : (
+							<Link
+								to="/auth/sign-in"
+								className={linkClass('/auth/sign-in')}
+								aria-current={isActive('/auth/sign-in') ? 'page' : undefined}
+							>
+								Sign in
+							</Link>
+						)}
 					</div>
 				)}
 			</div>

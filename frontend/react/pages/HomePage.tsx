@@ -4,6 +4,7 @@ import { trackEvent } from '../../analytics';
 import { isPremiumBuild } from '../../buildTier';
 import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import { useConfigStore } from '../../stores/useConfigStore';
+import { useIsAuthenticated } from '../hooks/useIsAuthenticated';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { buildDemoTeam, DEMO_WEEKDAYS } from './demoFixture';
 import * as styles from './HomePage.module.css';
@@ -74,6 +75,10 @@ export const HomePage: React.FC = () => {
 	// Only hosted builds have accounts. In a free/self-host build /auth/sign-up
 	// isn't a registered route, so the CTA is gated to avoid a dead link.
 	const isPremium = isPremiumBuild();
+	const isAuthed = useIsAuthenticated();
+	// Show the "Create account" CTA only to logged-out visitors on hosted builds;
+	// a signed-in user leads straight into the app instead (ADA-379).
+	const showCreateAccount = isPremium && !isAuthed;
 
 	return (
 		<div className={styles.container}>
@@ -90,7 +95,7 @@ export const HomePage: React.FC = () => {
 					</p>
 
 					<div className={styles.buttonContainer}>
-						{isPremium && (
+						{showCreateAccount && (
 							<Link
 								to="/auth/sign-up"
 								className={styles.primaryButton}
@@ -106,7 +111,9 @@ export const HomePage: React.FC = () => {
 								<Link
 									to="/my-week"
 									className={
-										isPremium ? styles.secondaryButton : styles.primaryButton
+										showCreateAccount
+											? styles.secondaryButton
+											: styles.primaryButton
 									}
 								>
 									Open My Week
@@ -120,7 +127,9 @@ export const HomePage: React.FC = () => {
 								<Link
 									to="/demo"
 									className={
-										isPremium ? styles.secondaryButton : styles.primaryButton
+										showCreateAccount
+											? styles.secondaryButton
+											: styles.primaryButton
 									}
 								>
 									Try the demo
