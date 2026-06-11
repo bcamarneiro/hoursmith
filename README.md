@@ -6,7 +6,7 @@ Hoursmith is a personal Jira worklog dashboard for developers, tech leads, and e
 
 ## Free and Premium
 
-Hoursmith is open source. The whole app is in this repository under MIT. There is also a hosted Premium tier for people who would rather not run a local proxy.
+Hoursmith is source-available, with the app core under MIT. The whole app is in this repository; only the hosted Premium code under [`/premium`](premium) is BSL 1.1 (converting to Apache 2.0 in 2030). There is also a hosted Premium tier for people who would rather not run a local proxy.
 
 | | Free (self-host) | Hosted | Lead |
 |---|---|---|---|
@@ -62,7 +62,7 @@ If you stop using Hoursmith, clear site data in your browser and revoke the API 
 The repository uses a split license:
 
 - Everything at the repository root is [MIT](LICENSE). This is the app you self-host.
-- Everything under [`/premium`](premium) is [BSL 1.1](premium/LICENSE). This is the code that powers the hosted Premium proxy. It is source-available so you can read and audit it, but it is not licensed for you to run a competing hosted service.
+- Everything under [`/premium`](premium) is [BSL 1.1](premium/LICENSE). This is the code that powers the hosted Premium proxy. It is source-available so you can read and audit it, but it is not licensed for you to run a competing hosted service. It converts to Apache 2.0 on 2030-05-16.
 
 The boundary is enforced in CI via `npm run check:premium-boundary`. If you only care about the open-source app, you can ignore `/premium` entirely.
 

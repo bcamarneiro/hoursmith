@@ -115,57 +115,66 @@ const AppShell: React.FC = () => {
 
 	const tree = (
 		<div className={styles.appContainer}>
+			<a href="#main" className={styles.skipLink}>
+				Skip to main content
+			</a>
 			<Navigation />
-			<Suspense
-				fallback={
-					<div className={styles.routeLoader}>
-						<Spinner size="lg" />
-						<span>Loading workspace...</span>
-					</div>
-				}
-			>
-				<Routes>
-					<Route path="/" element={<HomePage />} />
-					<Route path="/my-week" element={<MyWeekPage />} />
-					<Route
-						path="/dashboard"
-						element={<Navigate to="/my-week" replace />}
-					/>
-					<Route path="/pricing" element={<PricingPage />} />
-					<Route path="/demo" element={<DemoPage />} />
-					<Route path="/reports" element={<ReportsPage />} />
-					<Route path="/team" element={<Navigate to="/reports" replace />} />
-					<Route
-						path="/timesheet"
-						element={<Navigate to="/reports" replace />}
-					/>
-					<Route path="/settings" element={<SettingsPage />} />
-					<Route path="/sub-processors" element={<SubProcessorsPage />} />
-					<Route path="/privacy" element={<PrivacyPage />} />
-					<Route path="/terms" element={<TermsPage />} />
-					{premium?.premiumRoutes.map((route) => (
-						<Route key={route.path} path={route.path} element={route.element} />
-					))}
-					{/*
-					 * In premium builds the route table is split: known routes are
-					 * registered above, premium routes load asynchronously into
-					 * `premium`. If we render the catch-all redirect before the
-					 * dynamic chunk has resolved, a deep-link to /auth/sign-up
-					 * (which is a premium route) gets redirected to "/" before
-					 * SignUpPage ever mounts — and the URL change means SignUpPage
-					 * never renders even after the chunk finishes loading.
-					 *
-					 * In dev this is masked because the in-memory bundle resolves
-					 * synchronously; in production the network fetch opens the race.
-					 *
-					 * Fix: in premium builds, hold the catch-all until the chunk
-					 * resolves. Free builds keep the immediate catch-all.
-					 */}
-					{(!isPremiumBuild() || premium) && (
-						<Route path="*" element={<Navigate to="/" replace />} />
-					)}
-				</Routes>
-			</Suspense>
+			<main id="main">
+				<Suspense
+					fallback={
+						<div className={styles.routeLoader}>
+							<Spinner size="lg" />
+							<span>Loading workspace...</span>
+						</div>
+					}
+				>
+					<Routes>
+						<Route path="/" element={<HomePage />} />
+						<Route path="/my-week" element={<MyWeekPage />} />
+						<Route
+							path="/dashboard"
+							element={<Navigate to="/my-week" replace />}
+						/>
+						<Route path="/pricing" element={<PricingPage />} />
+						<Route path="/demo" element={<DemoPage />} />
+						<Route path="/reports" element={<ReportsPage />} />
+						<Route path="/team" element={<Navigate to="/reports" replace />} />
+						<Route
+							path="/timesheet"
+							element={<Navigate to="/reports" replace />}
+						/>
+						<Route path="/settings" element={<SettingsPage />} />
+						<Route path="/sub-processors" element={<SubProcessorsPage />} />
+						<Route path="/privacy" element={<PrivacyPage />} />
+						<Route path="/terms" element={<TermsPage />} />
+						{premium?.premiumRoutes.map((route) => (
+							<Route
+								key={route.path}
+								path={route.path}
+								element={route.element}
+							/>
+						))}
+						{/*
+						 * In premium builds the route table is split: known routes are
+						 * registered above, premium routes load asynchronously into
+						 * `premium`. If we render the catch-all redirect before the
+						 * dynamic chunk has resolved, a deep-link to /auth/sign-up
+						 * (which is a premium route) gets redirected to "/" before
+						 * SignUpPage ever mounts — and the URL change means SignUpPage
+						 * never renders even after the chunk finishes loading.
+						 *
+						 * In dev this is masked because the in-memory bundle resolves
+						 * synchronously; in production the network fetch opens the race.
+						 *
+						 * Fix: in premium builds, hold the catch-all until the chunk
+						 * resolves. Free builds keep the immediate catch-all.
+						 */}
+						{(!isPremiumBuild() || premium) && (
+							<Route path="*" element={<Navigate to="/" replace />} />
+						)}
+					</Routes>
+				</Suspense>
+			</main>
 			<ToastContainer />
 			<SiteFooter />
 			<BuildInfoFooter />
