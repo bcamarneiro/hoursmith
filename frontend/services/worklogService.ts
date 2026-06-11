@@ -1,7 +1,7 @@
 import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import { rewriteForHostedProxy } from './jiraGateway';
-import { fromHttpResponse } from './serviceErrors';
+import { fetchSearchPage } from './jiraSearch';
 
 export interface WorklogEntry {
 	date: string;
@@ -56,24 +56,13 @@ export async function fetchWeekWorklogs(
 		'X-Atlassian-Token': 'no-check',
 	};
 
-	const jql = encodeURIComponent(
-		`worklogDate >= "${weekStart}" AND worklogDate <= "${weekEnd}" AND worklogAuthor = currentUser()`,
-	);
+	const jql = `worklogDate >= "${weekStart}" AND worklogDate <= "${weekEnd}" AND worklogAuthor = currentUser()`;
 
-	const initialUrl = `${base}/rest/api/2/search?jql=${jql}&maxResults=50&fields=key,summary,worklog`;
-	const rewritten = rewriteForHostedProxy(initialUrl, headers, {
-		jiraHost: config.jiraHost,
-		email: config.email,
-		apiToken: config.apiToken,
-	});
-	const res = await fetch(rewritten.url, {
-		headers: rewritten.headers,
+	const { issues } = await fetchSearchPage<JiraSearchIssue>(
+		config,
+		{ jql, fields: 'key,summary,worklog', maxResults: 50 },
 		signal,
-	});
-
-	if (!res.ok) throw fromHttpResponse('Jira issue worklog', res.status);
-
-	const data = (await res.json()) as { issues: JiraSearchIssue[] };
+	);
 
 	const entries: WorklogEntry[] = [];
 	const email = config.email.toLowerCase();
@@ -84,7 +73,7 @@ export async function fetchWeekWorklogs(
 	endDate.setHours(23, 59, 59, 999);
 	const endMillis = endDate.getTime();
 
-	for (const issue of data.issues) {
+	for (const issue of issues) {
 		const embedded = issue.fields.worklog;
 		let worklogs: JiraWorklogItem[];
 
