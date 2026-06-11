@@ -118,15 +118,20 @@ export default async function handler(request: Request): Promise<Response> {
 }
 
 /**
- * Extract the catch-all path. Vercel routes `premium/api/proxy/[...path].ts`
- * to e.g. `/api/proxy/rest/api/2/myself`; we want `rest/api/2/myself`.
+ * Extract the upstream Jira path. Vercel's filesystem router doesn't deploy a
+ * `[...path]` catch-all for this project (symlinked `api/`), so a `vercel.json`
+ * rewrite maps `/api/proxy/:path*` → `/api/proxy?__target=:path*` and this
+ * single function reads the path from `__target` (ADA-381). Falls back to the
+ * legacy `/api/proxy/` path marker for any direct, un-rewritten call.
  */
 function extractPath(requestUrl: string): string {
-	const { pathname } = new URL(requestUrl);
+	const url = new URL(requestUrl);
+	const target = url.searchParams.get('__target');
+	if (target) return target.replace(/^\/+/, '');
 	const marker = '/api/proxy/';
-	const idx = pathname.indexOf(marker);
+	const idx = url.pathname.indexOf(marker);
 	if (idx === -1) return '';
-	return pathname.slice(idx + marker.length);
+	return url.pathname.slice(idx + marker.length);
 }
 
 function jsonResponse(

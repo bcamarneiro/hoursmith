@@ -131,7 +131,9 @@ export async function forwardToJira(
 	const cleanPath = input.path.replace(/^\/+/, '');
 	target.pathname =
 		target.pathname.replace(/\/+$/, '') + (cleanPath ? `/${cleanPath}` : '');
-	// Preserve query string from incoming request.
+	// Preserve query string from incoming request — minus our internal routing
+	// param (ADA-381: the proxy path arrives via ?__target=… after the rewrite).
+	url.searchParams.delete('__target');
 	target.search = url.search;
 
 	const outboundHeaders = buildOutboundHeaders(

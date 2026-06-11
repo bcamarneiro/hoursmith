@@ -5,6 +5,10 @@
 	"regions": ["fra1"],
 	"rewrites": [
 		{
+			"source": "/api/proxy/:path*",
+			"destination": "/api/proxy?__target=:path*"
+		},
+		{
 			"source": "/((?!api/).*)",
 			"destination": "/index.html"
 		}
