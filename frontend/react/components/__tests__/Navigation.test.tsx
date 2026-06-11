@@ -10,6 +10,10 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+	__resetProxyBridgeForTests,
+	setSupabaseAccessToken,
+} from '../../../services/proxyUrlBridge';
 import { Navigation } from '../Navigation';
 
 let mockIsPremium = false;
@@ -28,6 +32,7 @@ function renderNav(initialPath = '/') {
 
 afterEach(() => {
 	mockIsPremium = false;
+	__resetProxyBridgeForTests();
 });
 
 describe('Navigation', () => {
@@ -57,16 +62,24 @@ describe('Navigation', () => {
 		expect(screen.queryByRole('link', { name: 'Account' })).toBeNull();
 	});
 
-	it('shows Sign in and Account in the premium build', () => {
+	it('shows Sign in (not Account) for a logged-out premium visitor', () => {
 		mockIsPremium = true;
 		renderNav();
 		expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
 			'href',
 			'/auth/sign-in',
 		);
+		expect(screen.queryByRole('link', { name: 'Account' })).toBeNull();
+	});
+
+	it('shows Account (not Sign in) for a logged-in premium user', () => {
+		mockIsPremium = true;
+		setSupabaseAccessToken('a-token');
+		renderNav();
 		expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute(
 			'href',
 			'/account',
 		);
+		expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
 	});
 });

@@ -5,6 +5,7 @@ import { isPremiumBuild } from '../../buildTier';
 import type { TeamMemberSummary } from '../../services/teamService';
 import { ReportsWeeklyView } from '../components/reports/ReportsWeeklyView';
 import { toast } from '../components/ui/Toast';
+import { useIsAuthenticated } from '../hooks/useIsAuthenticated';
 import { usePageTitle } from '../hooks/usePageTitle';
 import type {
 	ReportsSortDirection,
@@ -42,6 +43,8 @@ function sortDemoMembers(
 
 export const DemoPage: React.FC = () => {
 	usePageTitle('Demo');
+	const isAuthed = useIsAuthenticated();
+	const showCreateAccount = isPremiumBuild() && !isAuthed;
 
 	// Default to gap-descending so the teammate most behind sits at the top —
 	// that's the chase-your-team's-missing-hours moment the demo exists to show.
@@ -138,7 +141,7 @@ export const DemoPage: React.FC = () => {
 					worklogs before invoice day.
 				</p>
 				<div className={styles.demoFooterActions}>
-					{isPremiumBuild() && (
+					{showCreateAccount && (
 						<Link to="/auth/sign-up" className={styles.exportButton}>
 							Create account
 						</Link>
