@@ -6,6 +6,7 @@ import {
 	describeGitlabConnectionError,
 	normalizeGitlabHost,
 } from '../services/gitlabService';
+import { rewriteForHostedProxy } from '../services/jiraGateway';
 import { type Config, normalizeConfig, useConfigStore } from './useConfigStore';
 import { buildJiraConnectionFingerprint, useUIStore } from './useUIStore';
 
@@ -120,14 +121,26 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				? `${normalizedConfig.corsProxy.replace(/\/$/, '')}/https://${normalizedConfig.jiraHost}`
 				: `https://${normalizedConfig.jiraHost}`;
 
-			const headers: HeadersInit = {
+			const baseHeaders: Record<string, string> = {
 				Authorization: `Bearer ${normalizedConfig.apiToken}`,
 				Accept: 'application/json',
 				'X-Atlassian-Token': 'no-check',
 			};
+			// Route through the hosted proxy for entitled premium users (no-op in
+			// direct/self-hosted mode). The connection test previously fetched Jira
+			// directly, which a hosted user's browser can't do (CORS) — ADA-382.
+			const jiraReq = (url: string) =>
+				rewriteForHostedProxy(url, baseHeaders, {
+					jiraHost: normalizedConfig.jiraHost,
+					email: normalizedConfig.email,
+					apiToken: normalizedConfig.apiToken,
+				});
 
 			const startTime = performance.now();
-			const myselfRes = await fetch(`${host}/rest/api/2/myself`, { headers });
+			const myselfReq = jiraReq(`${host}/rest/api/2/myself`);
+			const myselfRes = await fetch(myselfReq.url, {
+				headers: myselfReq.headers,
+			});
 			if (!myselfRes.ok) {
 				throw new Error(`Jira API error: ${myselfRes.status}`);
 			}
@@ -137,10 +150,12 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 
 			// Auto-detect worklog permissions
 			try {
-				const permsRes = await fetch(
+				const permsReq = jiraReq(
 					`${host}/rest/api/2/mypermissions?permissions=WORK_ON_ISSUES,EDIT_ALL_WORKLOGS,EDIT_OWN_WORKLOGS,DELETE_ALL_WORKLOGS,DELETE_OWN_WORKLOGS`,
-					{ headers },
 				);
+				const permsRes = await fetch(permsReq.url, {
+					headers: permsReq.headers,
+				});
 				if (permsRes.ok) {
 					const perms = (await permsRes.json()) as {
 						permissions?: Record<string, { havePermission: boolean }>;
