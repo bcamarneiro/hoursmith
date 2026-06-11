@@ -4,7 +4,7 @@ import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
 import { rewriteForHostedProxy } from './jiraGateway';
-import { fromHttpResponse } from './serviceErrors';
+import { searchAllIssues } from './jiraSearch';
 
 export type WorklogAuthor = JiraUser;
 export type WorklogItem = EnrichedJiraWorklog;
@@ -108,48 +108,41 @@ export async function fetchMonthWorklogs(
 	// Step 1: Search with embedded worklogs included
 	// Jira embeds up to 20 worklogs per issue. For issues with ≤20 total
 	// worklogs, we get everything from the search — no extra API call needed.
-	const issues: SearchIssue[] = [];
-	let startAt = 0;
 	const maxResults = 100;
 	const fields = 'key,summary,issuetype,parent,project,status,worklog';
 
-	while (true) {
-		const searchUrl = `${base}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&startAt=${startAt}&fields=${fields}`;
-		const rewritten = rewriteForHostedProxy(searchUrl, headers, {
-			jiraHost: config.jiraHost,
-			email: config.email,
-			apiToken: config.apiToken,
-		});
-		const res = await fetch(rewritten.url, {
-			headers: rewritten.headers,
+	const issues = await searchAllIssues<SearchIssue>(
+		config,
+		{ jql, fields, maxResults },
+		{
 			signal,
-		});
-		if (!res.ok) throw fromHttpResponse('Jira search', res.status);
-		const data = (await res.json()) as {
-			issues: SearchIssue[];
-			total: number;
-		};
-
-		for (const issue of data.issues) {
-			issues.push(issue);
-		}
-
-		const totalPages = Math.max(1, Math.ceil(data.total / maxResults));
-		const currentPage = Math.min(
-			totalPages,
-			Math.floor(startAt / maxResults) + 1,
-		);
-		const searchPercent = 10 + (currentPage / totalPages) * 35;
-		emitProgress(options?.onProgress, {
-			phase: 'searching',
-			percent: searchPercent,
-			message: 'Searching Jira issues with worklogs',
-			detail: `Loaded search page ${currentPage} of ${totalPages}`,
-		});
-
-		if (issues.length >= data.total || data.issues.length === 0) break;
-		startAt += maxResults;
-	}
+			onPage: (_pageIssues, { fetched, total }) => {
+				if (typeof total === 'number') {
+					// Server/DC: total known → render "page X of Y".
+					const totalPages = Math.max(1, Math.ceil(total / maxResults));
+					const currentPage = Math.min(
+						totalPages,
+						Math.max(1, Math.ceil(fetched / maxResults)),
+					);
+					const searchPercent = 10 + (currentPage / totalPages) * 35;
+					emitProgress(options?.onProgress, {
+						phase: 'searching',
+						percent: searchPercent,
+						message: 'Searching Jira issues with worklogs',
+						detail: `Loaded search page ${currentPage} of ${totalPages}`,
+					});
+				} else {
+					// Cloud: cursor pagination, no total → report the running count.
+					emitProgress(options?.onProgress, {
+						phase: 'searching',
+						percent: 45,
+						message: 'Searching Jira issues with worklogs',
+						detail: `Loaded ${fetched} issue${fetched === 1 ? '' : 's'}`,
+					});
+				}
+			},
+		},
+	);
 
 	if (signal?.aborted) return [];
 

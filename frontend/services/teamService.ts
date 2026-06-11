@@ -1,7 +1,7 @@
 import { addDaysToIsoDate } from '../react/utils/date';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
-import { fromHttpResponse } from './serviceErrors';
+import { searchAllIssues } from './jiraSearch';
 
 export interface TeamMemberSummary {
 	email: string;
@@ -99,40 +99,14 @@ export async function fetchTeamWorklogs(
 	// client-side via `classifyWorklog(wl).loggedOn`.
 	const fetchStart = addDaysToIsoDate(weekStart, -7);
 	const fetchEnd = addDaysToIsoDate(weekEnd, 7);
-	const jql = encodeURIComponent(
-		`worklogDate >= "${fetchStart}" AND worklogDate <= "${fetchEnd}"`,
-	);
+	const jql = `worklogDate >= "${fetchStart}" AND worklogDate <= "${fetchEnd}"`;
 
 	// Step 1: Search with embedded worklogs
-	const issues: SearchIssue[] = [];
-	let startAt = 0;
-	const maxResults = 50;
-
-	while (true) {
-		const res = await fetch(
-			buildUrl(
-				config,
-				`/rest/api/2/search?jql=${jql}&maxResults=${maxResults}&startAt=${startAt}&fields=key,worklog`,
-			),
-			{ headers, signal },
-		);
-
-		if (!res.ok) throw fromHttpResponse('Jira team worklog', res.status);
-
-		const data = (await res.json()) as {
-			issues: SearchIssue[];
-			total: number;
-		};
-
-		for (const issue of data.issues) {
-			issues.push(issue);
-		}
-
-		if (issues.length >= data.total || data.issues.length === 0) {
-			break;
-		}
-		startAt += maxResults;
-	}
+	const issues = await searchAllIssues<SearchIssue>(
+		config,
+		{ jql, fields: 'key,worklog', maxResults: 50 },
+		{ signal },
+	);
 
 	// Step 2: Use embedded worklogs when complete, fetch separately only for truncated
 	const allWorklogs: WorklogEntry[] = [];

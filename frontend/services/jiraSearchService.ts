@@ -1,16 +1,14 @@
 import type { Config } from '../stores/useConfigStore';
-import { rewriteForHostedProxy } from './jiraGateway';
-import { fromHttpResponse } from './serviceErrors';
+import { fetchSearchPage } from './jiraSearch';
 
 export interface JiraSearchResult {
 	key: string;
 	summary: string;
 }
 
-function buildBaseUrl(config: Config): string {
-	return config.corsProxy
-		? `${config.corsProxy.replace(/\/$/, '')}/https://${config.jiraHost}`
-		: `https://${config.jiraHost}`;
+interface JiraSearchIssue {
+	key: string;
+	fields: { summary?: string };
 }
 
 export async function searchJiraIssues(
@@ -20,7 +18,6 @@ export async function searchJiraIssues(
 ): Promise<JiraSearchResult[]> {
 	if (!config.jiraHost || !config.apiToken || !query.trim()) return [];
 
-	const base = buildBaseUrl(config);
 	const trimmed = query.trim();
 
 	// Build JQL: exact key match OR summary text search
@@ -34,34 +31,15 @@ export async function searchJiraIssues(
 
 	jqlParts.push(`summary ~ "${trimmed}"`);
 
-	const jql = encodeURIComponent(jqlParts.join(' OR '));
+	const jql = jqlParts.join(' OR ');
 
-	const initialUrl = `${base}/rest/api/2/search?jql=${jql}&maxResults=10&fields=key,summary`;
-	const initialHeaders = {
-		Authorization: `Bearer ${config.apiToken}`,
-		Accept: 'application/json',
-		'X-Atlassian-Token': 'no-check',
-	};
-	const rewritten = rewriteForHostedProxy(initialUrl, initialHeaders, {
-		jiraHost: config.jiraHost,
-		email: config.email,
-		apiToken: config.apiToken,
-	});
-	const res = await fetch(rewritten.url, {
-		headers: rewritten.headers,
+	const { issues } = await fetchSearchPage<JiraSearchIssue>(
+		config,
+		{ jql, fields: 'key,summary', maxResults: 10 },
 		signal,
-	});
+	);
 
-	if (!res.ok) throw fromHttpResponse('Jira search', res.status);
-
-	const data = (await res.json()) as {
-		issues: {
-			key: string;
-			fields: { summary?: string };
-		}[];
-	};
-
-	return data.issues.map((issue) => ({
+	return issues.map((issue) => ({
 		key: issue.key,
 		summary: issue.fields.summary ?? '',
 	}));
