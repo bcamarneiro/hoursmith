@@ -36,6 +36,10 @@ export function initAnalytics(): void {
 			capture_pageview: false,
 			disable_session_recording: true,
 			person_profiles: 'identified_only',
+			// Error Tracking: autocapture unhandled JS errors + promise rejections
+			// so we surface silent bugs during the dogfooding period. Sends error
+			// message + stack only (no DOM autocapture, no session recording).
+			capture_exceptions: true,
 		});
 		instance = posthog;
 		for (const [event, properties] of pending)
@@ -69,4 +73,17 @@ export function trackEvent(
 	properties?: Record<string, unknown>,
 ): void {
 	capture(event, properties);
+}
+
+/**
+ * Report a caught error to PostHog Error Tracking (e.g. from a React error
+ * boundary — those don't reach the global handler `capture_exceptions` hooks).
+ * No-op until the SDK is initialised.
+ */
+export function captureException(
+	error: unknown,
+	properties?: Record<string, unknown>,
+): void {
+	if (!KEY || !instance) return;
+	instance.captureException(error, properties);
 }

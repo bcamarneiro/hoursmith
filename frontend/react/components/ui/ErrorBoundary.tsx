@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Component } from 'react';
+import { captureException } from '../../../analytics';
 import * as styles from './ErrorBoundary.module.css';
 
 type Props = {
@@ -20,6 +21,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
 	static getDerivedStateFromError(error: Error): State {
 		return { hasError: true, error };
+	}
+
+	componentDidCatch(error: Error, info: React.ErrorInfo): void {
+		// Report render crashes to PostHog Error Tracking (dogfooding visibility).
+		captureException(error, { componentStack: info.componentStack });
 	}
 
 	render() {
