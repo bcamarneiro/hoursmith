@@ -18,6 +18,9 @@ test-output.log
 test-screenshots/
 .playwright-mcp/
 *.png
+# Generated-but-committed static assets (served from site root in prod).
+!frontend/public/og-image.png
+!frontend/public/apple-touch-icon.png
 
 # Local AI tooling caches (per-tool plugin caches; not project state)
 .agents/

@@ -40,7 +40,9 @@ export function SiteFooter(): JSX.Element {
 					GitHub
 				</a>
 			</nav>
-			<p className={styles.legal}>© Hoursmith — a Jira worklog dashboard.</p>
+			<p className={styles.legal}>
+				© Hoursmith — a Jira worklog dashboard. Built in Porto.
+			</p>
 		</footer>
 	);
 }
