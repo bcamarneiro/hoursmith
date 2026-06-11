@@ -42,6 +42,9 @@ jobs:
       - name: Disable Jekyll processing
         run: touch dist/.nojekyll
 
+      - name: Strip source maps from public Pages build (ADA-372)
+        run: find dist -name '*.map' -delete
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
