@@ -25,6 +25,33 @@ import { getSupabase, hasSupabaseEnv } from './supabaseClient';
 const MISSING_ENV_ERROR =
 	'Sign-in is temporarily unavailable. Please try again later.';
 
+/**
+ * Map raw Supabase auth errors to user-facing copy. Notably, an unconfirmed
+ * account surfaces as "Email not confirmed" — without this it read as a generic
+ * credentials failure, confusing users who hadn't clicked the email link yet.
+ */
+function friendlySignInError(message: string): string {
+	const m = message.toLowerCase();
+	if (m.includes('not confirmed') || m.includes('not been confirmed')) {
+		return 'Please confirm your email first — check your inbox for the confirmation link.';
+	}
+	if (m.includes('invalid login credentials') || m.includes('invalid')) {
+		return 'Incorrect email or password.';
+	}
+	return message;
+}
+
+/**
+ * Where Supabase should send the user after they click the confirmation link.
+ * Uses the current origin so a sign-up on hoursmith.io returns to hoursmith.io
+ * (and staging → staging) instead of falling back to Supabase's Site URL. The
+ * origin must be on the Supabase redirect allowlist.
+ */
+function emailRedirectTarget(): string | undefined {
+	if (typeof window === 'undefined') return undefined;
+	return `${window.location.origin}/auth/callback`;
+}
+
 function buildMisconfiguredContext(): AuthContextValue {
 	const fail = async () => ({ error: MISSING_ENV_ERROR });
 	return {
@@ -136,7 +163,7 @@ function ConfiguredAuthProvider({
 			});
 			if (error) {
 				logEvent('sign_in_failed');
-				return { error: error.message };
+				return { error: friendlySignInError(error.message) };
 			}
 			logEvent('sign_in_success');
 			return { error: null };
@@ -146,7 +173,11 @@ function ConfiguredAuthProvider({
 
 	const signUp = useCallback(
 		async (email: string, password: string) => {
-			const { data, error } = await supabase.auth.signUp({ email, password });
+			const { data, error } = await supabase.auth.signUp({
+				email,
+				password,
+				options: { emailRedirectTo: emailRedirectTarget() },
+			});
 			if (error) {
 				logEvent('sign_up_failed');
 				return { error: error.message, needsEmailConfirmation: false };

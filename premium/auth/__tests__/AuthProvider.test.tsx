@@ -190,7 +190,44 @@ describe('AuthProvider', () => {
 		});
 
 		await waitFor(() =>
-			expect(signInResult?.error).toBe('Invalid login credentials'),
+			expect(signInResult?.error).toBe('Incorrect email or password.'),
+		);
+	});
+
+	it('maps an unconfirmed-email sign-in to a confirm-your-email message', async () => {
+		const client = makeClient(null);
+		client.auth.signInWithPassword.mockResolvedValue({
+			error: { message: 'Email not confirmed' },
+			data: { session: null, user: null },
+		});
+
+		let signInResult: { error: string | null } | null = null;
+		function Probe(): JSX.Element {
+			const { signIn } = useAuth();
+			return (
+				<button
+					type="button"
+					onClick={async () => {
+						signInResult = await signIn('x@y.com', 'pw');
+					}}
+				>
+					go
+				</button>
+			);
+		}
+
+		render(
+			<AuthProvider client={client as unknown as SupabaseClient}>
+				<Probe />
+			</AuthProvider>,
+		);
+
+		await act(async () => {
+			screen.getByText('go').click();
+		});
+
+		await waitFor(() =>
+			expect(signInResult?.error).toContain('confirm your email'),
 		);
 	});
 });
