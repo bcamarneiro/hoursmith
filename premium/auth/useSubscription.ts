@@ -154,16 +154,18 @@ export function useSubscription(): SubscriptionView {
 		};
 	}, [body, isLoading, error, refetch]);
 
-	// Push the hosted URL into the cross-tier bridge whenever active flips.
+	// Route Jira traffic through the hosted proxy as soon as the user is
+	// authenticated AND the subscription is still loading OR confirmed active.
+	// The hosted URL is just `${origin}/api/proxy` and the server enforces
+	// entitlement (401 if not), so routing optimistically during the
+	// subscription fetch avoids a startup race where early Jira requests fired
+	// before `isActive` resolved, fell back to "direct", and failed CORS
+	// (ADA-382). Only a *confirmed* non-active subscription clears it, so a
+	// logged-in free user still falls back to their own proxy.
 	useEffect(() => {
-		if (view.isActive) {
-			setHostedProxyUrl(getHostedProxyUrl());
-			// TODO(ADA-273): emit a Plausible event "switched_to_hosted_proxy" the
-			// first time this flips on per session.
-		} else {
-			setHostedProxyUrl(null);
-		}
-	}, [view.isActive]);
+		const routeHosted = !!accessToken && (view.isLoading || view.isActive);
+		setHostedProxyUrl(routeHosted ? getHostedProxyUrl() : null);
+	}, [accessToken, view.isLoading, view.isActive]);
 
 	// Keep the cross-tier bridge in sync with the Supabase access token so the
 	// network layer can attach it to hosted-proxy requests without importing
