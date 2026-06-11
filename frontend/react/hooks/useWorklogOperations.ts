@@ -288,11 +288,35 @@ export function useWorklogOperations() {
 		}
 	};
 
+	/**
+	 * Fetch a single worklog's current fields so an edit can preserve `comment`
+	 * and `started` — `updateWorklog` PUTs all three, so editing only the time
+	 * without these would wipe the comment and reset the date.
+	 */
+	const getWorklog = async (
+		issueKey: string,
+		worklogId: string,
+	): Promise<{ timeSpent: string; comment: string; started: string }> => {
+		if (!config.jiraHost || !config.apiToken) {
+			throw new Error('Jira client not configured');
+		}
+		const worklogUrl = buildUrl(
+			`/rest/api/2/issue/${issueKey}/worklog/${worklogId}`,
+		);
+		const wl = await makeRequest(worklogUrl, { method: 'GET' });
+		return {
+			timeSpent: typeof wl?.timeSpent === 'string' ? wl.timeSpent : '',
+			comment: typeof wl?.comment === 'string' ? wl.comment : '',
+			started: typeof wl?.started === 'string' ? wl.started : '',
+		};
+	};
+
 	return {
 		createWorklog,
 		createMultipleWorklogs,
 		updateWorklog,
 		deleteWorklog,
+		getWorklog,
 		isLoading,
 		error,
 	};

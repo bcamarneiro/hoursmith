@@ -23,6 +23,7 @@
  */
 
 import { logAuditEvent } from '../_lib/auditLog.js';
+import { userIdFromToken } from '../_lib/auth.js';
 import { cancelPolarSubscription } from '../_lib/polarClient.js';
 import {
 	defaultSupabaseAdmin,
@@ -74,7 +75,11 @@ export async function handleDelete(
 		});
 	}
 
-	const verifyJwt = deps.verifyJwt ?? makeJwtVerifier();
+	// GDPR erasure is irreversible and must reject a deleted/revoked user, not
+	// just an expired token — force the live server check (ADA-343 / ADA-313).
+	const verifyJwt =
+		deps.verifyJwt ??
+		((t: string) => userIdFromToken(t, { confirmWithServer: true }));
 	const userId = await verifyJwt(token);
 	if (!userId) {
 		logEvent({ event: 'account_delete', status: 401, note: 'invalid_token' });
@@ -134,6 +139,23 @@ export async function handleDelete(
 		});
 	}
 
+	// Defense-in-depth (ADA-313): deleting auth.users already cascades the
+	// user's sessions in GoTrue, but we ALSO globally sign the token out so a
+	// JWT leaked before deletion (e.g. via third-party XSS) is rejected by
+	// Supabase REST immediately rather than living until natural expiry.
+	// Best-effort: the account is already gone and is the source of truth, so a
+	// revocation failure is logged but never turns a successful delete into a
+	// 500 or blocks the audit log below.
+	try {
+		await admin.signOutUser(token);
+	} catch (err) {
+		logEvent({
+			event: 'account_delete',
+			status: 0,
+			note: `global_signout_failed:${(err as Error).message}`,
+		});
+	}
+
 	try {
 		await logAuditEvent('account_deleted', stripeCustomerId, cancelMeta, admin);
 	} catch (err) {
@@ -156,27 +178,6 @@ function extractBearer(header: string | null): string | null {
 	if (!match) return null;
 	const token = match[1].trim();
 	return token.length > 0 ? token : null;
-}
-
-function makeJwtVerifier(): (token: string) => Promise<string | null> {
-	const url = process.env.SUPABASE_URL;
-	const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-	if (!url || !serviceRoleKey) {
-		// Surface as 401 rather than crashing; default factories above already
-		// surfaced the misconfig as 500 if env was missing.
-		return async () => null;
-	}
-	return async (token: string): Promise<string | null> => {
-		const res = await fetch(`${url}/auth/v1/user`, {
-			headers: {
-				apikey: serviceRoleKey,
-				authorization: `Bearer ${token}`,
-			},
-		});
-		if (!res.ok) return null;
-		const body = (await res.json()) as { id?: string } | null;
-		return body?.id ?? null;
-	};
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {

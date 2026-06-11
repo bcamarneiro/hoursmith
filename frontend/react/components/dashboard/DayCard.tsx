@@ -4,13 +4,16 @@ import { useDashboardStore } from '../../../stores/useDashboardStore';
 import { useWorklogOperations } from '../../hooks/useWorklogOperations';
 import { getAbsenceKindLabel } from '../../utils/absence';
 import {
+	formatDateTimeLocalValue,
 	parseIsoDateLocal,
 	toLocalDateString,
 	withLocalOffset,
 } from '../../utils/date';
 import { formatHours, formatJiraTimeSpent } from '../../utils/format';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
 import { toast } from '../ui/Toast';
+import { WorklogForm } from '../worklog/WorklogForm';
 import { CloneWorklogPopover } from './CloneWorklogPopover';
 import * as styles from './DayCard.module.css';
 import { DayNote } from './DayNote';
@@ -60,7 +63,13 @@ export const DayCard = memo<Props>(function DayCard({
 	const unmarkMultipleSuggestionsLogged = useDashboardStore(
 		(s) => s.unmarkMultipleSuggestionsLogged,
 	);
-	const { createMultipleWorklogs, deleteWorklog } = useWorklogOperations();
+	const {
+		createMultipleWorklogs,
+		deleteWorklog,
+		updateWorklog,
+		getWorklog,
+		isLoading: isWorklogOpLoading,
+	} = useWorklogOperations();
 	const [isBatchLogging, setIsBatchLogging] = useState(false);
 	const activeSuggestions = day.suggestions.filter((s) => !s.logged);
 	const loggableSuggestions = activeSuggestions.filter((s) => !!s.issueKey);
@@ -78,6 +87,78 @@ export const DayCard = memo<Props>(function DayCard({
 	const isClosed = !day.isWeekend && day.gapSeconds === 0;
 	const [expanded, setExpanded] = useState<boolean>(() => !isClosed || isToday);
 	const [cloneSource, setCloneSource] = useState<LoggedWorklog | null>(null);
+	const [editingWorklog, setEditingWorklog] = useState<{
+		worklog: LoggedWorklog;
+		initial: {
+			issueKey: string;
+			timeSpent: string;
+			comment: string;
+			started: string;
+		};
+	} | null>(null);
+	const [isEditOpening, setIsEditOpening] = useState(false);
+	const [deleteTarget, setDeleteTarget] = useState<LoggedWorklog | null>(null);
+
+	// Open the edit form for a logged worklog. We fetch the worklog first so the
+	// form prefills the real comment/started — editing only the time then keeps
+	// them intact (updateWorklog PUTs all three).
+	const handleEditOpen = async (wl: LoggedWorklog) => {
+		setIsEditOpening(true);
+		try {
+			const current = await getWorklog(wl.issueKey, wl.worklogId);
+			setEditingWorklog({
+				worklog: wl,
+				initial: {
+					issueKey: wl.issueKey,
+					timeSpent:
+						current.timeSpent || formatJiraTimeSpent(wl.timeSpentSeconds),
+					comment: current.comment,
+					started: current.started
+						? formatDateTimeLocalValue(new Date(current.started))
+						: formatDateTimeLocalValue(new Date(`${day.date}T09:00`)),
+				},
+			});
+		} catch {
+			toast.error('Could not load this worklog to edit');
+		} finally {
+			setIsEditOpening(false);
+		}
+	};
+
+	const handleEditSubmit = async (data: {
+		issueKey: string;
+		timeSpent: string;
+		comment: string;
+		started: string;
+	}) => {
+		if (!editingWorklog) return;
+		try {
+			await updateWorklog(
+				editingWorklog.worklog.issueKey,
+				editingWorklog.worklog.worklogId,
+				{
+					timeSpent: data.timeSpent,
+					comment: data.comment,
+					started: data.started,
+				},
+			);
+			setEditingWorklog(null);
+			toast.success('Worklog updated');
+		} catch {
+			toast.error('Failed to update worklog');
+		}
+	};
+
+	const handleDeleteConfirm = async () => {
+		if (!deleteTarget) return;
+		try {
+			await deleteWorklog(deleteTarget.issueKey, deleteTarget.worklogId);
+			setDeleteTarget(null);
+			toast.success('Worklog deleted');
+		} catch {
+			toast.error('Failed to delete worklog');
+		}
+	};
 
 	const handleClone = async (source: LoggedWorklog, dates: string[]) => {
 		if (dates.length === 0) return;
@@ -302,14 +383,33 @@ export const DayCard = memo<Props>(function DayCard({
 											{wl.issueSummary}
 										</span>
 									)}
-									<button
-										type="button"
-										className={styles.cloneButton}
-										onClick={() => setCloneSource(wl)}
-										aria-label={`Clone ${wl.issueKey} to other days`}
-									>
-										Clone to…
-									</button>
+									<div className={styles.worklogActions}>
+										<button
+											type="button"
+											className={styles.cloneButton}
+											onClick={() => handleEditOpen(wl)}
+											disabled={isEditOpening}
+											aria-label={`Edit the time logged on ${wl.issueKey}`}
+										>
+											Edit
+										</button>
+										<button
+											type="button"
+											className={styles.cloneButton}
+											onClick={() => setCloneSource(wl)}
+											aria-label={`Clone ${wl.issueKey} to other days`}
+										>
+											Clone to…
+										</button>
+										<button
+											type="button"
+											className={styles.deleteWorklogButton}
+											onClick={() => setDeleteTarget(wl)}
+											aria-label={`Delete the worklog on ${wl.issueKey}`}
+										>
+											Delete
+										</button>
+									</div>
 								</div>
 							))}
 						</div>
@@ -393,6 +493,33 @@ export const DayCard = memo<Props>(function DayCard({
 						onCancel={() => setCloneSource(null)}
 					/>
 				</Modal>
+			)}
+
+			{editingWorklog && (
+				<Modal
+					isOpen
+					onClose={() => setEditingWorklog(null)}
+					title="Edit worklog"
+				>
+					<WorklogForm
+						initialData={editingWorklog.initial}
+						onSubmit={handleEditSubmit}
+						onCancel={() => setEditingWorklog(null)}
+						isEdit
+						isLoading={isWorklogOpLoading}
+					/>
+				</Modal>
+			)}
+
+			{deleteTarget && (
+				<ConfirmDialog
+					isOpen
+					title="Delete worklog"
+					message={`Delete the ${formatHours(deleteTarget.timeSpentSeconds)} worklog on ${deleteTarget.issueKey}? This removes it from Jira.`}
+					confirmLabel="Delete"
+					onConfirm={handleDeleteConfirm}
+					onCancel={() => setDeleteTarget(null)}
+				/>
 			)}
 		</div>
 	);

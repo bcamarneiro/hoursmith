@@ -29,12 +29,12 @@ import { downloadAsFile } from '../utils/downloadFile';
 import { generateWeeklyCsv } from '../utils/weekCsvExport';
 import { buildWeeklyCloseAssistantModel } from '../utils/weeklyCloseAssistant';
 import { generateWeeklySummary } from '../utils/weekSummary';
-import * as styles from './DashboardPage.module.css';
+import * as styles from './MyWeekPage.module.css';
 
 const GAP_DAYS_SECTION_ID = 'dashboard-gap-days';
 
-export const DashboardPage: React.FC = () => {
-	usePageTitle('Dashboard');
+export const MyWeekPage: React.FC = () => {
+	usePageTitle('My Week');
 	useDashboardDataFetcher();
 
 	const jiraHost = useConfigStore((s) => s.config.jiraHost);
@@ -54,9 +54,17 @@ export const DashboardPage: React.FC = () => {
 	const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
 	const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
 
-	const weekdays = daySummaries.filter((d) => !d.isWeekend);
+	// Day cards stay in chronological (Mon→Fri) order so they never reshuffle
+	// while you log time. The earlier gap-first sort (ADA-349) re-ranked days by
+	// remaining gap on every worklog change, so logging a block dropped that day
+	// below others even when it wasn't finished. The gap is surfaced by the lead
+	// close panel + the week-overview bars instead, not by reordering the cards.
+	const orderedWeekdays = useMemo(
+		() => daySummaries.filter((d) => !d.isWeekend),
+		[daySummaries],
+	);
 	const { focusedDayIndex, focusedSuggestionIndex, showHelp, setShowHelp } =
-		useKeyboardShortcuts(weekdays);
+		useKeyboardShortcuts(orderedWeekdays);
 	const { canRemind, reminderEnabled, enableReminder, totalGapHours } =
 		useComplianceReminder();
 	const { copyPreviousWeek, isLoading: isCopyingPrevWeek } =
@@ -104,6 +112,7 @@ export const DashboardPage: React.FC = () => {
 		const configSnapshot = useConfigStore.getState().config;
 		const csv = generateWeeklyCsv(weekStart, weekEnd, weekWorklogs, {
 			provenance: { jiraHost: configSnapshot.jiraHost },
+			includeProvenance: configSnapshot.includeCsvProvenance,
 			absenceDays,
 			includeAbsenceColumns: configSnapshot.includeAbsenceInCsv,
 		});
@@ -132,9 +141,9 @@ export const DashboardPage: React.FC = () => {
 			<div className={styles.container}>
 				<section className={styles.emptySetup}>
 					<div className={styles.emptySetupText}>
-						<h2>Set up Jira before you use Dashboard</h2>
+						<h2>Set up Jira before you use My Week</h2>
 						<p>
-							Dashboard works best once Jira is connected and the core checks
+							My Week works best once Jira is connected and the core checks
 							pass. After that, this becomes the fastest place to close the
 							week.
 						</p>
@@ -171,7 +180,7 @@ export const DashboardPage: React.FC = () => {
 					<SourceStatusBar />
 				</div>
 				<div className={styles.error}>
-					<h2>Unable to load dashboard</h2>
+					<h2>Unable to load My Week</h2>
 					<p>{worklogsError}</p>
 					<Link to="/settings">Check your settings</Link>
 				</div>
@@ -179,7 +188,7 @@ export const DashboardPage: React.FC = () => {
 		);
 	}
 
-	const hasGaps = weekdays.some((d) => d.gapSeconds > 0);
+	const hasGaps = orderedWeekdays.some((d) => d.gapSeconds > 0);
 	const jumpToGapDays = () => {
 		document.getElementById(GAP_DAYS_SECTION_ID)?.scrollIntoView({
 			behavior: 'smooth',
@@ -220,7 +229,7 @@ export const DashboardPage: React.FC = () => {
 						Export MD
 					</Button>
 					<Button
-						variant="secondary"
+						variant="primary"
 						onClick={handleExportCsv}
 						disabled={weekWorklogs.length === 0}
 					>
@@ -285,15 +294,27 @@ export const DashboardPage: React.FC = () => {
 						</div>
 					)}
 
+					{/* Lead with the close surface: one panel, one primary job. */}
+					<WeeklyCloseAssistant
+						model={closeAssistantModel}
+						canExport={weekWorklogs.length > 0}
+						isCopyingPrevWeek={isCopyingPrevWeek}
+						onJumpToGapDays={jumpToGapDays}
+						onCopyPrevWeek={handleCopyPrevWeek}
+						onCopySummary={handleExportMd}
+						onExportCsv={handleExportCsv}
+						onEnableReminders={enableReminder}
+					/>
+
 					<WeekOverview days={daySummaries} />
 
-					{weekdays.length > 0 && (
+					{orderedWeekdays.length > 0 && (
 						<div id={GAP_DAYS_SECTION_ID} className={styles.daysSection}>
 							<h3 className={styles.sectionTitle}>This week</h3>
-							{/* All weekdays render in order; complete days collapse in
-							    place (DayCard) instead of disappearing, so they stay
-							    reviewable and editable. */}
-							{weekdays.map((day, i) => (
+							{/* Gap-first: the day you still owe leads; complete days
+							    collapse in place (DayCard) rather than disappearing, so
+							    they stay reviewable and editable. */}
+							{orderedWeekdays.map((day, i) => (
 								<DayCard
 									key={day.date}
 									day={day}
@@ -305,17 +326,6 @@ export const DashboardPage: React.FC = () => {
 							))}
 						</div>
 					)}
-
-					<WeeklyCloseAssistant
-						model={closeAssistantModel}
-						canExport={weekWorklogs.length > 0}
-						isCopyingPrevWeek={isCopyingPrevWeek}
-						onJumpToGapDays={jumpToGapDays}
-						onCopyPrevWeek={handleCopyPrevWeek}
-						onCopySummary={handleExportMd}
-						onExportCsv={handleExportCsv}
-						onEnableReminders={enableReminder}
-					/>
 
 					{monthHeatmap.isLoading && monthHeatmap.data.size === 0 && (
 						<div className={styles.heatmapLoading}>

@@ -60,6 +60,20 @@ describe('buildTimesheetCsv', () => {
 		);
 	});
 
+	it('omits the provenance footer when includeProvenance is false', () => {
+		const result = buildTimesheetCsv({
+			worklogs: [],
+			issueSummaries: {},
+			policy: 'logged',
+			period: { year: 2025, month: 0 },
+			provenance: PROVENANCE,
+			includeProvenance: false,
+		});
+		const lines = result.split('\n');
+		expect(lines).toHaveLength(4); // header + 3 totals, no footer
+		expect(result).not.toContain('# generated=');
+	});
+
 	it('emits a non-backdated row with both dates equal', () => {
 		const result = buildTimesheetCsv({
 			worklogs: [entry({ comment: 'Some work' })],
@@ -363,6 +377,26 @@ describe('buildSummaryCsv', () => {
 		expect(result).toContain('Alice;20.0;22;1;160.00;8.00');
 		expect(result).toMatch(/policy=logged/);
 		expect(result).toMatch(/period=2025-10/);
+	});
+
+	it('omits the provenance footer when includeProvenance is false', () => {
+		const result = buildSummaryCsv({
+			summaries: [
+				{
+					user: 'Alice',
+					totalHours: 160,
+					backdatedHours: 8,
+					worklogCount: 22,
+					backdatedCount: 1,
+					daysWorked: 20,
+				},
+			],
+			policy: 'logged',
+			period: { year: 2025, month: 9 },
+			provenance: PROVENANCE,
+			includeProvenance: false,
+		});
+		expect(result).not.toContain('# generated=');
 	});
 });
 

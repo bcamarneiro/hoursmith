@@ -1,12 +1,14 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import { trackEvent } from '../../analytics';
+import { isPremiumBuild } from '../../buildTier';
+import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { PWAInstallCard } from '../components/home/PWAInstallCard';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { buildDemoTeam, DEMO_WEEKDAYS } from './demoFixture';
 import * as styles from './HomePage.module.css';
 
-const GITHUB_URL = 'https://github.com/bcamarneiro/jira-timesheet-report';
+const GITHUB_URL = 'https://github.com/bcamarneiro/hoursmith';
 const DAY_INITIALS = ['M', 'T', 'W', 'T', 'F'];
 
 // First name only — keeps the hero preview compact and scannable.
@@ -69,6 +71,9 @@ export const HomePage: React.FC = () => {
 	usePageTitle('Home');
 	const jiraHost = useConfigStore((state) => state.config.jiraHost);
 	const isConfigured = !!jiraHost;
+	// Only hosted builds have accounts. In a free/self-host build /auth/sign-up
+	// isn't a registered route, so the CTA is gated to avoid a dead link.
+	const isPremium = isPremiumBuild();
 
 	return (
 		<div className={styles.container}>
@@ -85,10 +90,26 @@ export const HomePage: React.FC = () => {
 					</p>
 
 					<div className={styles.buttonContainer}>
+						{isPremium && (
+							<Link
+								to="/auth/sign-up"
+								className={styles.primaryButton}
+								onClick={() =>
+									trackEvent('cta_create_account', { location: 'home' })
+								}
+							>
+								Create account
+							</Link>
+						)}
 						{isConfigured ? (
 							<>
-								<Link to="/dashboard" className={styles.primaryButton}>
-									Open Dashboard
+								<Link
+									to="/my-week"
+									className={
+										isPremium ? styles.secondaryButton : styles.primaryButton
+									}
+								>
+									Open My Week
 								</Link>
 								<Link to="/pricing" className={styles.secondaryButton}>
 									See pricing
@@ -96,7 +117,12 @@ export const HomePage: React.FC = () => {
 							</>
 						) : (
 							<>
-								<Link to="/demo" className={styles.primaryButton}>
+								<Link
+									to="/demo"
+									className={
+										isPremium ? styles.secondaryButton : styles.primaryButton
+									}
+								>
 									Try the demo
 								</Link>
 								<Link to="/pricing" className={styles.secondaryButton}>
@@ -107,12 +133,14 @@ export const HomePage: React.FC = () => {
 					</div>
 
 					<p className={styles.priceAnchor}>
-						Free to self-host · Hosted €29/year · Lead from €60/year
+						{LEAD_TIER_ENABLED
+							? 'Free to self-host · Hosted €29/year · Lead from €60/year'
+							: 'Free to self-host · Hosted €29/year'}
 					</p>
 
 					<div className={styles.tertiaryLinks}>
 						{!isConfigured && (
-							<Link to="/dashboard" className={styles.tertiaryLink}>
+							<Link to="/my-week" className={styles.tertiaryLink}>
 								Open the app
 							</Link>
 						)}
@@ -147,13 +175,13 @@ export const HomePage: React.FC = () => {
 				<div className={styles.sectionHeading}>
 					<h2 className={styles.sectionTitle}>Two clear surfaces</h2>
 					<p className={styles.sectionDescription}>
-						Dashboard is your personal home base for closing the week; Reports
-						is the shared surface for team compliance and month-end exports.
+						My Week is your personal home base for closing the week; Reports is
+						the shared surface for team compliance and month-end exports.
 					</p>
 				</div>
 				<div className={styles.featureGrid}>
 					<div className={styles.featureItem}>
-						<div className={styles.featureTitle}>Dashboard</div>
+						<div className={styles.featureTitle}>My Week</div>
 						<div className={styles.featureDescription}>
 							Weekly gap triage, copy-previous-week flows, suggestions,
 							templates, pins, notes, and quick exports.
@@ -208,24 +236,11 @@ export const HomePage: React.FC = () => {
 							Trust comes from consistency
 						</div>
 						<div className={styles.adoptionDescription}>
-							Dashboard and Reports keep matching on real data, not just looking
+							My Week and Reports keep matching on real data, not just looking
 							polished in isolation.
 						</div>
 					</div>
 				</div>
-			</section>
-
-			<section className={styles.section}>
-				<div className={styles.sectionHeading}>
-					<h2 className={styles.sectionTitle}>
-						Install it like a lightweight app
-					</h2>
-					<p className={styles.sectionDescription}>
-						A hosted workspace gets much more usable when it can live in a dock,
-						launcher, or home screen instead of a random browser tab.
-					</p>
-				</div>
-				<PWAInstallCard />
 			</section>
 
 			{!isConfigured && (
@@ -249,7 +264,7 @@ export const HomePage: React.FC = () => {
 						<li className={styles.step}>
 							<span className={styles.stepNumber}>3</span>
 							<span className={styles.stepText}>
-								Use Dashboard for the weekly close and Reports for team/month
+								Use My Week for the weekly close and Reports for team/month
 								visibility
 							</span>
 						</li>
@@ -264,8 +279,8 @@ export const HomePage: React.FC = () => {
 						<li className={styles.step}>
 							<span className={styles.stepNumber}>1</span>
 							<span className={styles.stepText}>
-								Open <Link to="/dashboard">Dashboard</Link> to close the week,
-								fill gaps, and reuse prior work
+								Open <Link to="/my-week">My Week</Link> to close the week, fill
+								gaps, and reuse prior work
 							</span>
 						</li>
 						<li className={styles.step}>

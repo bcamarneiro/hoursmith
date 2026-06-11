@@ -452,19 +452,19 @@ export function buildReportsSnapshotHtml(input: ReportsSnapshotInput): string {
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>Hoursmith Report Snapshot</title>
 	<style>
-		body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 32px; background: #f5f7fb; color: #101828; }
+		body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 32px; background: #f4efe7; color: #241d18; }
 		main { max-width: 1080px; margin: 0 auto; display: grid; gap: 24px; }
-		header, section { background: white; border: 1px solid #d0d5dd; border-radius: 16px; padding: 24px; }
+		header, section { background: #fbf8f2; border: 1px solid #e2d8c8; border-radius: 16px; padding: 24px; }
 		h1, h2, h3 { margin: 0 0 12px; }
 		p, li { line-height: 1.5; }
 		ul { margin: 0; padding-left: 20px; }
 		.summary-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-		.stat { border: 1px solid #d0d5dd; border-radius: 12px; padding: 16px; background: #f8fafc; }
-		.stat span { display: block; color: #475467; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+		.stat { border: 1px solid #e2d8c8; border-radius: 12px; padding: 16px; background: #ede4d6; }
+		.stat span { display: block; color: #574d43; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
 		.stat strong { font-size: 24px; }
 		table { width: 100%; border-collapse: collapse; }
-		th, td { padding: 12px 14px; border-bottom: 1px solid #eaecf0; text-align: left; }
-		th { background: #f8fafc; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #475467; }
+		th, td { padding: 12px 14px; border-bottom: 1px solid #e2d8c8; text-align: left; }
+		th { background: #ede4d6; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #574d43; }
 		.meta-list { display: grid; gap: 8px; }
 	</style>
 </head>

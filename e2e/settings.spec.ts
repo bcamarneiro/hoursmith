@@ -17,7 +17,9 @@ test.describe('Settings Page', () => {
 		await expect(page.getByLabel(/JQL Filter/)).toBeVisible();
 		await expect(page.getByLabel(/Allow adding worklogs/)).toBeVisible();
 		await expect(page.getByLabel('Theme')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Backup' })).toBeVisible();
+		await expect(
+			page.getByRole('button', { name: 'Backup', exact: true }),
+		).toBeVisible();
 		await expect(
 			page.getByRole('button', { name: 'Share Pack' }),
 		).toBeVisible();
@@ -47,10 +49,10 @@ test.describe('Settings Page', () => {
 
 	test('exports settings as a JSON backup', async ({ page }) => {
 		const downloadPromise = page.waitForEvent('download');
-		await page.getByRole('button', { name: 'Backup' }).click();
+		await page.getByRole('button', { name: 'Backup', exact: true }).click();
 		const download = await downloadPromise;
 
-		expect(download.suggestedFilename()).toBe('jira-timesheet-settings.json');
+		expect(download.suggestedFilename()).toBe('hoursmith-settings.json');
 		const stream = await download.createReadStream();
 		let content = '';
 		if (stream) {

@@ -19,8 +19,10 @@
  *               Authorization header.
  */
 
+import { corsHeaders } from '../_lib/cors.js';
 import { getEntitlement } from '../_lib/entitlement.js';
-import { corsHeaders, forwardToJira } from '../_lib/jiraForward.js';
+import { forwardToJira } from '../_lib/jiraForward.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
 
 // Pin to Frankfurt for GDPR residency. Mirrors vercel.json.
 export const config = {
@@ -30,10 +32,11 @@ export const config = {
 
 export default async function handler(request: Request): Promise<Response> {
 	const start = Date.now();
+	const origin = request.headers.get('origin');
 
 	// Preflight: respond without auth so the browser can probe.
 	if (request.method === 'OPTIONS') {
-		return new Response(null, { status: 204, headers: corsHeaders() });
+		return new Response(null, { status: 204, headers: corsHeaders(origin) });
 	}
 
 	// 1. Entitlement check (Supabase JWT + active subscription).
@@ -45,7 +48,11 @@ export default async function handler(request: Request): Promise<Response> {
 			durationMs: Date.now() - start,
 			note: entitlement.code,
 		});
-		return jsonResponse(entitlement.status, { error: entitlement.code });
+		return jsonResponse(
+			entitlement.status,
+			{ error: entitlement.code },
+			origin,
+		);
 	}
 
 	// 2. Validate Jira routing headers.
@@ -58,16 +65,42 @@ export default async function handler(request: Request): Promise<Response> {
 			durationMs: Date.now() - start,
 			note: 'missing_jira_headers',
 		});
-		return jsonResponse(400, {
-			error: 'bad_request',
-			detail: 'X-Jira-Base and X-Jira-Auth headers are required.',
-		});
+		return jsonResponse(
+			400,
+			{
+				error: 'bad_request',
+				detail: 'X-Jira-Base and X-Jira-Auth headers are required.',
+			},
+			origin,
+		);
 	}
 
-	// 3. Extract catch-all path from the URL (everything after `/api/proxy/`).
+	// 3. Per-user rate limit (ADA-302). Fails open if the counter store is
+	//    unavailable, so a transient backend issue never blocks a paying user.
+	const rate = await checkRateLimit(entitlement.userId);
+	if (!rate.allowed) {
+		logProxy({
+			userId: entitlement.userId,
+			upstreamStatus: 429,
+			durationMs: Date.now() - start,
+			note: 'rate_limited',
+		});
+		return jsonResponse(
+			429,
+			{
+				error: 'rate_limited',
+				detail: 'Too many requests. Please retry shortly.',
+				retry_after: rate.retryAfterSeconds,
+			},
+			origin,
+			{ 'retry-after': String(rate.retryAfterSeconds) },
+		);
+	}
+
+	// 4. Extract catch-all path from the URL (everything after `/api/proxy/`).
 	const path = extractPath(request.url);
 
-	// 4. Forward. TODO(ADA-272): add rate limiting here (per user_id, sliding window).
+	// 5. Forward.
 	const upstream = await forwardToJira({
 		request,
 		path,
@@ -96,12 +129,18 @@ function extractPath(requestUrl: string): string {
 	return pathname.slice(idx + marker.length);
 }
 
-function jsonResponse(status: number, body: Record<string, unknown>): Response {
+function jsonResponse(
+	status: number,
+	body: Record<string, unknown>,
+	origin: string | null,
+	extraHeaders: Record<string, string> = {},
+): Response {
 	return new Response(JSON.stringify(body), {
 		status,
 		headers: {
 			'content-type': 'application/json',
-			...corsHeaders(),
+			...corsHeaders(origin),
+			...extraHeaders,
 		},
 	});
 }

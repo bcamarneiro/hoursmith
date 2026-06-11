@@ -12,9 +12,13 @@ import * as styles from './App.module.css';
 
 import { Navigation } from './components/Navigation';
 import { BuildInfoFooter } from './components/ui/BuildInfoFooter';
+import { SiteFooter } from './components/ui/SiteFooter';
 import { Spinner } from './components/ui/Spinner';
 import { ToastContainer } from './components/ui/Toast';
+import { useFlags } from './hooks/useFlags';
+import { usePageViewTracking } from './hooks/usePageViewTracking';
 import { useTheme } from './hooks/useTheme';
+import { MaintenancePage } from './pages/MaintenancePage';
 import { appBasePath, isHashRouterMode } from './utils/runtimeConfig';
 
 const HomePage = lazy(() =>
@@ -22,9 +26,9 @@ const HomePage = lazy(() =>
 		default: module.HomePage,
 	})),
 );
-const DashboardPage = lazy(() =>
-	import('./pages/DashboardPage').then((module) => ({
-		default: module.DashboardPage,
+const MyWeekPage = lazy(() =>
+	import('./pages/MyWeekPage').then((module) => ({
+		default: module.MyWeekPage,
 	})),
 );
 const PricingPage = lazy(() =>
@@ -32,9 +36,9 @@ const PricingPage = lazy(() =>
 		default: module.PricingPage,
 	})),
 );
-const TimesheetPage = lazy(() =>
-	import('./pages/TimesheetPage').then((module) => ({
-		default: module.TimesheetPage,
+const ReportsPage = lazy(() =>
+	import('./pages/ReportsPage').then((module) => ({
+		default: module.ReportsPage,
 	})),
 );
 const SettingsPage = lazy(() =>
@@ -91,6 +95,7 @@ function loadPremiumRoutes(): Promise<PremiumRoutesModule> {
 }
 
 const AppShell: React.FC = () => {
+	usePageViewTracking();
 	const [premium, setPremium] = useState<PremiumRoutesModule | null>(null);
 
 	useEffect(() => {
@@ -121,10 +126,14 @@ const AppShell: React.FC = () => {
 			>
 				<Routes>
 					<Route path="/" element={<HomePage />} />
-					<Route path="/dashboard" element={<DashboardPage />} />
+					<Route path="/my-week" element={<MyWeekPage />} />
+					<Route
+						path="/dashboard"
+						element={<Navigate to="/my-week" replace />}
+					/>
 					<Route path="/pricing" element={<PricingPage />} />
 					<Route path="/demo" element={<DemoPage />} />
-					<Route path="/reports" element={<TimesheetPage />} />
+					<Route path="/reports" element={<ReportsPage />} />
 					<Route path="/team" element={<Navigate to="/reports" replace />} />
 					<Route
 						path="/timesheet"
@@ -158,6 +167,7 @@ const AppShell: React.FC = () => {
 				</Routes>
 			</Suspense>
 			<ToastContainer />
+			<SiteFooter />
 			<BuildInfoFooter />
 		</div>
 	);
@@ -172,6 +182,14 @@ const AppShell: React.FC = () => {
 
 export const App: React.FC = () => {
 	useTheme();
+	const flags = useFlags();
+
+	// Operational kill switch (ADA-341): when maintenance mode is on, render the
+	// static maintenance screen instead of the route table. The Polar webhook and
+	// /api/version are separate functions and keep responding.
+	if (flags.maintenanceMode) {
+		return <MaintenancePage />;
+	}
 
 	return isHashRouterMode ? (
 		<HashRouter>

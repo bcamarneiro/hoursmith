@@ -88,6 +88,14 @@ module.exports = {
 			'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
 				process.env.VITE_SUPABASE_ANON_KEY || '',
 			),
+			// PostHog product analytics (ADA-377). Publishable client key + host.
+			// Empty fallbacks make analytics a no-op in free/self-host/CI builds.
+			'process.env.VITE_POSTHOG_KEY': JSON.stringify(
+				process.env.VITE_POSTHOG_KEY || '',
+			),
+			'process.env.VITE_POSTHOG_HOST': JSON.stringify(
+				process.env.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com',
+			),
 			__BUILD_TIER__: JSON.stringify(buildTier),
 		}),
 		new NodeProtocolUrlPlugin(),

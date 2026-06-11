@@ -248,50 +248,27 @@
 .hoursCell {
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 	min-width: 60px;
-}
-
-.hoursCellGreen {
-	text-align: center;
-	font-variant-numeric: tabular-nums;
-	min-width: 60px;
-	background: var(--color-success-bg);
-	color: var(--color-success);
-	font-weight: var(--font-semibold);
-}
-
-.hoursCellYellow {
-	text-align: center;
-	font-variant-numeric: tabular-nums;
-	min-width: 60px;
-	background: var(--color-warning-bg);
-	color: var(--color-warning);
-	font-weight: var(--font-semibold);
-}
-
-.hoursCellRed {
-	text-align: center;
-	font-variant-numeric: tabular-nums;
-	min-width: 60px;
-	background: var(--color-error-bg);
-	color: var(--color-error);
-	font-weight: var(--font-semibold);
 }
 
 .totalCell {
 	text-align: center;
 	font-weight: var(--font-semibold);
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 }
 
 .gapCell {
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 }
 
 .gapPositive {
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 	color: var(--color-error);
 	font-weight: var(--font-semibold);
 }
@@ -299,6 +276,7 @@
 .gapZero {
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 	color: var(--color-success);
 	font-weight: var(--font-semibold);
 }

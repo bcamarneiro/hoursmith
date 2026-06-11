@@ -134,8 +134,15 @@ export function useSubscription(): SubscriptionView {
 		const sub = body?.subscription ?? null;
 		const tier = (sub?.tier as SubscriptionTier | undefined) ?? null;
 		const status = (sub?.status as SubscriptionStatus | undefined) ?? null;
+		// `past_due` is entitled during the dunning grace window (ADA-371): Polar
+		// retries the failed renewal charge over ~2 weeks and only then emits
+		// `subscription.revoked`, which our webhook maps to `tier:'free'`. That
+		// revoke is the real cutoff — so a transient card decline keeps proxy
+		// access (and the "Update payment method" CTA) working until revoked.
+		// Status-based grace; kept identical to the server entitlement check.
 		const isActive =
-			tier === 'premium' && (status === 'active' || status === 'trialing');
+			tier === 'premium' &&
+			(status === 'active' || status === 'trialing' || status === 'past_due');
 		return {
 			tier,
 			status,

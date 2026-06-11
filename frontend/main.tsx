@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createRoot } from 'react-dom/client';
+import { initAnalytics } from './analytics';
 import { App } from './react/App';
 import { queryClient } from './react/queryClient';
 import { logger } from './react/utils/logger';
@@ -39,6 +40,9 @@ async function startApp() {
 			logger.error('[OFFLINE MODE] Failed to start MSW:', error);
 		}
 	}
+
+	// Product analytics (ADA-377). No-op unless VITE_POSTHOG_KEY is set.
+	initAnalytics();
 
 	const container = document.getElementById('root');
 	if (container) {

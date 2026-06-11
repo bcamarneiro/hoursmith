@@ -57,7 +57,7 @@
 .error {
 	margin: 0;
 	font-size: var(--text-sm);
-	color: var(--color-danger, #b91c1c);
+	color: var(--color-error);
 }
 
 .finePrint {

@@ -36,10 +36,16 @@ function makeAdmin(
 	return {
 		getProfile: vi.fn().mockResolvedValue(PROFILE),
 		getSubscription: vi.fn().mockResolvedValue(SUBSCRIPTION),
+		getSubscriptionByCustomerId: vi.fn().mockResolvedValue(null),
+		getUserIdFromToken: vi.fn().mockResolvedValue(null),
+		insertIncompleteSubscription: vi.fn().mockResolvedValue(undefined),
+		upsertSubscription: vi.fn().mockResolvedValue(undefined),
 		deleteSubscription: vi.fn(),
 		deleteProfile: vi.fn(),
 		deleteAuthUser: vi.fn(),
+		signOutUser: vi.fn().mockResolvedValue(undefined),
 		insertAuditLog: vi.fn().mockResolvedValue(undefined),
+		recordBillingEvent: vi.fn().mockResolvedValue(true),
 		...overrides,
 	};
 }

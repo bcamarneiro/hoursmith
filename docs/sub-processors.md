@@ -4,7 +4,7 @@ Hoursmith uses a small number of third-party sub-processors to deliver the hoste
 
 This list is kept current as our stack evolves. When the active customer base warrants it, material changes to this list — for example, a new sub-processor, a new processing region, or an expansion of processing scope — will be communicated by email to active subscribers in advance of the change taking effect.
 
-Last updated: 2026-05-27.
+Last updated: 2026-06-07.
 
 ## Active sub-processors
 
@@ -13,7 +13,7 @@ Last updated: 2026-05-27.
 | Vercel | Application hosting and serverless functions. All compute is pinned to the `fra1` region. | EU (Frankfurt, Germany) | [vercel.com/legal/dpa](https://vercel.com/legal/dpa) |
 | Supabase | Authentication (email/password and GitHub OAuth) and Postgres database storing only the `profiles` and `subscriptions` tables. | EU (Frankfurt, Germany) | [supabase.com/legal/dpa](https://supabase.com/legal/dpa) |
 | Polar | Merchant of Record for Premium subscriptions: checkout, payment processing, invoicing, and EU VAT calculation, collection, and remittance. | United States (Polar Software Inc.), transferred under Standard Contractual Clauses | [polar.sh/legal/data-processing-addendum](https://polar.sh/legal/data-processing-addendum) |
-| Plausible Analytics | Cookieless, anonymous traffic analytics. No personal identifiers are collected and no consent banner is required. | EU (Germany) | [plausible.io/dpa](https://plausible.io/dpa) |
+| PostHog | Cookieless product analytics: page views and a small set of product events. No autocapture, no session recording, and no persistent identifiers — so no consent banner is required. | EU (Germany), via PostHog EU Cloud | [posthog.com/dpa](https://posthog.com/dpa) |
 
 ### Not yet active
 
@@ -41,4 +41,4 @@ Historical changes can be reviewed in the git history of this page.
 
 ---
 
-Last updated: 2026-05-27. Contact: see the [Privacy Policy](/privacy).
+Last updated: 2026-06-07. Contact: see the [Privacy Policy](/privacy).

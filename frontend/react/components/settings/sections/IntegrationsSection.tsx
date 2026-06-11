@@ -278,8 +278,8 @@ export const IntegrationsSection: React.FC<Props> = ({
 						<h3>Turn meetings into worklog suggestions</h3>
 						<p>
 							Subscribe to calendars whose event titles either already contain a
-							Jira key or can be mapped to one below. Suggestions show up in
-							Dashboard alongside the rest of your day.
+							Jira key or can be mapped to one below. Suggestions show up in My
+							Week alongside the rest of your day.
 						</p>
 					</div>
 					<span

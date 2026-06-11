@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import type { EnrichedJiraWorklog } from '../../../../types/jira';
 import type { WorklogFetchProgress } from '../../../../types/worklogLoading';
 import type { UserAbsenceDays } from '../../../services/absenceService';
-import * as styles from '../../pages/TimesheetPage.module.css';
+import * as styles from '../../pages/ReportsPage.module.css';
 import { getUserAbsenceDayMap } from '../../utils/absence';
 import { monthLabel } from '../../utils/date';
 import { formatHours } from '../../utils/format';

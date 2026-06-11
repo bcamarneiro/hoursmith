@@ -29,6 +29,7 @@ const baseConfig: Config = {
 	theme: 'system',
 	timeRounding: 'off',
 	includeAbsenceInCsv: true,
+	includeCsvProvenance: false,
 };
 
 describe('buildSettingsSetupModel', () => {

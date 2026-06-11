@@ -27,16 +27,26 @@
 	text-decoration: none;
 }
 
-.brand {
-	font-size: var(--text-md);
-	font-weight: var(--font-bold);
+.brandLogo {
+	display: block;
+	height: 1.7rem;
+	width: auto;
+	/* Drives currentColor for the lockup's dark-ink parts; iron on light,
+	   paper on dark via the theme token. */
 	color: var(--color-text);
-	letter-spacing: -0.02em;
 }
 
 .navLinks {
 	display: flex;
 	gap: var(--space-1);
+}
+
+/* Sign in / Account cluster, pushed to the right edge of the bar. */
+.authCluster {
+	display: flex;
+	align-items: center;
+	gap: var(--space-1);
+	margin-left: var(--space-4);
 }
 
 .navLink {
@@ -76,8 +86,8 @@
 		padding: var(--space-3) var(--space-4);
 	}
 
-	.brand {
-		font-size: var(--text-sm);
+	.brandLogo {
+		height: 1.5rem;
 	}
 
 	.navLinks {
@@ -90,5 +100,21 @@
 		flex: 1 1 0;
 		text-align: center;
 		padding: var(--space-2);
+		/* Comfortable tap targets on mobile (WCAG 2.5.5). */
+		min-height: 44px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.authCluster {
+		width: 100%;
+		margin-left: 0;
+		justify-content: space-between;
+	}
+
+	.authCluster .navLink,
+	.authCluster .navLinkActive {
+		flex: 1 1 0;
 	}
 }

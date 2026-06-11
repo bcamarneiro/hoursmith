@@ -104,3 +104,11 @@
 	font-size: var(--text-sm);
 	color: var(--color-text-muted);
 }
+
+.success {
+	padding: var(--space-3);
+	border-radius: var(--radius-md);
+	background: color-mix(in srgb, var(--color-success) 14%, transparent);
+	color: var(--color-text);
+	font-size: var(--text-sm);
+}

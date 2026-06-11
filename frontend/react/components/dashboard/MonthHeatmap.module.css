@@ -95,7 +95,7 @@
 }
 
 .cellLevel4 {
-	background: var(--color-primary);
+	background: var(--color-success-strong);
 	color: var(--color-text-inverse);
 }
 
@@ -193,7 +193,7 @@
 }
 
 .legendCellLevel4 {
-	background: var(--color-primary);
+	background: var(--color-success-strong);
 }
 
 .legendCellVacation {

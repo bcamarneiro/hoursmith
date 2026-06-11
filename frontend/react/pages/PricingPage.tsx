@@ -1,5 +1,11 @@
 import type React from 'react';
 import { Link } from 'react-router-dom';
+import { trackEvent } from '../../analytics';
+import { isPremiumBuild } from '../../buildTier';
+import { LEAD_TIER_ENABLED } from '../../featureFlags';
+import type { PublicFlags } from '../../services/flagsService';
+import { PremiumWaitlistForm } from '../components/marketing/PremiumWaitlistForm';
+import { useFlags } from '../hooks/useFlags';
 import { usePageTitle } from '../hooks/usePageTitle';
 import * as styles from './PricingPage.module.css';
 
@@ -46,8 +52,38 @@ const LEAD_V2_ROADMAP = [
 
 const TRUST_LINE = 'Cancel anytime · EU VAT handled · Powered by Polar';
 
+/**
+ * Paid-tier CTA, gated by the operational flags (ADA-341):
+ *   - checkout disabled → an inline "temporarily unavailable" note
+ *   - paywall not open for me → the waitlist embed ("Coming soon")
+ *   - open → the real checkout CTA (routes to /account → Polar)
+ */
+const PaidCta: React.FC<{
+	flags: PublicFlags;
+	href: string;
+	label: string;
+}> = ({ flags, href, label }) => {
+	if (!flags.checkoutEnabled) {
+		return (
+			<p className={styles.trustLine}>Checkout is temporarily unavailable.</p>
+		);
+	}
+	if (!flags.paywallOpenForMe) {
+		return <PremiumWaitlistForm source="pricing" />;
+	}
+	return (
+		<>
+			<a href={href} className={styles.primaryCta}>
+				{label}
+			</a>
+			<p className={styles.trustLine}>{TRUST_LINE}</p>
+		</>
+	);
+};
+
 export const PricingPage: React.FC = () => {
 	usePageTitle('Pricing');
+	const flags = useFlags();
 
 	return (
 		<div className={styles.page}>
@@ -55,8 +91,27 @@ export const PricingPage: React.FC = () => {
 				<h1 className={styles.title}>Pricing.</h1>
 				<p className={styles.timeCost}>
 					Hoursmith replaces ~2 hours of month-end timesheet chasing per client.
-					Worth €29 — or €60 if you serve multiple clients.
+					{LEAD_TIER_ENABLED
+						? ' Worth €29 — yours at the €19/year founding rate — or €60/year for Lead if you serve multiple clients.'
+						: ' Worth €29 — yours at the €19/year founding rate.'}
 				</p>
+				{isPremiumBuild() && (
+					<div className={styles.heroCta}>
+						<Link
+							to="/auth/sign-up"
+							className={styles.primaryCta}
+							onClick={() =>
+								trackEvent('cta_create_account', { location: 'pricing' })
+							}
+						>
+							Create account
+						</Link>
+						<p className={styles.trustLine}>
+							Free to start — no card required. Pick a paid plan whenever you're
+							ready.
+						</p>
+					</div>
+				)}
 			</header>
 
 			<section className={styles.tiers}>
@@ -123,55 +178,59 @@ export const PricingPage: React.FC = () => {
 						))}
 					</ul>
 					<div className={styles.ctaSlot}>
-						<a href="/account?upgrade=hosted" className={styles.primaryCta}>
-							Get Hosted — €29/year
-						</a>
-						<p className={styles.trustLine}>{TRUST_LINE}</p>
+						<PaidCta
+							flags={flags}
+							href="/account?upgrade=hosted"
+							label="Get Hosted — €19/year (founding)"
+						/>
 					</div>
 				</article>
 
-				{/* Lead */}
-				<article className={styles.tier}>
-					<header className={styles.tierHeader}>
-						<h2 className={styles.tierName}>Lead</h2>
-						<p className={styles.tierPrice}>
-							<span className={styles.priceAmount}>€60</span>
-							<span className={styles.priceCadence}>/year (founding)</span>
-						</p>
-						<p className={styles.foundingNote}>
-							Public price rises to <strong>€120/year</strong> as V2 ships.
-							Founding subscribers keep €60.
-						</p>
-						<p className={styles.tierHeadline}>
-							Configure each client once. Switch in two clicks.
-						</p>
-						<p className={styles.tierTagline}>
-							For team leads invoicing multiple clients. Everything in Hosted,
-							plus the client-aware workflow.
-						</p>
-					</header>
-					<ul className={styles.featureList}>
-						{LEAD_V1_FEATURES.map((feature) => (
-							<li key={feature} className={styles.featureItem}>
-								<strong>{feature}</strong>
-							</li>
-						))}
-					</ul>
-					<p className={styles.roadmapHeading}>Coming to Lead in 2026:</p>
-					<ul className={styles.roadmapList}>
-						{LEAD_V2_ROADMAP.map((feature) => (
-							<li key={feature} className={styles.roadmapItem}>
-								{feature}
-							</li>
-						))}
-					</ul>
-					<div className={styles.ctaSlot}>
-						<a href="/account?upgrade=lead" className={styles.primaryCta}>
-							Get Lead — €60/year (founding)
-						</a>
-						<p className={styles.trustLine}>{TRUST_LINE}</p>
-					</div>
-				</article>
+				{/* Lead — hidden behind LEAD_TIER_ENABLED until the tier ships (ADA-376) */}
+				{LEAD_TIER_ENABLED && (
+					<article className={styles.tier}>
+						<header className={styles.tierHeader}>
+							<h2 className={styles.tierName}>Lead</h2>
+							<p className={styles.tierPrice}>
+								<span className={styles.priceAmount}>€60</span>
+								<span className={styles.priceCadence}>/year (founding)</span>
+							</p>
+							<p className={styles.foundingNote}>
+								Public price rises to <strong>€120/year</strong> as V2 ships.
+								Founding subscribers keep €60.
+							</p>
+							<p className={styles.tierHeadline}>
+								Configure each client once. Switch in two clicks.
+							</p>
+							<p className={styles.tierTagline}>
+								For team leads invoicing multiple clients. Everything in Hosted,
+								plus the client-aware workflow.
+							</p>
+						</header>
+						<ul className={styles.featureList}>
+							{LEAD_V1_FEATURES.map((feature) => (
+								<li key={feature} className={styles.featureItem}>
+									<strong>{feature}</strong>
+								</li>
+							))}
+						</ul>
+						<p className={styles.roadmapHeading}>Coming to Lead in 2026:</p>
+						<ul className={styles.roadmapList}>
+							{LEAD_V2_ROADMAP.map((feature) => (
+								<li key={feature} className={styles.roadmapItem}>
+									{feature}
+								</li>
+							))}
+						</ul>
+						<div className={styles.ctaSlot}>
+							<PaidCta
+								flags={flags}
+								href="/account?upgrade=lead"
+								label="Get Lead — €60/year (founding)"
+							/>
+						</div>
+					</article>
+				)}
 			</section>
 
 			<section
@@ -181,17 +240,28 @@ export const PricingPage: React.FC = () => {
 				<h2 id="founding-policy-heading" className={styles.policyHeading}>
 					Founding-customer rate
 				</h2>
+				{LEAD_TIER_ENABLED && (
+					<p className={styles.policyBody}>
+						Subscribe at <strong>€60</strong> before the V2 features ship, and
+						your price stays €60/year while you stay subscribed. As we add
+						scheduled exports, manager digests, audit log, and project budget
+						tracking later in 2026, public pricing rises to{' '}
+						<strong>€120/year</strong>. Yours doesn't.
+					</p>
+				)}
 				<p className={styles.policyBody}>
-					Subscribe at <strong>€60</strong> before the V2 features ship, and
-					your price stays €60/year while you stay subscribed. As we add
-					scheduled exports, manager digests, audit log, and project budget
-					tracking later in 2026, public pricing rises to{' '}
-					<strong>€120/year</strong>. Yours doesn't.
-				</p>
-				<p className={styles.policyBody}>
-					The same lock applies to Hosted founding subscribers:{' '}
-					<strong>€19 stays €19</strong> even after the public price returns to
-					€29.
+					{LEAD_TIER_ENABLED ? (
+						<>
+							The same lock applies to Hosted founding subscribers:{' '}
+							<strong>€19 stays €19</strong> even after the public price returns
+							to €29.
+						</>
+					) : (
+						<>
+							Hosted founding subscribers lock in <strong>€19/year</strong> — it
+							stays €19 even after the public price returns to €29.
+						</>
+					)}
 				</p>
 			</section>
 
@@ -200,17 +270,19 @@ export const PricingPage: React.FC = () => {
 					Questions
 				</h2>
 				<dl className={styles.faqList}>
-					<div className={styles.faqItem}>
-						<dt className={styles.faqQuestion}>
-							What's the difference between Hosted and Lead?
-						</dt>
-						<dd className={styles.faqAnswer}>
-							Hosted gives you the hosted CORS proxy so you don't run anything
-							locally. Lead adds the multi-client workflow (per-client CSV
-							profiles, billable rates, PTO awareness) for people who invoice
-							two or more clients.
-						</dd>
-					</div>
+					{LEAD_TIER_ENABLED && (
+						<div className={styles.faqItem}>
+							<dt className={styles.faqQuestion}>
+								What's the difference between Hosted and Lead?
+							</dt>
+							<dd className={styles.faqAnswer}>
+								Hosted gives you the hosted CORS proxy so you don't run anything
+								locally. Lead adds the multi-client workflow (per-client CSV
+								profiles, billable rates, PTO awareness) for people who invoice
+								two or more clients.
+							</dd>
+						</div>
+					)}
 					<div className={styles.faqItem}>
 						<dt className={styles.faqQuestion}>Why pay if it's open source?</dt>
 						<dd className={styles.faqAnswer}>

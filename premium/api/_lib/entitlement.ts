@@ -11,8 +11,11 @@
  * for the official SDK client; the {@link SupabaseLikeClient} interface keeps
  * the call sites stable and tests inject a mock through the same shape.
  *
- * Linear: ADA-272 (this file), ADA-254 (Supabase project bringup).
+ * Linear: ADA-272 (this file), ADA-254 (Supabase project bringup),
+ * ADA-343 (JWT verify consolidated into _lib/auth.ts).
  */
+
+import { userIdFromToken } from './auth.js';
 
 export type SubscriptionStatus =
 	| 'active'
@@ -110,7 +113,7 @@ export async function getEntitlement(
 	}
 
 	const subscription = await client.getSubscription(userId);
-	if (!subscription || subscription.status !== 'active') {
+	if (!subscription || !isEntitledStatus(subscription.status)) {
 		return {
 			ok: false,
 			status: 403,
@@ -125,6 +128,19 @@ export async function getEntitlement(
 		tier: subscription.tier,
 		status: subscription.status,
 	};
+}
+
+/**
+ * Statuses that grant proxy access. `past_due` is included for the dunning
+ * grace window (ADA-371): Polar retries the failed renewal over ~2 weeks and
+ * only then emits `subscription.revoked`, which our webhook maps to
+ * `tier:'free'`. That revoke — not the first failed charge — is the real
+ * cutoff, so `past_due` stays entitled until revoked. `canceled`/`unpaid`/
+ * `incomplete` are NOT entitled. Kept identical to the client check in
+ * `premium/auth/useSubscription.ts`.
+ */
+function isEntitledStatus(status: SubscriptionStatus): boolean {
+	return status === 'active' || status === 'trialing' || status === 'past_due';
 }
 
 function extractBearer(header: string | null): string | null {
@@ -165,16 +181,15 @@ class FetchSupabaseClient implements SupabaseLikeClient {
 	) {}
 
 	async getUserIdFromToken(token: string): Promise<string | null> {
-		// GoTrue endpoint: GET /auth/v1/user with the user's bearer token.
-		const res = await fetch(`${this.url}/auth/v1/user`, {
-			headers: {
-				apikey: this.serviceRoleKey,
-				authorization: `Bearer ${token}`,
+		// Consolidated verify (ADA-343): local JWKS signature check with a REST
+		// (`GET /auth/v1/user`) fallback. Avoids the GoTrue round-trip on the hot
+		// proxy path when the project uses asymmetric (ES256/RS256) JWTs.
+		return userIdFromToken(token, {
+			env: {
+				SUPABASE_URL: this.url,
+				SUPABASE_SERVICE_ROLE_KEY: this.serviceRoleKey,
 			},
 		});
-		if (!res.ok) return null;
-		const body = (await res.json()) as { id?: string } | null;
-		return body?.id ?? null;
 	}
 
 	async getSubscription(

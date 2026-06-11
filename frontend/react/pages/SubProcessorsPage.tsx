@@ -13,7 +13,7 @@ import * as styles from './SubProcessorsPage.module.css';
  * sub-processor list changes (expected cadence: quarterly at most).
  */
 
-const LAST_UPDATED = '2026-05-27';
+const LAST_UPDATED = '2026-06-07';
 
 interface SubProcessorRow {
 	name: string;
@@ -55,11 +55,11 @@ const ACTIVE_SUB_PROCESSORS: SubProcessorRow[] = [
 		},
 	},
 	{
-		name: 'Plausible Analytics',
+		name: 'PostHog',
 		purpose:
-			'Cookieless, anonymous traffic analytics. No personal identifiers are collected and no consent banner is required.',
-		region: 'EU (Germany)',
-		dpa: { label: 'plausible.io/dpa', href: 'https://plausible.io/dpa' },
+			'Cookieless product analytics: page views and a small set of product events. No autocapture, no session recording, and no persistent identifiers — so no consent banner is required.',
+		region: 'EU (Germany), via PostHog EU Cloud',
+		dpa: { label: 'posthog.com/dpa', href: 'https://posthog.com/dpa' },
 	},
 ];
 

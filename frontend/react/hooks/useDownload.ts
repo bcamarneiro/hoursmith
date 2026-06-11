@@ -75,6 +75,9 @@ export function useDownload(opts?: {
 	const includeAbsenceInCsv = useConfigStore(
 		(state) => state.config.includeAbsenceInCsv,
 	);
+	const includeCsvProvenance = useConfigStore(
+		(state) => state.config.includeCsvProvenance,
+	);
 
 	const provenance = { jiraHost: jiraHost || 'unknown' };
 
@@ -96,6 +99,7 @@ export function useDownload(opts?: {
 			policy,
 			period: { year, month },
 			provenance,
+			includeProvenance: includeCsvProvenance,
 			absenceDays: resolveAbsenceMap(user),
 			includeAbsenceColumns: includeAbsenceInCsv,
 		});
@@ -120,6 +124,7 @@ export function useDownload(opts?: {
 				policy,
 				period: { year, month },
 				provenance,
+				includeProvenance: includeCsvProvenance,
 				absenceDays: resolveAbsenceMap(user),
 				includeAbsenceColumns: includeAbsenceInCsv,
 			});
@@ -138,6 +143,7 @@ export function useDownload(opts?: {
 				policy,
 				period: { year, month },
 				provenance,
+				includeProvenance: includeCsvProvenance,
 			});
 			const segment = formatMonthlyExportSegment(year, month);
 			download(

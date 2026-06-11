@@ -32,6 +32,9 @@ jobs:
       - name: Run formatter check
         run: npx biome check . --linter-enabled=false --assist-enabled=false
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Run unit tests
         run: npm run test:run
 
@@ -66,7 +69,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Start offline server
-        run: npm run dev:offline > /tmp/jira-timesheet-offline.log 2>&1 &
+        run: npm run dev:offline > /tmp/hoursmith-offline.log 2>&1 &
 
       - name: Wait for offline server
         run: |
@@ -76,7 +79,7 @@ jobs:
             fi
             sleep 2
           done
-          cat /tmp/jira-timesheet-offline.log
+          cat /tmp/hoursmith-offline.log
           exit 1
 
       - name: Run E2E smoke tests
@@ -97,5 +100,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: offline-server-log
-          path: /tmp/jira-timesheet-offline.log
+          path: /tmp/hoursmith-offline.log
           retention-days: 7

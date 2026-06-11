@@ -13,7 +13,7 @@ import * as styles from './LegalPage.module.css';
  * changes (expected cadence: when material processing changes ship).
  */
 
-const EFFECTIVE_DATE = '2026-05-27';
+const EFFECTIVE_DATE = '2026-06-07';
 // TODO(ADA-283): replace once support@hoursmith.io is provisioned.
 const CONTACT_EMAIL = 'privacy@hoursmith.io';
 
@@ -79,9 +79,12 @@ export const PrivacyPage: React.FC = () => {
 					tokens are written.
 				</p>
 				<p className={styles.body}>
-					<strong>Analytics.</strong> When Plausible Analytics is enabled it
-					counts page views without setting cookies and without collecting any
-					identifiers that could identify you personally.
+					<strong>Analytics.</strong> When PostHog product analytics is enabled
+					it records page views and a small set of product events (such as
+					starting checkout) to help us improve the product. It runs cookieless
+					with no persistent identifiers, no autocapture, and no session
+					recording, so it never captures your Jira data and no consent banner
+					is required. PostHog processes this in the EU.
 				</p>
 			</section>
 

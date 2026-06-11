@@ -23,6 +23,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { trackEvent } from '../../frontend/analytics';
+import { LEAD_TIER_ENABLED } from '../../frontend/featureFlags';
+import { PremiumWaitlistForm } from '../../frontend/react/components/marketing/PremiumWaitlistForm';
+import { useFlags } from '../../frontend/react/hooks/useFlags';
 import * as styles from './AccountPage.module.css';
 import { getSupabase } from './supabaseClient';
 import { useAuth } from './useAuth';
@@ -73,9 +77,34 @@ async function postJson(
 const DEFAULT_UPGRADE_TIER: 'hosted' | 'lead' = 'hosted';
 
 const UPGRADE_TIER_LABELS: Record<'hosted' | 'lead', string> = {
-	hosted: 'Hosted (€29/year)',
-	lead: 'Lead (€60/year)',
+	hosted: 'Hosted (€19/year, founding)',
+	lead: 'Lead (€60/year, founding)',
 };
+
+// The `subscriptions` row only stores 'free' | 'premium' (DB CHECK) — the Polar
+// webhook collapses every paid product to 'premium'. Hosted is the only live
+// paid tier today, so premium → "Hosted". When Lead (ADA-358) ships it must
+// persist its own plan on the row, or Lead buyers would mislabel as Hosted here.
+const TIER_LABELS: Record<SubscriptionRow['tier'], string> = {
+	free: 'Free',
+	premium: 'Hosted',
+};
+
+const STATUS_LABELS: Record<SubscriptionStatus, string> = {
+	active: 'Active',
+	past_due: 'Past due',
+	canceled: 'Canceled',
+	incomplete: 'Incomplete',
+	trialing: 'Trial',
+	unpaid: 'Unpaid',
+};
+
+function statusLabel(status: SubscriptionStatus | null): string {
+	return status ? STATUS_LABELS[status] : 'No subscription';
+}
+
+// TODO(ADA-283): replace once support@hoursmith.io is provisioned.
+const CONTACT_EMAIL = 'privacy@hoursmith.io';
 
 export function AccountPage(): JSX.Element {
 	useEffect(() => {
@@ -86,11 +115,18 @@ export function AccountPage(): JSX.Element {
 		};
 	}, []);
 	const { user, session, signOut } = useAuth();
+	// Operational flags (ADA-341), personalised via the session token so an
+	// allowlisted user during closed launch still sees the real upgrade button.
+	const flags = useFlags(session?.access_token);
 	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const intendedTier = useMemo<'hosted' | 'lead' | null>(() => {
 		const v = searchParams.get('upgrade');
-		return v === 'hosted' || v === 'lead' ? v : null;
+		if (v === 'hosted') return 'hosted';
+		// Lead is hidden until it ships (ADA-376) — ignore ?upgrade=lead so a
+		// stale link can't auto-fire a checkout for the unbuilt tier.
+		if (v === 'lead' && LEAD_TIER_ENABLED) return 'lead';
+		return null;
 	}, [searchParams]);
 	const [subscription, setSubscription] = useState<SubscriptionRow | null>(
 		null,
@@ -99,35 +135,81 @@ export function AccountPage(): JSX.Element {
 	const [actionPending, setActionPending] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [autoUpgradeFired, setAutoUpgradeFired] = useState(false);
+	const [justUpgraded, setJustUpgraded] = useState(false);
 
-	useEffect(() => {
-		if (!user) return;
-		let cancelled = false;
-		setLoadingSub(true);
-		getSupabase()
-			.from('subscriptions')
-			.select('tier, status, current_period_end')
-			.eq('user_id', user.id)
-			.maybeSingle()
-			.then(({ data, error }) => {
-				if (cancelled) return;
+	// Key the fetch on the stable user id, not the whole auth object — depending
+	// on `user` identity would refetch on every auth-context churn.
+	const userId = user?.id ?? null;
+	const fetchSubscription =
+		useCallback(async (): Promise<SubscriptionRow | null> => {
+			if (!userId) return null;
+			setLoadingSub(true);
+			let row: SubscriptionRow | null = null;
+			try {
+				const { data, error } = await getSupabase()
+					.from('subscriptions')
+					.select('tier, status, current_period_end')
+					.eq('user_id', userId)
+					.maybeSingle();
 				if (error) {
 					console.warn('[account] subscription_fetch_failed');
-					setSubscription(null);
 				} else {
-					setSubscription((data as SubscriptionRow | null) ?? null);
+					row = (data as SubscriptionRow | null) ?? null;
 				}
-				setLoadingSub(false);
-			});
+			} catch {
+				// Never leave the section spinning if the client/query throws.
+				console.warn('[account] subscription_fetch_failed');
+			}
+			setSubscription(row);
+			setLoadingSub(false);
+			return row;
+		}, [userId]);
+
+	useEffect(() => {
+		void fetchSubscription();
+	}, [fetchSubscription]);
+
+	// Post-checkout, Polar redirects to /account?upgrade=success. Flag the
+	// confirmation and clear the param immediately so a refresh/back-button
+	// doesn't replay it.
+	useEffect(() => {
+		if (searchParams.get('upgrade') !== 'success') return;
+		setJustUpgraded(true);
+		trackEvent('checkout_succeeded');
+		const next = new URLSearchParams(searchParams);
+		next.delete('upgrade');
+		setSearchParams(next, { replace: true });
+	}, [searchParams, setSearchParams]);
+
+	// The activating webhook can land a few seconds after the redirect, so poll
+	// the subscription briefly — otherwise a customer who just paid keeps seeing
+	// "Free" until they manually refresh. Stops once active, or after 5 tries.
+	useEffect(() => {
+		if (!justUpgraded || !userId) return;
+		let cancelled = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let attempts = 0;
+		const poll = async () => {
+			if (cancelled) return;
+			const row = await fetchSubscription();
+			attempts += 1;
+			const active = row?.tier === 'premium' && row?.status === 'active';
+			if (!active && attempts < 5 && !cancelled) {
+				timer = setTimeout(poll, 2000);
+			}
+		};
+		void poll();
 		return () => {
 			cancelled = true;
+			if (timer) clearTimeout(timer);
 		};
-	}, [user]);
+	}, [justUpgraded, userId, fetchSubscription]);
 
 	const handleUpgrade = useCallback(
 		async (tier: 'hosted' | 'lead' = DEFAULT_UPGRADE_TIER) => {
 			setActionPending('checkout');
 			setActionError(null);
+			trackEvent('checkout_started', { tier });
 			try {
 				const res = await postJson('/api/checkout', session?.access_token, {
 					tier,
@@ -158,6 +240,8 @@ export function AccountPage(): JSX.Element {
 		if (!user || loadingSub) return;
 		if (subscription?.tier === 'premium' && subscription?.status === 'active')
 			return;
+		// Don't auto-fire a checkout the operational gate would reject (ADA-341).
+		if (!flags.checkoutEnabled || !flags.paywallOpenForMe) return;
 		setAutoUpgradeFired(true);
 		const next = new URLSearchParams(searchParams);
 		next.delete('upgrade');
@@ -172,6 +256,8 @@ export function AccountPage(): JSX.Element {
 		searchParams,
 		setSearchParams,
 		handleUpgrade,
+		flags.checkoutEnabled,
+		flags.paywallOpenForMe,
 	]);
 
 	const handleExport = useCallback(async () => {
@@ -183,7 +269,10 @@ export function AccountPage(): JSX.Element {
 					? { authorization: `Bearer ${session.access_token}` }
 					: undefined,
 			});
-			if (!res.ok) throw new Error('Export endpoint not available yet.');
+			if (!res.ok)
+				throw new Error(
+					`We couldn't generate your export right now. Please try again in a moment — if it keeps failing, email ${CONTACT_EMAIL}.`,
+				);
 			const blob = await res.blob();
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
@@ -207,7 +296,10 @@ export function AccountPage(): JSX.Element {
 		setActionError(null);
 		try {
 			const res = await postJson('/api/account/delete', session?.access_token);
-			if (!res.ok) throw new Error('Delete endpoint not available yet.');
+			if (!res.ok)
+				throw new Error(
+					`We couldn't delete your account right now. Please try again in a moment — if it keeps failing, email ${CONTACT_EMAIL}.`,
+				);
 			await signOut();
 			navigate('/', { replace: true });
 		} catch (err) {
@@ -272,19 +364,24 @@ export function AccountPage(): JSX.Element {
 
 			<section className={styles.section}>
 				<h2 className={styles.sectionTitle}>Subscription</h2>
+				{justUpgraded && (
+					<div className={styles.success}>
+						{tier === 'premium'
+							? 'Payment received — welcome to Hosted! Your subscription is active.'
+							: 'Payment received — welcome to Hosted! Your subscription is activating; this page will update automatically in a few seconds.'}
+					</div>
+				)}
 				{loadingSub ? (
 					<p className={styles.note}>Loading…</p>
 				) : (
 					<>
 						<div className={styles.row}>
 							<span className={styles.label}>Tier</span>
-							<span className={styles.value}>
-								{tier === 'premium' ? 'Premium' : 'Free'}
-							</span>
+							<span className={styles.value}>{TIER_LABELS[tier]}</span>
 						</div>
 						<div className={styles.row}>
 							<span className={styles.label}>Status</span>
-							<span className={styles.value}>{status ?? 'none'}</span>
+							<span className={styles.value}>{statusLabel(status)}</span>
 						</div>
 						{subscription?.current_period_end && (
 							<div className={styles.row}>
@@ -304,36 +401,64 @@ export function AccountPage(): JSX.Element {
 						)}
 
 						<div className={styles.actions}>
-							{(!status || status === 'incomplete' || tier === 'free') && (
-								<button
-									type="button"
-									className={styles.primary}
-									onClick={() =>
-										handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
-									}
-									disabled={actionPending === 'checkout'}
-								>
-									{actionPending === 'checkout'
-										? 'Redirecting…'
-										: `Upgrade to ${
-												UPGRADE_TIER_LABELS[
-													intendedTier ?? DEFAULT_UPGRADE_TIER
-												]
-											}`}
-								</button>
-							)}
-							{status === 'canceled' && (
-								<button
-									type="button"
-									className={styles.primary}
-									onClick={() =>
-										handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
-									}
-									disabled={actionPending === 'checkout'}
-								>
-									Resubscribe
-								</button>
-							)}
+							{(!status || status === 'incomplete' || tier === 'free') &&
+								(!flags.checkoutEnabled ? (
+									<p className={styles.note}>
+										Checkout is temporarily unavailable.
+									</p>
+								) : !flags.paywallOpenForMe ? (
+									<>
+										<p className={styles.note}>
+											Hoursmith is in private beta — paid upgrades are
+											invite-only right now. Join the list and we'll email you
+											the moment your account is enabled.
+										</p>
+										<PremiumWaitlistForm source="in-app-settings" />
+									</>
+								) : (
+									<button
+										type="button"
+										className={styles.primary}
+										onClick={() =>
+											handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
+										}
+										disabled={actionPending === 'checkout'}
+									>
+										{actionPending === 'checkout'
+											? 'Redirecting…'
+											: `Upgrade to ${
+													UPGRADE_TIER_LABELS[
+														intendedTier ?? DEFAULT_UPGRADE_TIER
+													]
+												}`}
+									</button>
+								))}
+							{status === 'canceled' &&
+								(!flags.checkoutEnabled ? (
+									<p className={styles.note}>
+										Checkout is temporarily unavailable.
+									</p>
+								) : !flags.paywallOpenForMe ? (
+									<>
+										<p className={styles.note}>
+											Hoursmith is in private beta — paid upgrades are
+											invite-only right now. Join the list and we'll email you
+											the moment your account is enabled.
+										</p>
+										<PremiumWaitlistForm source="in-app-settings" />
+									</>
+								) : (
+									<button
+										type="button"
+										className={styles.primary}
+										onClick={() =>
+											handleUpgrade(intendedTier ?? DEFAULT_UPGRADE_TIER)
+										}
+										disabled={actionPending === 'checkout'}
+									>
+										Resubscribe
+									</button>
+								))}
 							{(status === 'active' ||
 								status === 'past_due' ||
 								status === 'trialing' ||

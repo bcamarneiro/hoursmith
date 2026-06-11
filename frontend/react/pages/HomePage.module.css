@@ -384,6 +384,7 @@
 	padding: var(--space-2);
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
 	border-top: 1px solid var(--color-border);
 }
 
@@ -392,7 +393,7 @@
 }
 
 .rollupCellMissed {
-	color: var(--color-danger, #dc2626);
+	color: var(--color-error);
 	font-weight: var(--font-bold);
 	background-color: var(--color-day-incomplete-bg);
 }

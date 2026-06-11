@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { migrateStorageKey } from './migrateStorageKeys';
 import { getPersistStorage } from './persistStorage';
 
 export interface CalendarFeed {
@@ -53,6 +54,12 @@ export interface Config {
 	 * for new installs would silently strip data — keep on.
 	 */
 	includeAbsenceInCsv: boolean;
+	/**
+	 * When true, CSV exports append a `# generated=… jira=… policy=… period=…`
+	 * provenance footer line (traceability for finance/audit). Off by default
+	 * so exports are clean and don't leak the Jira host / build version.
+	 */
+	includeCsvProvenance: boolean;
 }
 
 interface ConfigState {
@@ -170,6 +177,7 @@ export function createDefaultConfig(): Config {
 		theme: 'system',
 		timeRounding: 'off',
 		includeAbsenceInCsv: true,
+		includeCsvProvenance: false,
 	};
 }
 
@@ -266,6 +274,10 @@ export function normalizeConfig(
 			typeof config?.includeAbsenceInCsv === 'boolean'
 				? config.includeAbsenceInCsv
 				: fallback.includeAbsenceInCsv,
+		includeCsvProvenance:
+			typeof config?.includeCsvProvenance === 'boolean'
+				? config.includeCsvProvenance
+				: fallback.includeCsvProvenance,
 	};
 }
 
@@ -309,6 +321,9 @@ export function migratePersistedConfigState(
 	return { config: normalizeConfig(legacyConfig) };
 }
 
+// Carry existing users' data across the jira-timesheet-report → hoursmith rename.
+migrateStorageKey('jira-timesheet-config', 'hoursmith-config');
+
 export const useConfigStore = create<ConfigState>()(
 	persist(
 		(set) => ({
@@ -316,7 +331,7 @@ export const useConfigStore = create<ConfigState>()(
 			setConfig: (newConfig) => set({ config: normalizeConfig(newConfig) }),
 		}),
 		{
-			name: 'jira-timesheet-config',
+			name: 'hoursmith-config',
 			storage: createJSONStorage(getPersistStorage),
 			version: CONFIG_STORAGE_VERSION,
 			migrate: (persistedState, version) =>

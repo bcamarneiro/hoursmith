@@ -9,7 +9,17 @@
       content="Chase your team's missing Jira worklogs before invoice day. A team-lead's dashboard: pull everyone's logged hours into one view, spot missed days, export clean CSVs at month-end. Browser-only. Free to self-host; Hosted €29/year."
     />
     <meta name="application-name" content="Hoursmith" />
-    <meta name="theme-color" content="#4f46e5" />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#f4efe7"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#161210"
+    />
+    <link rel="canonical" href="https://hoursmith.io/" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Hoursmith" />
@@ -21,21 +31,58 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://hoursmith.io" />
     <meta property="og:site_name" content="Hoursmith" />
-    <!-- TODO: og:image once a 1200x630 social preview asset is ready. -->
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="https://hoursmith.io/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Hoursmith — chase missing Jira worklogs before invoice day, shown as a worklog heatmap"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Hoursmith — Jira worklog dashboard" />
     <meta
       name="twitter:description"
       content="Chase your team's missing Jira worklogs before invoice day. Spot missed days, export clean CSVs at month-end. Browser-only. Free to self-host; Hosted €29/year."
     />
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" href="pwa-icon.svg" type="image/svg+xml" />
+    <meta name="twitter:image" content="https://hoursmith.io/og-image.png" />
+    <!-- Root-absolute so deep links (e.g. /auth/*) resolve these from site
+         root instead of relative to the nested route path (which 404s). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Forge × Ledger type system: Bricolage Grotesque (display),
+         Hanken Grotesk (body), JetBrains Mono (numerals). -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Hoursmith",
+        "url": "https://hoursmith.io/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "A browser-only Jira worklog dashboard for team leads: pull everyone's logged hours into one view, spot missed days, and export clean CSVs at month-end.",
+        "offers": [
+          {
+            "@type": "Offer",
+            "name": "Free (self-host)",
+            "price": "0",
+            "priceCurrency": "EUR"
+          },
+          {
+            "@type": "Offer",
+            "name": "Hosted",
+            "price": "29",
+            "priceCurrency": "EUR"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

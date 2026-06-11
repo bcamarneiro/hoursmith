@@ -38,6 +38,7 @@ function makeAdmin(
 		deleteSubscription: vi.fn().mockResolvedValue(undefined),
 		deleteProfile: vi.fn().mockResolvedValue(undefined),
 		deleteAuthUser: vi.fn().mockResolvedValue(undefined),
+		signOutUser: vi.fn().mockResolvedValue(undefined),
 		insertAuditLog: vi.fn().mockResolvedValue(undefined),
 		...overrides,
 	} as unknown as SupabaseAdminClient;
@@ -86,6 +87,8 @@ describe('POST /api/account/delete', () => {
 		expect(admin.deleteSubscription).toHaveBeenCalledWith('user-123');
 		expect(admin.deleteProfile).toHaveBeenCalledWith('user-123');
 		expect(admin.deleteAuthUser).toHaveBeenCalledWith('user-123');
+		// ADA-313: the verified JWT is globally signed out after the delete.
+		expect(admin.signOutUser).toHaveBeenCalledWith('ok');
 		expect(admin.insertAuditLog).toHaveBeenCalledWith(
 			expect.objectContaining({
 				event_type: 'account_deleted',
@@ -158,6 +161,42 @@ describe('POST /api/account/delete', () => {
 		);
 		expect(res.status).toBe(500);
 		expect(admin.insertAuditLog).not.toHaveBeenCalled();
+		// ADA-313: nothing was deleted, so we must not attempt a global signout.
+		expect(admin.signOutUser).not.toHaveBeenCalled();
+	});
+
+	it('globally signs out the verified JWT after a successful delete (ADA-313)', async () => {
+		const admin = makeAdmin();
+		const res = await handleDelete(
+			makeRequest({ authorization: 'Bearer the-jwt' }),
+			{
+				admin,
+				cancelSubscription: okCancel(),
+				verifyJwt: vi.fn().mockResolvedValue('user-123'),
+			},
+		);
+		expect(res.status).toBe(204);
+		expect(admin.deleteAuthUser).toHaveBeenCalledWith('user-123');
+		expect(admin.signOutUser).toHaveBeenCalledWith('the-jwt');
+	});
+
+	it('still succeeds and logs audit when the global signout fails (best-effort, ADA-313)', async () => {
+		const admin = makeAdmin({
+			signOutUser: vi.fn().mockRejectedValue(new Error('gotrue down')),
+		});
+		const res = await handleDelete(
+			makeRequest({ authorization: 'Bearer the-jwt' }),
+			{
+				admin,
+				cancelSubscription: okCancel(),
+				verifyJwt: vi.fn().mockResolvedValue('user-123'),
+			},
+		);
+		// Account is already deleted; a revocation failure must not 500 or skip
+		// the audit log.
+		expect(res.status).toBe(204);
+		expect(admin.signOutUser).toHaveBeenCalledWith('the-jwt');
+		expect(admin.insertAuditLog).toHaveBeenCalled();
 	});
 
 	it('rejects non-POST methods', async () => {

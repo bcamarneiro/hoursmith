@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useEffect, useId, useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
 	AbsenceAssignment,
 	CalendarFeed,
@@ -7,7 +7,10 @@ import type {
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { useSettingsFormStore } from '../../../stores/useSettingsFormStore';
 import { useUserDataStore } from '../../../stores/useUserDataStore';
-import { SETTINGS_SECTION_IDS } from '../../constants/settingsSections';
+import {
+	SETTINGS_RAIL_ITEMS,
+	SETTINGS_SECTION_IDS,
+} from '../../constants/settingsSections';
 import { downloadAsFile } from '../../utils/downloadFile';
 import { splitCsvEmailList, uniqueEmailEntries } from '../../utils/emailList';
 import {
@@ -15,6 +18,10 @@ import {
 	createSettingsSharePack,
 	parseSettingsBackup,
 } from '../../utils/settingsBackup';
+import type {
+	SettingsSetupModel,
+	SetupStatus,
+} from '../../utils/settingsSetup';
 import { Button } from '../ui/Button';
 import { toast } from '../ui/Toast';
 import * as styles from './SettingsForm.module.css';
@@ -84,7 +91,37 @@ function getGitlabTroubleshooting(message: string | null): string | null {
 	return null;
 }
 
-export const SettingsForm: React.FC = () => {
+type SettingsFormProps = {
+	/**
+	 * The setup model (from buildSettingsSetupModel) — used only to drive the
+	 * rail status dots. Optional so the form still renders standalone in tests.
+	 */
+	setupModel?: SettingsSetupModel;
+	/**
+	 * Controlled active rail section. Optional: when omitted the form manages its
+	 * own active-section state (keeps the component usable standalone in tests).
+	 */
+	activeSection?: string;
+	onSelectSection?: (sectionId: string) => void;
+};
+
+/** Resolve a rail item's status dot from the shared setup model. */
+function railStatus(
+	model: SettingsSetupModel | undefined,
+	setupKey: string | undefined,
+): SetupStatus | null {
+	if (!model || !setupKey) return null;
+	const step = model.steps.find((s) => s.id === setupKey);
+	if (step) return step.status;
+	const diag = model.diagnostics.find((d) => d.id === setupKey);
+	return diag ? diag.status : null;
+}
+
+export const SettingsForm: React.FC<SettingsFormProps> = ({
+	setupModel,
+	activeSection: controlledActiveSection,
+	onSelectSection,
+}) => {
 	const formData = useSettingsFormStore((state) => state.formData);
 	const integrationTests = useSettingsFormStore(
 		(state) => state.integrationTests,
@@ -116,6 +153,11 @@ export const SettingsForm: React.FC = () => {
 		(s) => s.replaceCalendarMappings,
 	);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [internalActiveSection, setInternalActiveSection] = useState<string>(
+		SETTINGS_SECTION_IDS.connection,
+	);
+	const activeSection = controlledActiveSection ?? internalActiveSection;
+	const selectSection = onSelectSection ?? setInternalActiveSection;
 
 	const jiraHostId = useId();
 	const emailId = useId();
@@ -129,6 +171,7 @@ export const SettingsForm: React.FC = () => {
 	const timeRoundingId = useId();
 	const themeId = useId();
 	const includeAbsenceInCsvId = useId();
+	const includeCsvProvenanceId = useId();
 	const isDirty = JSON.stringify(formData) !== JSON.stringify(savedConfig);
 	const canTestJira =
 		!!formData.jiraHost.trim() &&
@@ -288,7 +331,7 @@ export const SettingsForm: React.FC = () => {
 		});
 		downloadAsFile(
 			`${JSON.stringify(backup, null, 2)}\n`,
-			'jira-timesheet-settings.json',
+			'hoursmith-settings.json',
 			'application/json;charset=utf-8',
 		);
 		toast.success('Settings exported');
@@ -298,7 +341,7 @@ export const SettingsForm: React.FC = () => {
 		const sharePack = createSettingsSharePack(savedConfig, calendarMappings);
 		downloadAsFile(
 			`${JSON.stringify(sharePack, null, 2)}\n`,
-			'jira-timesheet-share-pack.json',
+			'hoursmith-share-pack.json',
 			'application/json;charset=utf-8',
 		);
 		toast.success('Share pack exported without local secrets');
@@ -342,6 +385,43 @@ export const SettingsForm: React.FC = () => {
 		}
 	};
 
+	const configRailItems = SETTINGS_RAIL_ITEMS.filter(
+		(item) => item.group === 'config',
+	);
+	const savedRailItems = SETTINGS_RAIL_ITEMS.filter(
+		(item) => item.group === 'saved',
+	);
+	const dataSectionId = SETTINGS_SECTION_IDS.form;
+
+	const renderRailItem = (item: (typeof SETTINGS_RAIL_ITEMS)[number]) => {
+		const status = railStatus(setupModel, item.setupKey);
+		const isActive = activeSection === item.id;
+		return (
+			<button
+				key={item.id}
+				type="button"
+				className={`${styles.railItem} ${isActive ? styles.railItemActive : ''}`}
+				aria-current={isActive ? 'true' : undefined}
+				onClick={() => selectSection(item.id)}
+			>
+				{status ? (
+					<span
+						className={`${styles.railDot} ${
+							status === 'ready'
+								? styles.railDotReady
+								: status === 'warning'
+									? styles.railDotWarning
+									: styles.railDotPending
+						}`}
+					/>
+				) : (
+					<span className={styles.railDot} />
+				)}
+				<span className={styles.railLabel}>{item.label}</span>
+			</button>
+		);
+	};
+
 	return (
 		<div id={SETTINGS_SECTION_IDS.form} className={styles.form}>
 			<input
@@ -351,7 +431,132 @@ export const SettingsForm: React.FC = () => {
 				className={styles.hiddenInput}
 				onChange={handleImportSettings}
 			/>
-			<div className={styles.formStatus} aria-live="polite">
+
+			<div className={styles.layout}>
+				<nav className={styles.rail} aria-label="Settings sections">
+					<p className={styles.railGroupLabel}>Configuration</p>
+					{configRailItems.map(renderRailItem)}
+					<div className={styles.railSeparator} />
+					<p className={styles.railGroupLabel}>Saved state</p>
+					{savedRailItems.map(renderRailItem)}
+				</nav>
+
+				<div className={styles.panels}>
+					{/*
+					 * Every section component is still rendered with identical props and
+					 * handlers — only visibility is gated by the active rail item, so
+					 * field/store/test parity is unchanged. `hidden` keeps each section
+					 * mounted (preserving its local input state) while showing one.
+					 */}
+					<div hidden={activeSection !== SETTINGS_SECTION_IDS.connection}>
+						<ConnectionSection
+							formData={formData}
+							handleChange={handleChange}
+							testJira={testJira}
+							canTestJira={canTestJira}
+							integrationTest={integrationTests.jira}
+							jiraHostId={jiraHostId}
+							emailId={emailId}
+							apiTokenId={apiTokenId}
+							corsProxyId={corsProxyId}
+						/>
+					</div>
+
+					<div hidden={activeSection !== SETTINGS_SECTION_IDS.scope}>
+						<ScopeSection
+							jqlFilter={formData.jqlFilter}
+							allowedUsers={formData.allowedUsers}
+							allowedUserSuggestions={allowedUserSuggestions}
+							handleChange={handleChange}
+							onAllowedUsersChange={(nextValue) =>
+								updateFormField('allowedUsers', nextValue as never)
+							}
+							jqlFilterId={jqlFilterId}
+							allowedUsersId={allowedUsersId}
+						/>
+					</div>
+
+					<div hidden={activeSection !== SETTINGS_SECTION_IDS.permissions}>
+						<PermissionsSection
+							canAddWorklogs={formData.canAddWorklogs}
+							canEditWorklogs={formData.canEditWorklogs}
+							canDeleteWorklogs={formData.canDeleteWorklogs}
+							complianceReminderEnabled={formData.complianceReminderEnabled}
+							handleChange={handleChange}
+						/>
+					</div>
+
+					<div hidden={activeSection !== SETTINGS_SECTION_IDS.integrations}>
+						<IntegrationsSection
+							gitlabHost={formData.gitlabHost}
+							gitlabToken={formData.gitlabToken}
+							rescueTimeApiKey={formData.rescueTimeApiKey}
+							absenceAssignments={formData.absenceAssignments ?? []}
+							gitlabHostId={gitlabHostId}
+							gitlabTokenId={gitlabTokenId}
+							rescueTimeKeyId={rescueTimeKeyId}
+							gitlabStatus={gitlabStatus}
+							rescueTimeStatus={rescueTimeStatus}
+							calendarStatus={calendarStatus}
+							gitlabTroubleshooting={gitlabTroubleshooting}
+							integrationTests={integrationTests}
+							testGitlab={testGitlab}
+							testRescueTime={testRescueTime}
+							testCalendar={testCalendar}
+							canTestGitlab={canTestGitlab}
+							canTestRescueTime={canTestRescueTime}
+							hasCalendarFeeds={hasCalendarFeeds}
+							suggestionFeedEntries={suggestionFeedEntries}
+							absenceFeedEntries={absenceFeedEntries}
+							holidayFeedEntries={holidayFeedEntries}
+							hasSharedAbsenceFeedsWithoutAssignments={
+								hasSharedAbsenceFeedsWithoutAssignments
+							}
+							showAbsenceAssignments={showAbsenceAssignments}
+							addCalendarFeed={addCalendarFeed}
+							updateCalendarFeed={updateCalendarFeed}
+							removeCalendarFeed={removeCalendarFeed}
+							calendarMappings={calendarMappings}
+							addCalendarMapping={addCalendarMapping}
+							updateCalendarMapping={updateCalendarMapping}
+							removeCalendarMapping={removeCalendarMapping}
+							addAbsenceAssignment={addAbsenceAssignment}
+							updateAbsenceAssignment={updateAbsenceAssignment}
+							removeAbsenceAssignment={removeAbsenceAssignment}
+							allowedUserSuggestions={allowedUserSuggestions}
+							handleChange={handleChange}
+						/>
+					</div>
+
+					<div hidden={activeSection !== SETTINGS_SECTION_IDS.preferences}>
+						<PreferencesSection
+							theme={formData.theme}
+							timeRounding={formData.timeRounding}
+							includeAbsenceInCsv={formData.includeAbsenceInCsv}
+							includeCsvProvenance={formData.includeCsvProvenance}
+							handleSelectChange={handleSelectChange}
+							handleChange={handleChange}
+							themeId={themeId}
+							timeRoundingId={timeRoundingId}
+							includeAbsenceInCsvId={includeAbsenceInCsvId}
+							includeCsvProvenanceId={includeCsvProvenanceId}
+						/>
+					</div>
+
+					<div hidden={activeSection !== dataSectionId}>
+						<section className={styles.section}>
+							<h2 className={styles.dataSectionTitle}>Data &amp; backup</h2>
+							<p className={styles.dataSectionHint}>
+								Back up your configuration, share a secret-free pack with a
+								teammate, or import a saved file. Save and Discard for the
+								current form are always available in the bar below.
+							</p>
+						</section>
+					</div>
+				</div>
+			</div>
+
+			<div className={styles.saveBar} aria-live="polite">
 				<div className={styles.formStatusText}>
 					<strong>{isDirty ? 'Unsaved changes' : 'Settings up to date'}</strong>
 					<span>
@@ -391,89 +596,6 @@ export const SettingsForm: React.FC = () => {
 					</Button>
 				</div>
 			</div>
-
-			<ConnectionSection
-				formData={formData}
-				handleChange={handleChange}
-				testJira={testJira}
-				canTestJira={canTestJira}
-				integrationTest={integrationTests.jira}
-				jiraHostId={jiraHostId}
-				emailId={emailId}
-				apiTokenId={apiTokenId}
-				corsProxyId={corsProxyId}
-			/>
-
-			<ScopeSection
-				jqlFilter={formData.jqlFilter}
-				allowedUsers={formData.allowedUsers}
-				allowedUserSuggestions={allowedUserSuggestions}
-				handleChange={handleChange}
-				onAllowedUsersChange={(nextValue) =>
-					updateFormField('allowedUsers', nextValue as never)
-				}
-				jqlFilterId={jqlFilterId}
-				allowedUsersId={allowedUsersId}
-			/>
-
-			<PermissionsSection
-				canAddWorklogs={formData.canAddWorklogs}
-				canEditWorklogs={formData.canEditWorklogs}
-				canDeleteWorklogs={formData.canDeleteWorklogs}
-				complianceReminderEnabled={formData.complianceReminderEnabled}
-				handleChange={handleChange}
-			/>
-
-			<IntegrationsSection
-				gitlabHost={formData.gitlabHost}
-				gitlabToken={formData.gitlabToken}
-				rescueTimeApiKey={formData.rescueTimeApiKey}
-				absenceAssignments={formData.absenceAssignments ?? []}
-				gitlabHostId={gitlabHostId}
-				gitlabTokenId={gitlabTokenId}
-				rescueTimeKeyId={rescueTimeKeyId}
-				gitlabStatus={gitlabStatus}
-				rescueTimeStatus={rescueTimeStatus}
-				calendarStatus={calendarStatus}
-				gitlabTroubleshooting={gitlabTroubleshooting}
-				integrationTests={integrationTests}
-				testGitlab={testGitlab}
-				testRescueTime={testRescueTime}
-				testCalendar={testCalendar}
-				canTestGitlab={canTestGitlab}
-				canTestRescueTime={canTestRescueTime}
-				hasCalendarFeeds={hasCalendarFeeds}
-				suggestionFeedEntries={suggestionFeedEntries}
-				absenceFeedEntries={absenceFeedEntries}
-				holidayFeedEntries={holidayFeedEntries}
-				hasSharedAbsenceFeedsWithoutAssignments={
-					hasSharedAbsenceFeedsWithoutAssignments
-				}
-				showAbsenceAssignments={showAbsenceAssignments}
-				addCalendarFeed={addCalendarFeed}
-				updateCalendarFeed={updateCalendarFeed}
-				removeCalendarFeed={removeCalendarFeed}
-				calendarMappings={calendarMappings}
-				addCalendarMapping={addCalendarMapping}
-				updateCalendarMapping={updateCalendarMapping}
-				removeCalendarMapping={removeCalendarMapping}
-				addAbsenceAssignment={addAbsenceAssignment}
-				updateAbsenceAssignment={updateAbsenceAssignment}
-				removeAbsenceAssignment={removeAbsenceAssignment}
-				allowedUserSuggestions={allowedUserSuggestions}
-				handleChange={handleChange}
-			/>
-
-			<PreferencesSection
-				theme={formData.theme}
-				timeRounding={formData.timeRounding}
-				includeAbsenceInCsv={formData.includeAbsenceInCsv}
-				handleSelectChange={handleSelectChange}
-				handleChange={handleChange}
-				themeId={themeId}
-				timeRoundingId={timeRoundingId}
-				includeAbsenceInCsvId={includeAbsenceInCsvId}
-			/>
 		</div>
 	);
 };

@@ -5,7 +5,7 @@ import type {
 	ReportsSortDirection,
 	ReportsSortField,
 } from '../../hooks/useReportsURLState';
-import * as styles from '../../pages/TimesheetPage.module.css';
+import * as styles from '../../pages/ReportsPage.module.css';
 import { addDaysToIsoDate, parseIsoDateLocal } from '../../utils/date';
 import { formatHours } from '../../utils/format';
 import type { ManagerTrendModel } from '../../utils/teamReports';
@@ -16,20 +16,9 @@ import { ManagerInsightsPanel } from './ManagerInsightsPanel';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-const hoursCellStyleMap = {
-	green: styles.hoursCellGreen,
-	yellow: styles.hoursCellYellow,
-	red: styles.hoursCellRed,
-	neutral: styles.hoursCell,
-} as const;
-
-function getHoursCellStyle(hours: number): string {
-	if (hours >= 8) return hoursCellStyleMap.green;
-	if (hours >= 4) return hoursCellStyleMap.yellow;
-	if (hours > 0) return hoursCellStyleMap.red;
-	return hoursCellStyleMap.neutral;
-}
-
+// Per-day cells stay neutral mono — the Gap column is the single red signal on
+// this table (screens.html: "only the gap cell goes red"). Per-day fullness is
+// read from the figure itself, not a colour wash.
 const gapCellStyleMap = {
 	positive: styles.gapPositive,
 	zero: styles.gapZero,
@@ -54,6 +43,24 @@ function formatHoursDecimal(hours: number): string {
 	return Number.isInteger(hours)
 		? `${hours.toFixed(0)}h`
 		: `${hours.toFixed(1)}h`;
+}
+
+// Compliance banner copy is derived from the members' actual targets — the
+// figure must reflect part-time/prorated targets and short weeks, never a
+// hardcoded 40h. When every rendered member shares the same target we can name
+// the hours; when targets differ we fall back to neutral, number-free copy.
+function getComplianceMessage(members: TeamMemberSummary[]): string {
+	const targets = members.map((m) => m.targetSeconds);
+	const allShareTarget = targets.every((t) => t === targets[0]);
+	if (allShareTarget && targets[0] > 0) {
+		const target = formatHours(targets[0]);
+		return members.length === 1
+			? `The team member has logged ${target}+ this week.`
+			: `Every team member has logged ${target}+ this week.`;
+	}
+	return members.length === 1
+		? 'The team member hit their logging target this week.'
+		: 'Every team member hit their logging target this week.';
 }
 
 function TeamMemberRow({
@@ -97,7 +104,7 @@ function TeamMemberRow({
 			{weekdays.map((day) => {
 				const hours = member.dailyHours.get(day) || 0;
 				return (
-					<td key={day} className={getHoursCellStyle(hours)}>
+					<td key={day} className={styles.hoursCell}>
 						{hours > 0 ? formatHoursDecimal(hours) : '-'}
 					</td>
 				);
@@ -125,14 +132,17 @@ function SummaryRow({
 		<tr className={styles.summaryRow}>
 			<td>
 				<span className={styles.summaryLabel}>Team Average</span>
-				<span className={styles.memberCount}> ({count} members)</span>
+				<span className={styles.memberCount}>
+					{' '}
+					({count} {count === 1 ? 'member' : 'members'})
+				</span>
 			</td>
 			{weekdays.map((day) => {
 				const avg =
 					members.reduce((sum, m) => sum + (m.dailyHours.get(day) || 0), 0) /
 					count;
 				return (
-					<td key={day} className={getHoursCellStyle(avg)}>
+					<td key={day} className={styles.hoursCell}>
 						{avg > 0 ? formatHoursDecimal(avg) : '-'}
 					</td>
 				);
@@ -190,6 +200,13 @@ type Props = {
 	hasNoFilteredWeeklyResults: boolean;
 	weeklySummary: { totalSeconds: number; totalGapSeconds: number } | null;
 	onMemberClick: (name: string) => void;
+	/**
+	 * True when Jira isn't connected yet (no host/API token). Shows a "connect
+	 * Jira" guard instead of the misleading empty-team state, matching the
+	 * monthly view's not-configured branch. Optional + defaults off so the demo
+	 * (sample data, intentionally unconfigured) renders normally.
+	 */
+	notConfigured?: boolean;
 };
 
 export const ReportsWeeklyView: React.FC<Props> = ({
@@ -211,8 +228,22 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 	hasNoFilteredWeeklyResults,
 	weeklySummary,
 	onMemberClick,
+	notConfigured,
 }) => {
 	const weekdays = getWeekdays(weekStart);
+
+	if (notConfigured) {
+		return (
+			<div className={styles.error}>
+				<h2>Connect Jira to see reports</h2>
+				<p>
+					Add your Jira host and API token in Settings to load your team's
+					weekly worklogs.
+				</p>
+				<Link to="/settings">Go to Settings</Link>
+			</div>
+		);
+	}
 
 	return (
 		<>
@@ -375,7 +406,7 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 									Full team compliance!
 								</div>
 								<div className={styles.allCompliantText}>
-									Every team member has logged 40+ hours this week.
+									{getComplianceMessage(sortedMembers)}
 								</div>
 							</div>
 						)}

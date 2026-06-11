@@ -16,6 +16,8 @@
  * Cached for 60s public — it's a heartbeat, not a hot path.
  */
 
+import { corsHeaders } from './_lib/cors.js';
+
 export const config = {
 	runtime: 'edge',
 };
@@ -24,7 +26,7 @@ export const config = {
 // "Releases" for the flow (`npm version <bump>` then `gh release create`).
 const VERSION = '1.0.0';
 
-export default function handler(): Response {
+export default function handler(request: Request): Response {
 	const sha = process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev';
 	const body = {
 		version: VERSION,
@@ -39,9 +41,10 @@ export default function handler(): Response {
 		headers: {
 			'content-type': 'application/json',
 			'cache-control': 'public, max-age=60',
-			// Permissive CORS so the frontend footer can hit this from any origin
-			// during preview-URL dev. Read-only metadata; no sensitivity.
-			'access-control-allow-origin': '*',
+			// The footer fetches this same-origin (no CORS needed); the allowlist
+			// helper covers cross-origin preview URLs via APP_URL. No wildcard
+			// ACAO anywhere under premium/api (ADA-297).
+			...corsHeaders(request.headers.get('origin')),
 		},
 	});
 }

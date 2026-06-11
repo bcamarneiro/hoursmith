@@ -15,6 +15,7 @@
  */
 
 import { logAuditEvent } from '../_lib/auditLog.js';
+import { userIdFromToken } from '../_lib/auth.js';
 import {
 	defaultSupabaseAdmin,
 	type SupabaseAdminClient,
@@ -64,7 +65,11 @@ export async function handleExport(
 		});
 	}
 
-	const verifyJwt = deps.verifyJwt ?? makeJwtVerifier();
+	// GDPR data export discloses personal data — require the live server check so
+	// a deleted/revoked user can't export with a still-unexpired token (ADA-343).
+	const verifyJwt =
+		deps.verifyJwt ??
+		((t: string) => userIdFromToken(t, { confirmWithServer: true }));
 	const userId = await verifyJwt(token);
 	if (!userId) {
 		logEvent({ event: 'data_export', status: 401, note: 'invalid_token' });
@@ -154,25 +159,6 @@ function extractBearer(header: string | null): string | null {
 	if (!match) return null;
 	const token = match[1].trim();
 	return token.length > 0 ? token : null;
-}
-
-function makeJwtVerifier(): (token: string) => Promise<string | null> {
-	const url = process.env.SUPABASE_URL;
-	const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-	if (!url || !serviceRoleKey) {
-		return async () => null;
-	}
-	return async (token: string): Promise<string | null> => {
-		const res = await fetch(`${url}/auth/v1/user`, {
-			headers: {
-				apikey: serviceRoleKey,
-				authorization: `Bearer ${token}`,
-			},
-		});
-		if (!res.ok) return null;
-		const body = (await res.json()) as { id?: string } | null;
-		return body?.id ?? null;
-	};
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
