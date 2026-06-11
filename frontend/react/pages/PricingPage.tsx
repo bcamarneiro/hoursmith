@@ -6,6 +6,7 @@ import { LEAD_TIER_ENABLED } from '../../featureFlags';
 import type { PublicFlags } from '../../services/flagsService';
 import { PremiumWaitlistForm } from '../components/marketing/PremiumWaitlistForm';
 import { useFlags } from '../hooks/useFlags';
+import { useIsAuthenticated } from '../hooks/useIsAuthenticated';
 import { usePageTitle } from '../hooks/usePageTitle';
 import * as styles from './PricingPage.module.css';
 
@@ -84,6 +85,10 @@ const PaidCta: React.FC<{
 export const PricingPage: React.FC = () => {
 	usePageTitle('Pricing');
 	const flags = useFlags();
+	const isAuthed = useIsAuthenticated();
+	// Logged-out hosted visitors get the "Create account" hero CTA; signed-in
+	// users don't need it (ADA-379).
+	const showCreateAccount = isPremiumBuild() && !isAuthed;
 
 	return (
 		<div className={styles.page}>
@@ -95,7 +100,7 @@ export const PricingPage: React.FC = () => {
 						? ' Worth €29 — yours at the €19/year founding rate — or €60/year for Lead if you serve multiple clients.'
 						: ' Worth €29 — yours at the €19/year founding rate.'}
 				</p>
-				{isPremiumBuild() && (
+				{showCreateAccount && (
 					<div className={styles.heroCta}>
 						<Link
 							to="/auth/sign-up"
