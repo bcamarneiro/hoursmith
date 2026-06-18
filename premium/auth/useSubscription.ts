@@ -72,7 +72,7 @@ function getHostedProxyUrl(): string | null {
 }
 
 export function useSubscription(): SubscriptionView {
-	const { session, user } = useAuth();
+	const { session, user, isLoading: authLoading } = useAuth();
 	const accessToken = session?.access_token ?? null;
 	const userId = user?.id ?? null;
 	const [body, setBody] = useState<SubscriptionResponseBody | null>(null);
@@ -163,19 +163,28 @@ export function useSubscription(): SubscriptionView {
 	// (ADA-382). Only a *confirmed* non-active subscription clears it, so a
 	// logged-in free user still falls back to their own proxy.
 	useEffect(() => {
+		// While AuthProvider is still rehydrating the persisted session on a cold
+		// load, `accessToken` is transiently null even for a signed-in user. In
+		// that window `proxyUrlBridge` has already bootstrapped the hosted URL from
+		// the persisted session — clearing it here would make the first worklog
+		// queries fire direct-to-Atlassian and CORS-fail before auth resolves
+		// (ADA-447). Wait until auth has resolved before setting/clearing.
+		if (authLoading) return;
 		const routeHosted = !!accessToken && (view.isLoading || view.isActive);
 		setHostedProxyUrl(routeHosted ? getHostedProxyUrl() : null);
-	}, [accessToken, view.isLoading, view.isActive]);
+	}, [authLoading, accessToken, view.isLoading, view.isActive]);
 
 	// Keep the cross-tier bridge in sync with the Supabase access token so the
 	// network layer can attach it to hosted-proxy requests without importing
 	// Premium auth state directly (boundary guard).
 	useEffect(() => {
+		// Same rehydration guard as above: don't overwrite the bridge token that
+		// was bootstrapped from the persisted session while auth is still loading,
+		// otherwise the hosted-proxy requests fire without the Supabase JWT and 401
+		// before auth resolves (ADA-447).
+		if (authLoading) return;
 		setSupabaseAccessToken(accessToken);
-		return () => {
-			setSupabaseAccessToken(null);
-		};
-	}, [accessToken]);
+	}, [authLoading, accessToken]);
 
 	return view;
 }

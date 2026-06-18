@@ -11,13 +11,24 @@
  */
 
 import { renderHook, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Controllable auth mock so individual tests can drive `isLoading` / `session`
+// (needed for the ADA-447 rehydration-guard test). Defaults to a signed-in,
+// resolved session so the existing entitlement tests behave as before.
+const authState = vi.hoisted(() => ({
+	current: {
+		user: { id: 'u1', email: 'a@b.com' } as {
+			id: string;
+			email: string;
+		} | null,
+		session: { access_token: 't' } as { access_token: string } | null,
+		isLoading: false,
+	},
+}));
 
 vi.mock('../useAuth', () => ({
-	useAuth: () => ({
-		user: { id: 'u1', email: 'a@b.com' },
-		session: { access_token: 't' },
-	}),
+	useAuth: () => authState.current,
 }));
 
 vi.mock('../../../frontend/services/proxyUrlBridge', () => ({
@@ -25,7 +36,17 @@ vi.mock('../../../frontend/services/proxyUrlBridge', () => ({
 	setSupabaseAccessToken: vi.fn(),
 }));
 
+import { setHostedProxyUrl } from '../../../frontend/services/proxyUrlBridge';
 import { useSubscription } from '../useSubscription';
+
+beforeEach(() => {
+	vi.mocked(setHostedProxyUrl).mockClear();
+	authState.current = {
+		user: { id: 'u1', email: 'a@b.com' },
+		session: { access_token: 't' },
+		isLoading: false,
+	};
+});
 
 function mockSubscriptionFetch(
 	subscription: {
@@ -74,5 +95,27 @@ describe('useSubscription isActive (ADA-371 dunning grace)', () => {
 		const { result } = renderHook(() => useSubscription());
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		expect(result.current.isActive).toBe(false);
+	});
+});
+
+describe('useSubscription hosted-proxy bridge (ADA-447 rehydration guard)', () => {
+	it('does NOT clear the bridge while auth is still rehydrating', async () => {
+		// Cold load: AuthProvider hasn't resolved the persisted session yet, so
+		// session is null but isLoading is true. proxyUrlBridge has already
+		// bootstrapped the hosted URL from localStorage — clearing it here is the
+		// ADA-447 regression that made worklog queries fire direct-to-Atlassian.
+		authState.current = { user: null, session: null, isLoading: true };
+		mockSubscriptionFetch(null);
+		renderHook(() => useSubscription());
+		await new Promise((r) => setTimeout(r, 0));
+		// Must not have cleared (or otherwise touched) the bootstrapped bridge.
+		expect(setHostedProxyUrl).not.toHaveBeenCalled();
+	});
+
+	it('clears the bridge once auth resolves to signed-out', async () => {
+		authState.current = { user: null, session: null, isLoading: false };
+		mockSubscriptionFetch(null);
+		renderHook(() => useSubscription());
+		await waitFor(() => expect(setHostedProxyUrl).toHaveBeenCalledWith(null));
 	});
 });
