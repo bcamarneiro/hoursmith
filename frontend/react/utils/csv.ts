@@ -127,7 +127,7 @@ export function buildTimesheetCsv(opts: BuildTimesheetCsvOptions): string {
 		const hours = ((entry.timeSpentSeconds ?? 0) / 3600).toFixed(2);
 		const baseCols = [
 			csvEscape(name),
-			ticketKey,
+			csvEscape(ticketKey),
 			csvEscape(ticketName),
 			c.intendedFor,
 			c.loggedOn,

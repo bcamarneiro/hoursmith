@@ -1,7 +1,10 @@
 import type { WorklogSuggestion } from '../../types/Suggestion';
-import { fromRichMessage } from './serviceErrors';
+import { fromRichMessage, ServiceError } from './serviceErrors';
 
-const JIRA_KEY_RE = /([A-Z][A-Z0-9]+-\d+)/g;
+// Match standard Jira issue keys (e.g. PROJ-12, A-1) while requiring a left
+// boundary so we don't extract `PROJ-5` from a longer token like `XPROJ-5`.
+// `[A-Z][A-Z0-9]*` allows single-letter project keys (`A-1`).
+const JIRA_KEY_RE = /(?<![A-Z0-9])([A-Z][A-Z0-9]*-\d+)/g;
 
 interface GitLabEvent {
 	action_name: string;
@@ -107,6 +110,20 @@ function dateOnly(iso: string): string {
 	return iso.slice(0, 10);
 }
 
+/**
+ * Shift a `YYYY-MM-DD` date by a whole number of days (UTC).
+ *
+ * GitLab's Events API treats `after`/`before` as *exclusive* bounds, so to
+ * include events that happened on `weekStart`/`weekEnd` we widen the query
+ * window by one day on each side and rely on the inclusive client-side filter
+ * to trim the extras.
+ */
+function shiftDay(date: string, deltaDays: number): string {
+	const ts = Date.parse(`${date.slice(0, 10)}T00:00:00Z`);
+	const shifted = new Date(ts + deltaDays * 24 * 60 * 60 * 1000);
+	return shifted.toISOString().slice(0, 10);
+}
+
 function isPushEvent(action: string): boolean {
 	return PUSH_ACTIONS.has(action);
 }
@@ -192,40 +209,59 @@ export async function fetchGitlabSuggestions(
 	const cleanHost = normalizeGitlabHost(gitlabHost);
 	const baseUrl = buildGitlabBaseUrl(gitlabHost, corsProxy);
 
-	// Fetch up to 3 pages of events (60 events)
+	// GitLab Events `after`/`before` are *exclusive*, so widen the window by a
+	// day on each side; the inclusive client-side filter below trims the extras.
+	const after = shiftDay(weekStart, -1);
+	const before = shiftDay(weekEnd, 1);
+
+	// Page through events at the max page size until exhausted, with a safety
+	// cap so a misbehaving instance can't loop forever (10 pages × 100 = 1000).
+	const PER_PAGE = 100;
+	const MAX_PAGES = 10;
 	const allEvents: GitLabEvent[] = [];
-	try {
-		for (let page = 1; page <= 3; page++) {
+	for (let page = 1; page <= MAX_PAGES; page++) {
+		let res: Response;
+		try {
 			const params = new URLSearchParams({
-				per_page: '20',
+				per_page: String(PER_PAGE),
 				page: String(page),
-				after: weekStart,
-				before: weekEnd,
+				after,
+				before,
 			});
-			const res = await fetch(`${baseUrl}/api/v4/events?${params}`, {
+			res = await fetch(`${baseUrl}/api/v4/events?${params}`, {
 				headers: {
 					'PRIVATE-TOKEN': gitlabToken,
 					Accept: 'application/json',
 				},
 				signal,
 			});
-			if (!res.ok) {
-				throw fromRichMessage(
-					'GitLab',
-					res.status,
-					await describeGitlabErrorResponse(res, cleanHost),
-				);
+		} catch (error) {
+			// A rich ServiceError thrown elsewhere must propagate unchanged; an
+			// abort must surface as an abort. Only genuine network/throw errors
+			// get the "could not reach host" wrapping.
+			if (error instanceof ServiceError) throw error;
+			if (error instanceof DOMException && error.name === 'AbortError') {
+				throw error;
 			}
-			const events = (await res.json()) as GitLabEvent[];
-			allEvents.push(...events);
-			if (events.length < 20) break;
+			if (error instanceof Error && error.name === 'AbortError') throw error;
+			throw fromRichMessage(
+				'GitLab',
+				undefined,
+				describeGitlabConnectionError(error, cleanHost),
+			);
 		}
-	} catch (error) {
-		throw fromRichMessage(
-			'GitLab',
-			undefined,
-			describeGitlabConnectionError(error, cleanHost),
-		);
+
+		if (!res.ok) {
+			throw fromRichMessage(
+				'GitLab',
+				res.status,
+				await describeGitlabErrorResponse(res, cleanHost),
+			);
+		}
+
+		const events = (await res.json()) as GitLabEvent[];
+		allEvents.push(...events);
+		if (events.length < PER_PAGE) break;
 	}
 
 	// Group activities by (date, issueKey, activityType)
@@ -246,10 +282,17 @@ export async function fetchGitlabSuggestions(
 			const keys = [...new Set([...branchKeys, ...titleKeys])];
 			if (keys.length === 0) continue;
 
+			// A push's commit_count must be counted once, not once per key.
+			// Attribute commits across the referenced keys: distribute the base
+			// share to every key and hand the remainder to the leading keys so
+			// the per-push total matches commit_count exactly.
 			const commits = pushData.commit_count || 1;
+			const base = Math.floor(commits / keys.length);
+			let remainder = commits % keys.length;
 			for (const key of keys) {
 				const entry = getEntry(grouped, `${day}::${key}::push`, 'push');
-				entry.count += commits;
+				entry.count += base + (remainder > 0 ? 1 : 0);
+				if (remainder > 0) remainder--;
 				if (pushData.commit_title) {
 					entry.reasons.push(pushData.commit_title.slice(0, 80));
 				}

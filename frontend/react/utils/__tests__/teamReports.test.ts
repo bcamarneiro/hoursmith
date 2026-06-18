@@ -167,6 +167,62 @@ describe('buildTeamSummaries', () => {
 		expect(summaries[0]?.targetSeconds).toBe(32 * 3600);
 		expect(summaries[0]?.gapSeconds).toBe(0);
 	});
+
+	it('keeps two distinct authors who share a displayName separate (ADA-458)', () => {
+		// Same displayName, different accountId + email. Grouping must key on the
+		// stable accountId so neither author silently overwrites the other.
+		const summaries = buildTeamSummaries(
+			[
+				{
+					author: {
+						accountId: 'acct-1',
+						emailAddress: 'alex.smith@example.com',
+						displayName: 'Alex Smith',
+					},
+					started: '2026-03-03T09:00:00.000+0000',
+					timeSpentSeconds: 40 * 3600,
+					issue: { id: '1', key: 'APP-1', fields: { summary: 'x' } },
+				} as WorklogItem,
+				{
+					author: {
+						accountId: 'acct-2',
+						emailAddress: 'alex.smith2@example.com',
+						displayName: 'Alex Smith',
+					},
+					started: '2026-03-04T09:00:00.000+0000',
+					timeSpentSeconds: 16 * 3600,
+					issue: { id: '1', key: 'APP-1', fields: { summary: 'x' } },
+				} as WorklogItem,
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'', // no allow-list → both included
+		);
+
+		expect(summaries).toHaveLength(2);
+		const totals = summaries.map((s) => s.totalSeconds).sort((a, b) => a - b);
+		expect(totals).toEqual([16 * 3600, 40 * 3600]);
+	});
+
+	it('does not drop an author that has no emailAddress (ADA-458)', () => {
+		const summaries = buildTeamSummaries(
+			[
+				{
+					author: { accountId: 'acct-9', displayName: 'No Email User' },
+					started: '2026-03-03T09:00:00.000+0000',
+					timeSpentSeconds: 24 * 3600,
+					issue: { id: '1', key: 'APP-1', fields: { summary: 'x' } },
+				} as WorklogItem,
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'', // no allow-list
+		);
+
+		expect(summaries).toHaveLength(1);
+		expect(summaries[0]?.displayName).toBe('No Email User');
+		expect(summaries[0]?.totalSeconds).toBe(24 * 3600);
+	});
 });
 
 describe('buildManagerTrendModel', () => {
@@ -225,6 +281,38 @@ describe('buildManagerTrendModel', () => {
 				currentLoggedSeconds: 24 * 3600,
 			},
 		]);
+	});
+
+	it('floors complianceRate so it never reads 100 while a member has a gap (ADA-458)', () => {
+		// 7 of 8 members fully logged, 1 short. 7/8 = 87.5% → floor 87 (a round
+		// would inflate to 88). The point: a fractional rate that rounds up must
+		// not let the "all compliant" threshold (100) be reached spuriously.
+		const worklogs: WorklogItem[] = [];
+		const emails: string[] = [];
+		for (let i = 0; i < 8; i++) {
+			const email = `user${i}@example.com`;
+			emails.push(email);
+			// Last member logs only 8h (gap), the rest log a full 40h week.
+			const hours = i === 7 ? 8 : 40;
+			worklogs.push(
+				createWorklog(
+					email,
+					`User ${i}`,
+					'2026-03-02T09:00:00.000+0000',
+					hours * 3600,
+				),
+			);
+		}
+
+		const model = buildManagerTrendModel(
+			worklogs,
+			'2026-03-02',
+			1,
+			emails.join(','),
+		);
+
+		expect(model.weeks[0]?.complianceRate).toBe(87);
+		expect(model.weeks[0]?.attentionCount).toBe(1);
 	});
 
 	it('uses reduced targets when absences are attributed during the trend window', () => {

@@ -3,7 +3,6 @@ import type { WeekWorklogEntry } from '../../stores/useDashboardStore';
 import { getAbsenceKindLabel } from './absence';
 import { buildProvenanceFooter, csvEscape, CSV_SEP as SEP } from './csvHelpers';
 import { parseIsoDateLocal } from './date';
-import { classifyWorklog } from './worklogClassifier';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -27,14 +26,12 @@ export interface WeeklyCsvProvenance {
 }
 
 function isEntryBackdated(entry: WeekWorklogEntry): boolean {
-	// `entry.date` is already the classifier-bucketed `loggedOn` for the
-	// dashboard. We synthesise a shape compatible with the classifier so the
-	// returned isBackdated matches what the rest of the app reports.
-	return classifyWorklog({
-		started: `${entry.date}T00:00:00`,
-		created: entry.created,
-		comment: entry.comment,
-	}).isBackdated;
+	// ADA-461: use the `isBackdated` flag set at fetch time (from the same
+	// `classifyWorklog` call that the heatmap and the rest of the app use).
+	// The previous approach re-synthesised a worklog from `entry.date` alone,
+	// which discards the real `started`/`created` delta and therefore missed
+	// Jira-native backdates — the root of the ~10h heatmap/CSV discrepancy.
+	return entry.isBackdated ?? false;
 }
 
 export interface GenerateWeeklyCsvOptions {
@@ -104,9 +101,9 @@ export function generateWeeklyCsv(
 		const hours = entry.timeSpentSeconds / 3600;
 		const formatted = formatDuration(entry.timeSpentSeconds);
 		const baseCols = [
-			entry.date,
-			dayLabel,
-			entry.issueKey,
+			csvEscape(entry.date),
+			csvEscape(dayLabel),
+			csvEscape(entry.issueKey),
 			csvEscape(entry.issueSummary ?? ''),
 			hours.toFixed(2),
 			formatted,

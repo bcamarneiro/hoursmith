@@ -345,6 +345,136 @@ END:VCALENDAR`,
 		expect(result.get('2026-05-01')?.kind).toBe('holiday');
 	});
 
+	it('spans the full DTEND−DTSTART duration for each recurring occurrence (ADA-462a)', async () => {
+		// A 3-day vacation (Mon–Wed; DTEND exclusive = Thu) that recurs WEEKLY.
+		// Each weekly occurrence must emit all three days, not just the start.
+		vi.spyOn(global, 'fetch').mockResolvedValue({
+			ok: true,
+			text: async () => `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:Bruno C - Vacation
+DTSTART;VALUE=DATE:20260601
+DTEND;VALUE=DATE:20260604
+RRULE:FREQ=WEEKLY;COUNT=2
+END:VEVENT
+END:VCALENDAR`,
+		} as Response);
+
+		const result = await fetchAbsenceDays(
+			[
+				{
+					label: 'Team time off',
+					url: 'https://calendar.example.com/team.ics',
+					type: 'absence',
+					absenceAttribution: 'self',
+					titleFilter: 'Bruno C',
+				},
+			],
+			[],
+			'bruno@example.com',
+			'',
+			'2026-06-01',
+			'2026-06-30',
+		);
+
+		expect([...result.keys()]).toEqual([
+			// Week 1: Mon–Wed
+			'2026-06-01',
+			'2026-06-02',
+			'2026-06-03',
+			// Week 2: Mon–Wed
+			'2026-06-08',
+			'2026-06-09',
+			'2026-06-10',
+		]);
+	});
+
+	it('honors WEEKLY;BYDAY=MO,WE,FR with INTERVAL (ADA-462b)', async () => {
+		// FREQ=WEEKLY;BYDAY=MO,WE,FR starting Mon 2026-06-01 should emit
+		// Mon/Wed/Fri each week. DTSTART = DTEND-1 → single-day occurrences.
+		vi.spyOn(global, 'fetch').mockResolvedValue({
+			ok: true,
+			text: async () => `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:Bruno C - Off
+DTSTART;VALUE=DATE:20260601
+DTEND;VALUE=DATE:20260602
+RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20260612
+END:VEVENT
+END:VCALENDAR`,
+		} as Response);
+
+		const result = await fetchAbsenceDays(
+			[
+				{
+					label: 'Team time off',
+					url: 'https://calendar.example.com/team.ics',
+					type: 'absence',
+					absenceAttribution: 'self',
+					titleFilter: 'Bruno C',
+				},
+			],
+			[],
+			'bruno@example.com',
+			'',
+			'2026-06-01',
+			'2026-06-30',
+		);
+
+		// Mon 06-01, Wed 06-03, Fri 06-05, Mon 06-08, Wed 06-10, Fri 06-12.
+		// UNTIL=20260612 is inclusive of Fri 06-12.
+		expect([...result.keys()]).toEqual([
+			'2026-06-01',
+			'2026-06-03',
+			'2026-06-05',
+			'2026-06-08',
+			'2026-06-10',
+			'2026-06-12',
+		]);
+	});
+
+	it('respects UNTIL consistently for recurring all-day events (ADA-462c)', async () => {
+		// UNTIL given as a UTC DATE-TIME. The final occurrence on the UNTIL day
+		// must stay included regardless of viewer TZ.
+		vi.spyOn(global, 'fetch').mockResolvedValue({
+			ok: true,
+			text: async () => `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:Bruno C - Off
+DTSTART;VALUE=DATE:20260601
+DTEND;VALUE=DATE:20260602
+RRULE:FREQ=DAILY;UNTIL=20260603T235959Z
+END:VEVENT
+END:VCALENDAR`,
+		} as Response);
+
+		const result = await fetchAbsenceDays(
+			[
+				{
+					label: 'Team time off',
+					url: 'https://calendar.example.com/team.ics',
+					type: 'absence',
+					absenceAttribution: 'self',
+					titleFilter: 'Bruno C',
+				},
+			],
+			[],
+			'bruno@example.com',
+			'',
+			'2026-06-01',
+			'2026-06-30',
+		);
+
+		expect([...result.keys()]).toEqual([
+			'2026-06-01',
+			'2026-06-02',
+			'2026-06-03',
+		]);
+	});
+
 	it('prefers sick over other absence kinds when a day has multiple events', async () => {
 		vi.spyOn(global, 'fetch').mockResolvedValue({
 			ok: true,

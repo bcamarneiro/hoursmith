@@ -67,12 +67,9 @@ export async function handleDelete(
 		logEvent({
 			event: 'account_delete',
 			status: 500,
-			note: 'server_misconfigured',
+			note: `server_misconfigured:${(err as Error).message}`,
 		});
-		return jsonResponse(500, {
-			error: 'server_misconfigured',
-			detail: (err as Error).message,
-		});
+		return jsonResponse(500, { error: 'server_misconfigured' });
 	}
 
 	// GDPR erasure is irreversible and must reject a deleted/revoked user, not
@@ -128,15 +125,12 @@ export async function handleDelete(
 		logEvent({
 			event: 'account_delete',
 			status: 500,
-			note: 'supabase_delete_failed',
+			note: `supabase_delete_failed:${(err as Error).message}`,
 		});
 		// Intentionally do NOT write an audit log here — leaving it unlogged
 		// keeps a retry idempotent and prevents a "deleted" record for a user
 		// who was not actually deleted.
-		return jsonResponse(500, {
-			error: 'delete_failed',
-			detail: (err as Error).message,
-		});
+		return jsonResponse(500, { error: 'delete_failed' });
 	}
 
 	// Defense-in-depth (ADA-313): deleting auth.users already cascades the

@@ -196,18 +196,100 @@ describe('searchAllIssues', () => {
 		expect(fetchMock.mock.calls[1]?.[0] as string).toContain('startAt=1');
 	});
 
-	it('returns what was gathered when the signal is already aborted', async () => {
+	it('throws an AbortError when the signal is already aborted (no partial as complete)', async () => {
 		const controller = new AbortController();
 		controller.abort();
 		const fetchMock = vi.spyOn(global, 'fetch');
 
-		const issues = await searchAllIssues(
-			cloudConfig,
-			{ jql: 'x', fields: 'key', maxResults: 10 },
-			{ signal: controller.signal },
+		await expect(
+			searchAllIssues(
+				cloudConfig,
+				{ jql: 'x', fields: 'key', maxResults: 10 },
+				{ signal: controller.signal },
+			),
+		).rejects.toMatchObject({ name: 'AbortError' });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('throws an AbortError when aborted between pages on Cloud', async () => {
+		const controller = new AbortController();
+		const fetchMock = vi.spyOn(global, 'fetch').mockImplementationOnce(
+			async () =>
+				({
+					ok: true,
+					json: async () => ({
+						issues: [{ key: 'A-1', fields: {} }],
+						nextPageToken: 'tok-2',
+					}),
+				}) as Response,
 		);
 
-		expect(issues).toEqual([]);
-		expect(fetchMock).not.toHaveBeenCalled();
+		await expect(
+			searchAllIssues<{ key: string }>(
+				cloudConfig,
+				{ jql: 'project = A', fields: 'key', maxResults: 1 },
+				{
+					signal: controller.signal,
+					// Abort after the first page has been gathered.
+					onPage: () => controller.abort(),
+				},
+			),
+		).rejects.toMatchObject({ name: 'AbortError' });
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('keeps paging on Server/DC when total is missing (does not stop after page 1)', async () => {
+		const fetchMock = vi
+			.spyOn(global, 'fetch')
+			// First page: full (== maxResults), NO total field at all.
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					issues: [{ key: 'A-1', fields: {} }],
+				}),
+			} as Response)
+			// Second page: still full, NO total.
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					issues: [{ key: 'A-2', fields: {} }],
+				}),
+			} as Response)
+			// Third page: short → end.
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					issues: [],
+				}),
+			} as Response);
+
+		const issues = await searchAllIssues<{ key: string }>(serverConfig, {
+			jql: 'project = A',
+			fields: 'key',
+			maxResults: 1,
+		});
+
+		// Without the fix this would stop after page 1 (total defaults to 0).
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+		expect(issues.map((i) => i.key)).toEqual(['A-1', 'A-2']);
+	});
+
+	it('stops on a short page even when total is missing', async () => {
+		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+			ok: true,
+			json: async () => ({
+				// Only 1 issue but maxResults is 5 → short page, end of results.
+				issues: [{ key: 'A-1', fields: {} }],
+			}),
+		} as Response);
+
+		const issues = await searchAllIssues<{ key: string }>(serverConfig, {
+			jql: 'project = A',
+			fields: 'key',
+			maxResults: 5,
+		});
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(issues.map((i) => i.key)).toEqual(['A-1']);
 	});
 });

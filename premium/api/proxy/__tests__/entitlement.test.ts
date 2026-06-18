@@ -26,12 +26,18 @@ function makeClient(
 ): SupabaseLikeClient {
 	return {
 		getUserIdFromToken: vi.fn().mockResolvedValue('user-123'),
-		getSubscription: vi
-			.fn()
-			.mockResolvedValue({ tier: 'premium', status: 'active' }),
+		getSubscription: vi.fn().mockResolvedValue({
+			tier: 'premium',
+			status: 'active',
+			current_period_end: FUTURE,
+		}),
 		...overrides,
 	};
 }
+
+// A period end safely in the future / past relative to the 2-day grace window.
+const FUTURE = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+const LONG_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
 describe('getEntitlement', () => {
 	it('returns 401 when the Authorization header is missing', async () => {
@@ -123,9 +129,11 @@ describe('getEntitlement', () => {
 		// transient card decline. Must agree with the client useSubscription
 		// check, which also treats `past_due` as active.
 		const client = makeClient({
-			getSubscription: vi
-				.fn()
-				.mockResolvedValue({ tier: 'premium', status: 'past_due' }),
+			getSubscription: vi.fn().mockResolvedValue({
+				tier: 'premium',
+				status: 'past_due',
+				current_period_end: FUTURE,
+			}),
 		});
 		const result = await getEntitlement(
 			makeRequest({ authorization: 'Bearer valid' }),
@@ -139,9 +147,11 @@ describe('getEntitlement', () => {
 
 	it('returns Entitlement for trialing subscriptions', async () => {
 		const client = makeClient({
-			getSubscription: vi
-				.fn()
-				.mockResolvedValue({ tier: 'premium', status: 'trialing' }),
+			getSubscription: vi.fn().mockResolvedValue({
+				tier: 'premium',
+				status: 'trialing',
+				current_period_end: FUTURE,
+			}),
 		});
 		const result = await getEntitlement(
 			makeRequest({ authorization: 'Bearer valid' }),
@@ -165,6 +175,73 @@ describe('getEntitlement', () => {
 		expect(result.status).toBe('active');
 		expect(client.getUserIdFromToken).toHaveBeenCalledWith('good-jwt');
 		expect(client.getSubscription).toHaveBeenCalledWith('user-123');
+	});
+
+	it('returns 403 for a stale active row whose period elapsed past grace (ADA-454)', async () => {
+		const client = makeClient({
+			getSubscription: vi.fn().mockResolvedValue({
+				tier: 'premium',
+				status: 'active',
+				current_period_end: LONG_AGO,
+			}),
+		});
+		const result = await getEntitlement(
+			makeRequest({ authorization: 'Bearer valid' }),
+			{ client },
+		);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.status).toBe(403);
+		expect(result.code).toBe('subscription_required');
+	});
+
+	it('returns 403 for a stale past_due row whose period elapsed past grace (ADA-454)', async () => {
+		const client = makeClient({
+			getSubscription: vi.fn().mockResolvedValue({
+				tier: 'premium',
+				status: 'past_due',
+				current_period_end: LONG_AGO,
+			}),
+		});
+		const result = await getEntitlement(
+			makeRequest({ authorization: 'Bearer valid' }),
+			{ client },
+		);
+		expect(result.ok).toBe(false);
+		if (result.ok) return;
+		expect(result.status).toBe(403);
+	});
+
+	it('stays entitled within the grace window after period end (ADA-454)', async () => {
+		// 1 day past period end — inside the 2-day grace window.
+		const justEnded = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+		const client = makeClient({
+			getSubscription: vi.fn().mockResolvedValue({
+				tier: 'premium',
+				status: 'active',
+				current_period_end: justEnded,
+			}),
+		});
+		const result = await getEntitlement(
+			makeRequest({ authorization: 'Bearer valid' }),
+			{ client },
+		);
+		expect(result.ok).toBe(true);
+	});
+
+	it('honours a row with a null current_period_end (ADA-454)', async () => {
+		const client = makeClient({
+			getSubscription: vi.fn().mockResolvedValue({
+				tier: 'premium',
+				status: 'active',
+				current_period_end: null,
+			}),
+		});
+		const result = await getEntitlement(
+			makeRequest({ authorization: 'Bearer valid' }),
+			{ client },
+		);
+		expect(result.ok).toBe(true);
 	});
 
 	it('trims surrounding whitespace inside the Bearer scheme', async () => {

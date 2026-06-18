@@ -189,6 +189,110 @@ describe('fetchMonthWorklogs', () => {
 		).rejects.toBeInstanceOf(ServiceError);
 	});
 
+	it('propagates a failure on the truncated-issue worklog fetch (ADA-456) instead of silently dropping it', async () => {
+		vi.spyOn(global, 'fetch')
+			// Search page → one truncated issue
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					issues: [
+						{
+							id: '10000',
+							key: 'PROJ-1',
+							fields: {
+								summary: 'Issue summary',
+								worklog: {
+									startAt: 0,
+									maxResults: 20,
+									total: 30,
+									worklogs: [],
+								},
+							},
+						},
+					],
+				}),
+			} as Response)
+			// Per-issue worklog fetch fails with 429
+			.mockResolvedValueOnce({
+				ok: false,
+				status: 429,
+				json: async () => ({}),
+			} as Response);
+
+		await expect(fetchMonthWorklogs(baseConfig, 2025, 9)).rejects.toMatchObject(
+			{
+				name: 'ServiceError',
+				kind: 'rate-limited',
+				status: 429,
+				source: 'Jira issue worklog',
+			},
+		);
+	});
+
+	it('filters embedded worklogs to the current user when currentUserOnly (ADA-467)', async () => {
+		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+			ok: true,
+			json: async () => ({
+				issues: [
+					{
+						id: '10000',
+						key: 'PROJ-1',
+						fields: {
+							summary: 'Shared issue',
+							worklog: {
+								startAt: 0,
+								maxResults: 20,
+								total: 2,
+								worklogs: [
+									{
+										id: 'mine',
+										started: '2025-10-15T09:00:00.000+0000',
+										timeSpentSeconds: 3600,
+										author: { emailAddress: 'dev@example.com' },
+									},
+									{
+										id: 'theirs',
+										started: '2025-10-16T09:00:00.000+0000',
+										timeSpentSeconds: 3600,
+										author: { emailAddress: 'other@example.com' },
+									},
+								],
+							},
+						},
+					},
+				],
+			}),
+		} as Response);
+
+		const result = await fetchMonthWorklogs(baseConfig, 2025, 9, {
+			currentUserOnly: true,
+		});
+
+		expect(result).toHaveLength(1);
+		expect(result[0]?.id).toBe('mine');
+	});
+
+	it('wraps app clauses and the user jqlFilter in parentheses (ADA-467)', async () => {
+		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+			ok: true,
+			json: async () => ({ issues: [] }),
+		} as Response);
+
+		await fetchMonthWorklogs(baseConfig, 2025, 9, {
+			currentUserOnly: true,
+			jqlFilter: 'project = A OR project = B',
+		});
+
+		const calledUrl = fetchMock.mock.calls[0]?.[0] as string;
+		// URLSearchParams encodes spaces as `+`; restore them before asserting.
+		const decoded = decodeURIComponent(calledUrl.replace(/\+/g, ' '));
+		// The app date clause and the currentUser clause are each parenthesized,
+		// and the raw user filter is wrapped so its OR can't widen scope.
+		expect(decoded).toContain('(worklogDate >=');
+		expect(decoded).toContain('(worklogAuthor = currentUser())');
+		expect(decoded).toContain('AND (project = A OR project = B)');
+	});
+
 	it('emits progress updates for search and truncated worklog fetches', async () => {
 		const onProgress = vi.fn();
 		vi.spyOn(global, 'fetch')

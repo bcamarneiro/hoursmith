@@ -5,6 +5,7 @@ import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { searchAllIssues } from './jiraSearch';
+import { fromHttpResponse } from './serviceErrors';
 
 export type WorklogAuthor = JiraUser;
 export type WorklogItem = EnrichedJiraWorklog;
@@ -55,6 +56,12 @@ function pad(n: number): string {
 	return String(n).padStart(2, '0');
 }
 
+function throwIfAborted(signal?: AbortSignal): void {
+	if (signal?.aborted) {
+		throw new DOMException('Aborted', 'AbortError');
+	}
+}
+
 function clampPercent(value: number): number {
 	return Math.min(100, Math.max(0, Math.round(value)));
 }
@@ -89,13 +96,19 @@ export async function fetchMonthWorklogs(
 	const startStr = `${year}-${pad(month + 1)}-01`;
 	const endStr = `${year}-${pad(month + 1)}-${pad(daysInMonth)}`;
 
-	// Build JQL
-	let jql = `worklogDate >= "${startStr}" AND worklogDate <= "${endStr}"`;
+	// Build JQL. App-generated clauses are wrapped in `(...)` and the optional
+	// user filter is appended parenthesized so a filter ending in a trailing
+	// `OR` (or any lower-precedence operator) can't widen the date/author scope
+	// of the query. (ADA-467b)
+	const appClauses = [
+		`worklogDate >= "${startStr}" AND worklogDate <= "${endStr}"`,
+	];
 	if (options?.currentUserOnly) {
-		jql += ' AND worklogAuthor = currentUser()';
+		appClauses.push('worklogAuthor = currentUser()');
 	}
+	let jql = `(${appClauses.join(') AND (')})`;
 	if (options?.jqlFilter?.trim()) {
-		jql += ` AND ${options.jqlFilter.trim()}`;
+		jql += ` AND (${options.jqlFilter.trim()})`;
 	}
 
 	emitProgress(options?.onProgress, {
@@ -144,7 +157,7 @@ export async function fetchMonthWorklogs(
 		},
 	);
 
-	if (signal?.aborted) return [];
+	throwIfAborted(signal);
 
 	emitProgress(options?.onProgress, {
 		phase: 'inspecting',
@@ -152,6 +165,17 @@ export async function fetchMonthWorklogs(
 		message: 'Reviewing embedded worklogs from search results',
 		detail: `${issues.length} issue${issues.length === 1 ? '' : 's'} returned from Jira`,
 	});
+
+	// When scoping to the current user, the JQL `worklogAuthor = currentUser()`
+	// only restricts which ISSUES match — a shared issue still returns every
+	// author's worklogs. Filter per-worklog by email so other authors' entries
+	// on shared issues are dropped, matching the week path in worklogService.
+	// (ADA-467a)
+	const userEmail = options?.currentUserOnly
+		? config.email.toLowerCase()
+		: null;
+	const matchesAuthor = (wl: EmbeddedWorklog): boolean =>
+		!userEmail || wl.author?.emailAddress?.toLowerCase() === userEmail;
 
 	// Step 2: Split issues into complete (embedded has all worklogs) vs truncated
 	const allWorklogs: WorklogItem[] = [];
@@ -167,6 +191,7 @@ export async function fetchMonthWorklogs(
 		if (embedded.total <= embedded.maxResults) {
 			// Embedded worklogs are COMPLETE — use them directly, filter by date in JS
 			for (const wl of embedded.worklogs) {
+				if (!matchesAuthor(wl)) continue;
 				const day = classifyWorklog(wl).loggedOn;
 				if (day && day >= startStr && day <= endStr) {
 					allWorklogs.push({ ...wl, issue });
@@ -193,7 +218,7 @@ export async function fetchMonthWorklogs(
 		);
 
 		for (let i = 0; i < truncatedIssues.length; i += batchSize) {
-			if (signal?.aborted) return [];
+			throwIfAborted(signal);
 			const batch = truncatedIssues.slice(i, i + batchSize);
 			const batchIndex = Math.floor(i / batchSize) + 1;
 			const processedIssues = Math.min(
@@ -207,30 +232,32 @@ export async function fetchMonthWorklogs(
 				message: 'Fetching full worklogs for truncated issues',
 				detail: `Batch ${batchIndex} of ${totalBatches} · ${processedIssues} of ${truncatedIssues.length} issue${truncatedIssues.length === 1 ? '' : 's'}`,
 			});
+			// A real failure on these supplementary per-issue fetches must NOT be
+			// swallowed: silently returning [] for a truncated issue undercounts
+			// the month and presents partial data as complete. Let the error
+			// propagate so the whole month is marked failed. An aborted signal is
+			// a clean cancel (AbortError), not a failure. (ADA-456a)
 			const results = await Promise.all(
 				batch.map(async (issue) => {
-					try {
-						const url = `${base}/rest/api/2/issue/${issue.key}/worklog?startedAfter=${startMillis}&startedBefore=${endMillis}`;
-						const rewritten = rewriteForHostedProxy(url, headers, {
-							jiraHost: config.jiraHost,
-							email: config.email,
-							apiToken: config.apiToken,
-						});
-						const res = await fetch(rewritten.url, {
-							headers: rewritten.headers,
-							signal,
-						});
-						if (!res.ok) return [];
-						const data = (await res.json()) as {
-							worklogs: EmbeddedWorklog[];
-						};
-						return (data.worklogs || []).map((wl) => ({
-							...wl,
-							issue,
-						}));
-					} catch {
-						return [];
+					const url = `${base}/rest/api/2/issue/${issue.key}/worklog?startedAfter=${startMillis}&startedBefore=${endMillis}`;
+					const rewritten = rewriteForHostedProxy(url, headers, {
+						jiraHost: config.jiraHost,
+						email: config.email,
+						apiToken: config.apiToken,
+					});
+					const res = await fetch(rewritten.url, {
+						headers: rewritten.headers,
+						signal,
+					});
+					if (!res.ok) {
+						throw fromHttpResponse('Jira issue worklog', res.status, issue.key);
 					}
+					const data = (await res.json()) as {
+						worklogs: EmbeddedWorklog[];
+					};
+					return (data.worklogs || [])
+						.filter(matchesAuthor)
+						.map((wl) => ({ ...wl, issue }));
 				}),
 			);
 			for (const worklogs of results) {

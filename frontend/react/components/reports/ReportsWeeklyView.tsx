@@ -72,7 +72,12 @@ function TeamMemberRow({
 	weekdays: string[];
 	onMemberClick: (name: string) => void;
 }) {
-	const pct = (member.totalSeconds / member.targetSeconds) * 100;
+	// Guard against a zero target (e.g. a full week of PTO) — a bare division
+	// would feed NaN/Infinity into ProgressBar (ADA-458). No target → 0%.
+	const pct =
+		member.targetSeconds > 0
+			? (member.totalSeconds / member.targetSeconds) * 100
+			: 0;
 	const workedOnPto = member.workedOnPtoDates ?? [];
 
 	return (

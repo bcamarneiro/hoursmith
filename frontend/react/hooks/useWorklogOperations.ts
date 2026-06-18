@@ -1,9 +1,59 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { rewriteForHostedProxy } from '../../services/jiraGateway';
 import { useConfigStore } from '../../stores/useConfigStore';
 import type { EnrichedJiraWorklog } from '../../stores/useTimesheetStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
+
+/**
+ * Which month a worklog belongs to, in the same 0-indexed shape used by the
+ * `monthWorklogs` query key. Derived from `started`, falling back to `created`.
+ * Returns null when neither is parseable so the patch is skipped rather than
+ * mis-bucketed.
+ */
+function worklogMonth(
+	wl: EnrichedJiraWorklog,
+): { year: number; month: number } | null {
+	const raw = wl.started || wl.created;
+	if (!raw) return null;
+	const d = new Date(raw);
+	if (Number.isNaN(d.getTime())) return null;
+	return { year: d.getFullYear(), month: d.getMonth() };
+}
+
+/**
+ * ADA-452: Jira's `/search/jql` is eventually consistent, so a refetch right
+ * after a mutation can return stale data (missing a just-created worklog, or
+ * still showing a just-deleted one). Instead of invalidating the month query
+ * (which would refetch from that lagging endpoint), patch every cached
+ * `monthWorklogs` entry directly so the change shows immediately and survives a
+ * later stale refetch. Only caches whose month matches the worklog are touched.
+ */
+function patchMonthCaches(
+	queryClient: QueryClient,
+	updater: (worklogs: EnrichedJiraWorklog[]) => EnrichedJiraWorklog[],
+	targetMonth: { year: number; month: number } | null,
+) {
+	// Read existing entries so we can inspect each query key, then patch the
+	// matching months by exact key (the v5 `setQueriesData` updater receives
+	// only the data, not the key).
+	const entries = queryClient.getQueriesData<EnrichedJiraWorklog[]>({
+		queryKey: ['monthWorklogs'],
+	});
+	for (const [key, prev] of entries) {
+		if (!prev) continue;
+		// Query key shape: ['monthWorklogs', year, month, ...]
+		const year = key[1] as number;
+		const month = key[2] as number;
+		if (
+			targetMonth &&
+			(year !== targetMonth.year || month !== targetMonth.month)
+		) {
+			continue;
+		}
+		queryClient.setQueryData<EnrichedJiraWorklog[]>(key, updater(prev));
+	}
+}
 
 /** Format a date string to Jira's expected format: 2026-03-02T09:00:00.000+0000 */
 function toJiraDatetime(dateStr: string): string {
@@ -109,7 +159,14 @@ export function useWorklogOperations() {
 			};
 
 			const currentData = useTimesheetStore.getState().data;
-			queryClient.invalidateQueries({ queryKey: ['monthWorklogs'] });
+			// Patch the month cache(s) instead of invalidating: the search API is
+			// eventually consistent, so an immediate refetch can omit this new
+			// worklog. (ADA-452)
+			patchMonthCaches(
+				queryClient,
+				(worklogs) => [...worklogs, enrichedWorklog],
+				worklogMonth(enrichedWorklog),
+			);
 			setData([...(currentData || []), enrichedWorklog]);
 
 			return enrichedWorklog;
@@ -164,7 +221,45 @@ export function useWorklogOperations() {
 				return wl;
 			});
 
-			queryClient.invalidateQueries({ queryKey: ['monthWorklogs'] });
+			// Patch the month cache(s) directly rather than refetching from the
+			// eventually-consistent search API, which may still return the old
+			// value. The worklog can move months (started changed), so patch the
+			// old month (find + replace, dropping if it moved out) and, if it now
+			// belongs elsewhere, ensure it lands there too. (ADA-452)
+			const newMonth = updatedWorklog?.started
+				? worklogMonth({
+						...updatedWorklog,
+						issue: { id: '', key: '', fields: {} },
+					} as EnrichedJiraWorklog)
+				: null;
+			patchMonthCaches(
+				queryClient,
+				(worklogs) =>
+					worklogs.map((wl) =>
+						wl.id === worklogId ? { ...updatedWorklog, issue: wl.issue } : wl,
+					),
+				null,
+			);
+			// Drop stale copies from months the worklog no longer belongs to.
+			if (newMonth) {
+				patchMonthCaches(
+					queryClient,
+					(worklogs) => {
+						const existing = worklogs.find((wl) => wl.id === worklogId);
+						if (!existing) return worklogs;
+						const wlMonth = worklogMonth(existing);
+						if (
+							wlMonth &&
+							(wlMonth.year !== newMonth.year ||
+								wlMonth.month !== newMonth.month)
+						) {
+							return worklogs.filter((wl) => wl.id !== worklogId);
+						}
+						return worklogs;
+					},
+					null,
+				);
+			}
 			setData(updatedData || null);
 
 			return updatedWorklog;
@@ -238,7 +333,11 @@ export function useWorklogOperations() {
 						...(useTimesheetStore.getState().data || []),
 						enrichedWorklog,
 					];
-					queryClient.invalidateQueries({ queryKey: ['monthWorklogs'] });
+					patchMonthCaches(
+						queryClient,
+						(worklogs) => [...worklogs, enrichedWorklog],
+						worklogMonth(enrichedWorklog),
+					);
 					setData(updatedData);
 
 					created.push({
@@ -276,7 +375,14 @@ export function useWorklogOperations() {
 			// Remove from the store
 			const currentData = useTimesheetStore.getState().data;
 			const updatedData = currentData?.filter((wl) => wl.id !== worklogId);
-			queryClient.invalidateQueries({ queryKey: ['monthWorklogs'] });
+			// Remove from the month cache(s) directly. A refetch from the
+			// eventually-consistent search API could still return the deleted
+			// worklog, so we patch rather than invalidate. (ADA-452)
+			patchMonthCaches(
+				queryClient,
+				(worklogs) => worklogs.filter((wl) => wl.id !== worklogId),
+				null,
+			);
 			setData(updatedData || null);
 		} catch (err) {
 			const errorMessage =
