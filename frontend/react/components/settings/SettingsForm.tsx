@@ -348,7 +348,9 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 			'hoursmith-share-pack.json',
 			'application/json;charset=utf-8',
 		);
-		toast.success('Share pack exported without local secrets');
+		toast.success(
+			'Share pack exported — excludes tokens, calendars, and personal data',
+		);
 	};
 
 	const handleImportClick = () => {

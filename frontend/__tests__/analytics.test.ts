@@ -22,12 +22,14 @@ const ORIGINAL_KEY = process.env.VITE_POSTHOG_KEY;
 // A shared spy for posthog.init / capture across re-imports.
 const initSpy = vi.fn();
 const captureSpy = vi.fn();
+const identifySpy = vi.fn();
 
 vi.mock('posthog-js', () => ({
 	default: {
 		init: initSpy,
 		capture: captureSpy,
 		captureException: vi.fn(),
+		identify: identifySpy,
 	},
 }));
 
@@ -47,6 +49,7 @@ function setDoNotTrack(value: string | null) {
 beforeEach(() => {
 	initSpy.mockClear();
 	captureSpy.mockClear();
+	identifySpy.mockClear();
 	process.env.VITE_POSTHOG_KEY = 'phc_test_key';
 	setDoNotTrack(null);
 	useConfigStore.setState((s) => ({
@@ -155,5 +158,73 @@ describe('opt-out suppression', () => {
 		await Promise.resolve();
 		// Nothing buffered means nothing flushes even if SDK later inits.
 		expect(captureSpy).not.toHaveBeenCalled();
+	});
+});
+
+describe('hashUserId', () => {
+	it('is deterministic for the same input (stable across calls)', async () => {
+		const { hashUserId } = await loadAnalytics();
+		expect(hashUserId('user-abc-123')).toBe(hashUserId('user-abc-123'));
+	});
+
+	it('produces different digests for different ids', async () => {
+		const { hashUserId } = await loadAnalytics();
+		expect(hashUserId('user-a')).not.toBe(hashUserId('user-b'));
+	});
+
+	it('never returns the raw id or email (non-reversible / no PII leak)', async () => {
+		const { hashUserId } = await loadAnalytics();
+		const id = 'auth0|alice@example.com';
+		const digest = hashUserId(id);
+		expect(digest).not.toContain(id);
+		expect(digest).not.toContain('alice');
+		expect(digest).not.toContain('@');
+		expect(digest).not.toContain('example.com');
+		// Opaque, fixed-shape token: `u_` + 8 hex chars.
+		expect(digest).toMatch(/^u_[0-9a-f]{8}$/);
+	});
+});
+
+describe('identifyUser', () => {
+	async function loadAndInit() {
+		const mod = await loadAnalytics();
+		mod.initAnalytics();
+		// Let the dynamic `import('posthog-js')` promise chain settle so `instance`
+		// is set before we call identify.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		return mod;
+	}
+
+	it('identifies with the hashed id, never the raw id', async () => {
+		const { identifyUser, hashUserId } = await loadAndInit();
+		identifyUser('user-xyz');
+		expect(identifySpy).toHaveBeenCalledTimes(1);
+		expect(identifySpy).toHaveBeenCalledWith(hashUserId('user-xyz'));
+		expect(identifySpy).not.toHaveBeenCalledWith('user-xyz');
+	});
+
+	it('is stable: the same user always maps to the same distinct id', async () => {
+		const { identifyUser } = await loadAndInit();
+		identifyUser('user-xyz');
+		identifyUser('user-xyz');
+		expect(identifySpy.mock.calls[0][0]).toBe(identifySpy.mock.calls[1][0]);
+	});
+
+	it('no-ops when opted out', async () => {
+		useConfigStore.setState((s) => ({
+			config: { ...s.config, analyticsOptOut: true },
+		}));
+		const { identifyUser } = await loadAnalytics();
+		identifyUser('user-xyz');
+		await Promise.resolve();
+		expect(identifySpy).not.toHaveBeenCalled();
+	});
+
+	it('no-ops when no key is configured', async () => {
+		delete process.env.VITE_POSTHOG_KEY;
+		const { identifyUser } = await loadAnalytics();
+		identifyUser('user-xyz');
+		await Promise.resolve();
+		expect(identifySpy).not.toHaveBeenCalled();
 	});
 });

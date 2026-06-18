@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { trackEvent } from '../analytics';
 import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
 import {
@@ -104,6 +105,36 @@ function describeJiraTestStatus(status: number, host: string): string {
 	return `Jira API error on ${host}: ${status}.`;
 }
 
+/**
+ * Fixed analytics enum for a Jira connection-test outcome (ADA — activation
+ * funnel). Derived from the HTTP status / error *type*, never the raw message,
+ * so no Jira-derived text (hosts, issue keys, JQL) can leak into analytics.
+ */
+type JiraTestFailureReason =
+	| 'ok'
+	| 'auth'
+	| 'not_found'
+	| 'cors'
+	| 'timeout'
+	| 'server'
+	| 'email_mismatch'
+	| 'unknown';
+
+function jiraFailureReasonForStatus(status: number): JiraTestFailureReason {
+	if (status === 401 || status === 403) return 'auth';
+	if (status === 404) return 'not_found';
+	if (status >= 500) return 'server';
+	return 'unknown';
+}
+
+/** Coarse duration bucket for the connection test, benign for analytics. */
+function durationBucket(ms: number): '<1s' | '1-3s' | '3-10s' | '>10s' {
+	if (ms < 1000) return '<1s';
+	if (ms < 3000) return '1-3s';
+	if (ms < 10_000) return '3-10s';
+	return '>10s';
+}
+
 const emptyTest: IntegrationTestResult = { loading: false, result: null };
 const resetIntegrationTests = () => ({
 	jira: { ...emptyTest },
@@ -176,6 +207,14 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 			},
 		}));
 
+		// Track the test wall-clock from the very start so the `jira_connection_tested`
+		// analytics event (the connect success-rate metric) has a duration bucket on
+		// every outcome path — including failures thrown before the inner timing.
+		const testStartedAt = performance.now();
+		// HTTP status of the `/myself` probe, captured so the catch path can map it to
+		// a fixed failure-reason enum (the thrown Error only carries a redacted message).
+		let myselfStatus = 0;
+
 		try {
 			const { formData } = get();
 			const normalizedConfig = normalizeConfig(formData);
@@ -213,6 +252,7 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				JIRA_TEST_TIMEOUT_MS,
 				timeoutHostLabel,
 			);
+			myselfStatus = myselfRes.status;
 			if (!myselfRes.ok) {
 				throw new Error(describeJiraTestStatus(myselfRes.status, host));
 			}
@@ -277,6 +317,12 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				// Connection authenticated, but the token's account != Settings email.
 				// Report as a failure so it isn't treated as verified evidence and the
 				// user is steered to fix the email (ADA-436).
+				trackEvent('jira_connection_tested', {
+					result: 'failure',
+					failure_reason: 'email_mismatch',
+					http_status: myselfStatus,
+					duration_bucket: durationBucket(performance.now() - testStartedAt),
+				});
 				set((s) => ({
 					integrationTests: {
 						...s.integrationTests,
@@ -292,6 +338,12 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				return;
 			}
 
+			trackEvent('jira_connection_tested', {
+				result: 'success',
+				failure_reason: 'ok',
+				http_status: myselfStatus,
+				duration_bucket: durationBucket(performance.now() - testStartedAt),
+			});
 			set((s) => ({
 				integrationTests: {
 					...s.integrationTests,
@@ -328,6 +380,22 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 					: isCorsFailure
 						? 'Your browser blocked direct access to Jira (CORS). Configure a CORS proxy in Settings, or use the hosted proxy.'
 						: rawMessage;
+			// Map the failure to the fixed enum from the error *type* / captured HTTP
+			// status — never the raw message — so no Jira-derived text reaches analytics.
+			const failureReason: JiraTestFailureReason =
+				error instanceof TestTimeoutError
+					? 'timeout'
+					: isCorsFailure
+						? 'cors'
+						: myselfStatus >= 400
+							? jiraFailureReasonForStatus(myselfStatus)
+							: 'unknown';
+			trackEvent('jira_connection_tested', {
+				result: 'failure',
+				failure_reason: failureReason,
+				http_status: myselfStatus,
+				duration_bucket: durationBucket(performance.now() - testStartedAt),
+			});
 			set((s) => ({
 				integrationTests: {
 					...s.integrationTests,

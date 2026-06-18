@@ -1,5 +1,6 @@
 import type React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { trackEvent } from '../../analytics';
 import { useConfigStore } from '../../stores/useConfigStore';
 import {
 	type SettingsIntegrationTests,
@@ -16,6 +17,10 @@ import { SETTINGS_SECTION_IDS } from '../constants/settingsSections';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { buildSettingsSetupModel } from '../utils/settingsSetup';
 import * as styles from './SettingsPage.module.css';
+
+// Session-scoped guard so `onboarding_started` fires at most once per page load,
+// not on every Settings re-render or revisit within the same session.
+let onboardingStartedTracked = false;
 
 export const SettingsPage: React.FC = () => {
 	usePageTitle('Settings');
@@ -71,6 +76,16 @@ export const SettingsPage: React.FC = () => {
 		isDirty,
 		savedConnectionEvidenceAt,
 	);
+
+	// First arrival on Settings with no saved Jira connection = the start of
+	// onboarding. Fire once per session (module-level guard) so repeat visits or
+	// re-renders don't inflate the funnel. No props — benign by construction.
+	useEffect(() => {
+		if (onboardingStartedTracked) return;
+		if (savedConfig.jiraHost) return;
+		onboardingStartedTracked = true;
+		trackEvent('onboarding_started', {});
+	}, [savedConfig.jiraHost]);
 
 	// Selecting a readiness step/section activates that rail section in the form
 	// and scrolls it into view (replaces the old scroll-to-anchor behaviour).

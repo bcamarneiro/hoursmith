@@ -169,14 +169,20 @@ function normalizeAbsenceAssignment(
 	};
 }
 
+// Share packs are handed to teammates, so they must contain NO secrets or
+// personal data. This is an allowlist — anything not listed here is excluded
+// (apiToken/gitlabToken/rescueTimeApiKey/email are all omitted by construction).
+// `calendarFeeds` and `absenceAssignments` are ALSO excluded (ADA-486):
+// ICS/calendar feed URLs frequently embed a private access token (Google "secret
+// address", Outlook published-calendar GUID, internal HR/absence feeds), and
+// absenceAssignments carries teammates' personal emails. Recipients re-add their
+// own calendars; the full backup still includes both.
 function createSharePackConfig(config: Config): Partial<Config> {
 	return {
 		jiraHost: config.jiraHost,
 		jqlFilter: config.jqlFilter,
 		allowedUsers: config.allowedUsers,
 		gitlabHost: config.gitlabHost,
-		calendarFeeds: config.calendarFeeds,
-		absenceAssignments: config.absenceAssignments,
 	};
 }
 
