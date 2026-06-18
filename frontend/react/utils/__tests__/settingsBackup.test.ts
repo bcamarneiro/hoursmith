@@ -25,6 +25,7 @@ const defaultConfig = {
 	timeRounding: 'off' as const,
 	includeAbsenceInCsv: true,
 	includeCsvProvenance: false,
+	analyticsOptOut: false,
 };
 
 describe('settingsBackup', () => {

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { WorklogFetchProgress } from '../../../../types/worklogLoading';
+import { describeServiceError } from '../../../services/serviceErrors';
 import type { TeamMemberSummary } from '../../../services/teamService';
 import type {
 	ReportsSortDirection,
@@ -10,6 +11,7 @@ import { addDaysToIsoDate, parseIsoDateLocal } from '../../utils/date';
 import { formatHours } from '../../utils/format';
 import type { ManagerTrendModel } from '../../utils/teamReports';
 import { TeamStatsCards } from '../team/TeamStatsCards';
+import { Button } from '../ui/Button';
 import { ProgressBar } from '../ui/ProgressBar';
 import { WorklogLoadingStatus } from '../ui/WorklogLoadingStatus';
 import { ManagerInsightsPanel } from './ManagerInsightsPanel';
@@ -204,6 +206,8 @@ type Props = {
 	trendsError: unknown;
 	hasNoFilteredWeeklyResults: boolean;
 	weeklySummary: { totalSeconds: number; totalGapSeconds: number } | null;
+	/** Re-runs the weekly team fetch from the data-error surface (ADA-476). */
+	onRetry?: () => void;
 	onMemberClick: (name: string) => void;
 	/**
 	 * True when Jira isn't connected yet (no host/API token). Shows a "connect
@@ -232,6 +236,7 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 	trendsError,
 	hasNoFilteredWeeklyResults,
 	weeklySummary,
+	onRetry,
 	onMemberClick,
 	notConfigured,
 }) => {
@@ -265,13 +270,29 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 					</span>
 				</div>
 			)}
-			{teamError && (
-				<div className={styles.error}>
-					<h2>Unable to load team data</h2>
-					<p>{teamError.message}</p>
-					<Link to="/settings">Check your settings</Link>
-				</div>
-			)}
+			{teamError &&
+				(() => {
+					// Route the error through the shared mapper so a Hoursmith-session
+					// 401 reads as "sign in again" rather than "check Jira" (ADA-475),
+					// and surface a "Try again" refetch alongside the link (ADA-476).
+					const copy = describeServiceError(teamError);
+					return (
+						<div className={styles.error}>
+							<h2>Unable to load team data</h2>
+							<p>{copy.message}</p>
+							{onRetry && (
+								<p>
+									<Button variant="secondary" onClick={onRetry}>
+										Try again
+									</Button>
+								</p>
+							)}
+							<Link to={copy.action?.to ?? '/settings'}>
+								{copy.action?.label ?? 'Check your settings'}
+							</Link>
+						</div>
+					);
+				})()}
 
 			{weekLoading && teamMembers.length === 0 && (
 				<div className={styles.loading}>

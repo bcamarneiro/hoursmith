@@ -20,11 +20,11 @@ Hoursmith is source-available, with the app core under MIT. The whole app is in 
 
 Hosted runs the CORS proxy for you for €29/year, so you never have to keep a proxy process running on your machine. Lead adds multi-client tooling for team leads who report to more than one client — €60/year founding rate, rising to €120 as more Lead features ship, with founding subscribers locked at €60 for as long as they stay subscribed. Early Hosted subscribers get a founding rate of €19/year on the same lock. The app code is identical across tiers — you pay for hosting and the Lead conveniences, never to unlock the core app.
 
-The paid tiers are not launched yet. You can register interest on the [pricing page](https://hoursmith.io/pricing) (placeholder — coming soon).
+The paid tiers are not open for purchase yet. The [pricing page](https://hoursmith.io/pricing) is live and shows the planned tiers and prices; while checkout is gated you can join the waitlist there to be notified when it opens.
 
 ## Self-host the Free tier
 
-Requirements: Node.js 18+ and a Jira Cloud account with an API token.
+Requirements: Node.js 18+ and a Jira account with an API token. Both Jira Cloud and Jira Server / Data Center are supported — point Settings at whichever host you use.
 
 ```bash
 git clone https://github.com/bcamarneiro/hoursmith.git
@@ -39,21 +39,21 @@ In a second terminal:
 npm run cors-proxy
 ```
 
-Then open `http://localhost:5173` and finish setup in the in-app wizard.
+Then open `http://localhost:5173` and finish setup from **Settings** — enter your Jira host, email, and API token (or import a backup JSON), then run the connection test in the readiness panel to confirm auth, permissions, and CORS are all in good shape.
 
 ### Why the CORS proxy?
 
-Jira Cloud's REST API does not send CORS headers for browser clients, so a pure SPA cannot call it directly from `localhost` without help. The bundled proxy (`cors-proxy.js`) is a small Node script that forwards requests from your browser to Jira on the same machine. Nothing leaves your computer.
+Jira's REST API does not send CORS headers for browser clients (this applies to Jira Cloud and to most Jira Server / Data Center setups), so a pure SPA cannot call it directly from `localhost` without help. The bundled proxy (`cors-proxy.js`) is a small Node script that forwards requests from your browser to Jira on the same machine. Nothing leaves your computer.
 
 For SOCKS5 environments, use `npm run cors-proxy:socks` instead.
 
 ## Security
 
-Hoursmith never sends your Jira credentials anywhere except Jira.
+Hoursmith never stores your Jira credentials. They live in your browser and are only used to sign requests to your own Jira instance.
 
 - Your Jira host, email, and API token live in your browser's `localStorage`.
 - The local CORS proxy is a transparent forwarder. It does not log, store, or persist tokens.
-- The eventual hosted Premium proxy will follow the same rule: tokens stay in your browser and are only used to sign the outbound request to your Jira instance for the duration of that request.
+- The hosted Premium proxy follows the same rule. Your token stays in your browser; on each request it transits the Vercel proxy function in-flight purely to reach your Jira instance, and is never logged, stored, or persisted. The proxy is stateless.
 
 If you stop using Hoursmith, clear site data in your browser and revoke the API token in Jira.
 

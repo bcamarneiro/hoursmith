@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import type { EnrichedJiraWorklog } from '../../../../types/jira';
 import type { WorklogFetchProgress } from '../../../../types/worklogLoading';
 import type { UserAbsenceDays } from '../../../services/absenceService';
+import { describeServiceError } from '../../../services/serviceErrors';
 import * as styles from '../../pages/ReportsPage.module.css';
 import { getUserAbsenceDayMap } from '../../utils/absence';
 import { monthLabel } from '../../utils/date';
@@ -9,6 +10,7 @@ import { formatHours } from '../../utils/format';
 import { OverviewTable } from '../OverviewTable';
 import { TimesheetGrid } from '../TimesheetGrid';
 import { TimesheetStatsCards } from '../timesheet/TimesheetStatsCards';
+import { Button } from '../ui/Button';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { WorklogLoadingStatus } from '../ui/WorklogLoadingStatus';
 
@@ -31,6 +33,8 @@ type Props = {
 	monthlyWorklogProgress: WorklogFetchProgress | null;
 	monthlySummary: { userCount: number; totalSeconds: number } | null;
 	errorMessage: string | null | undefined;
+	/** Re-runs the monthly worklog fetch from the data-error surface (ADA-476). */
+	onRetry?: () => void;
 	onUserChange: (user: string) => void;
 	onDownloadUser: (user: string) => void;
 };
@@ -52,18 +56,31 @@ export const ReportsMonthlyView: React.FC<Props> = ({
 	monthlyWorklogProgress,
 	monthlySummary,
 	errorMessage,
+	onRetry,
 	onUserChange,
 	onDownloadUser,
 }) => {
 	if (errorMessage) {
+		// "Not configured" keeps its dedicated Settings nudge; everything else
+		// goes through the shared error→copy mapper so a Hoursmith-session 401
+		// reads as "sign in again", not "check your Jira token" (ADA-475).
+		const isNotConfigured = errorMessage.includes('configured');
+		const copy = describeServiceError(errorMessage);
 		return (
 			<div className={styles.error}>
 				<h2>Unable to load timesheets</h2>
-				<p>{errorMessage}</p>
-				{errorMessage.includes('configured') ? (
+				<p>{isNotConfigured ? errorMessage : copy.message}</p>
+				{onRetry && !isNotConfigured && (
+					<p>
+						<Button variant="secondary" onClick={onRetry}>
+							Try again
+						</Button>
+					</p>
+				)}
+				{isNotConfigured ? (
 					<Link to="/settings">Go to Settings</Link>
-				) : errorMessage.includes('401') || errorMessage.includes('403') ? (
-					<Link to="/settings">Check your credentials in Settings</Link>
+				) : copy.action ? (
+					<Link to={copy.action.to}>{copy.action.label}</Link>
 				) : (
 					<p>
 						Try refreshing the page or check your{' '}

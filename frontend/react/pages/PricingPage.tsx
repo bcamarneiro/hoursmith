@@ -320,8 +320,11 @@ export const PricingPage: React.FC = () => {
 					<div className={styles.faqItem}>
 						<dt className={styles.faqQuestion}>Where is my data?</dt>
 						<dd className={styles.faqAnswer}>
-							Your Jira token stays in your browser. The hosted proxy passes
-							requests through to Jira without persisting anything. See the full{' '}
+							Your Jira token is stored only in your browser. On the hosted tier
+							it (and your worklog data) is forwarded through our EU proxy
+							in-transit to reach Jira, but it's never stored, logged, or
+							inspected. Self-host the proxy and nothing leaves your machine.
+							See the full{' '}
 							<Link to="/sub-processors" className={styles.inlineLink}>
 								sub-processors list
 							</Link>

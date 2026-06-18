@@ -120,8 +120,9 @@ describe('fetchSearchPage', () => {
 		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 			ok: false,
 			status: 410,
+			clone: () => ({ json: async () => ({}) }),
 			json: async () => ({}),
-		} as Response);
+		} as unknown as Response);
 
 		await expect(
 			fetchSearchPage(cloudConfig, {
@@ -130,6 +131,41 @@ describe('fetchSearchPage', () => {
 				maxResults: 10,
 			}),
 		).rejects.toMatchObject({ name: 'ServiceError', source: 'Jira search' });
+	});
+
+	it('captures the hosted-proxy entitlement code from a 401 body (ADA-475)', async () => {
+		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+			ok: false,
+			status: 401,
+			clone: () => ({ json: async () => ({ error: 'invalid_token' }) }),
+			json: async () => ({ error: 'invalid_token' }),
+		} as unknown as Response);
+
+		await expect(
+			fetchSearchPage(cloudConfig, { jql: 'x', fields: 'key', maxResults: 10 }),
+		).rejects.toMatchObject({
+			name: 'ServiceError',
+			status: 401,
+			entitlementCode: 'invalid_token',
+		});
+	});
+
+	it('leaves entitlementCode undefined on a genuine Jira 401 (no code body)', async () => {
+		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+			ok: false,
+			status: 401,
+			clone: () => ({ json: async () => ({}) }),
+			json: async () => ({}),
+		} as unknown as Response);
+
+		await fetchSearchPage(cloudConfig, {
+			jql: 'x',
+			fields: 'key',
+			maxResults: 10,
+		}).catch((err) => {
+			expect(err.status).toBe(401);
+			expect(err.entitlementCode).toBeUndefined();
+		});
 	});
 });
 

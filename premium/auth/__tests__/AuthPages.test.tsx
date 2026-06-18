@@ -61,6 +61,34 @@ describe('SignUpPage (ADA-291)', () => {
 		);
 		expect(screen.queryByText(/GitHub/i)).toBeNull();
 	});
+
+	it('shows a Terms/Privacy acknowledgement with links (ADA-471)', () => {
+		render(
+			<MemoryRouter>
+				<SignUpPage />
+			</MemoryRouter>,
+		);
+		expect(
+			screen.getByText(/By creating an account you agree to the/i),
+		).toBeInTheDocument();
+		expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute(
+			'href',
+			'/terms',
+		);
+		expect(
+			screen.getByRole('link', { name: 'Privacy Policy' }),
+		).toHaveAttribute('href', '/privacy');
+	});
+
+	it('shows the password-rule hint (ADA-471)', () => {
+		render(
+			<MemoryRouter>
+				<SignUpPage />
+			</MemoryRouter>,
+		);
+		expect(screen.getByText('At least 8 characters.')).toBeInTheDocument();
+		expect(screen.getByLabelText('Password')).toHaveAttribute('minlength', '8');
+	});
 });
 
 describe('SignInPage (ADA-309)', () => {

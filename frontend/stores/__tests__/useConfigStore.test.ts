@@ -49,6 +49,21 @@ describe('useConfigStore helpers', () => {
 		]);
 	});
 
+	it('defaults analyticsOptOut to false and preserves an explicit opt-out (ADA-472)', () => {
+		expect(createDefaultConfig().analyticsOptOut).toBe(false);
+		// Missing on disk → fills the default.
+		expect(normalizeConfig({}).analyticsOptOut).toBe(false);
+		// Non-boolean garbage → falls back to default.
+		expect(
+			normalizeConfig({ analyticsOptOut: 'yes' as unknown as boolean })
+				.analyticsOptOut,
+		).toBe(false);
+		// Explicit true is preserved.
+		expect(normalizeConfig({ analyticsOptOut: true }).analyticsOptOut).toBe(
+			true,
+		);
+	});
+
 	it('migrates old persisted config into the current normalized shape', () => {
 		const migrated = migratePersistedConfigState(
 			{

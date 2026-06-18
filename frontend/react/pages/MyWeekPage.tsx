@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { describeServiceError } from '../../services/serviceErrors';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import { DayCard } from '../components/dashboard/DayCard';
@@ -35,7 +36,8 @@ const GAP_DAYS_SECTION_ID = 'dashboard-gap-days';
 
 export const MyWeekPage: React.FC = () => {
 	usePageTitle('My Week');
-	useDashboardDataFetcher();
+	const { refetch: refetchDashboard, filteredOutEmpty } =
+		useDashboardDataFetcher();
 
 	const jiraHost = useConfigStore((s) => s.config.jiraHost);
 	const weekStart = useDashboardStore((s) => s.weekStart);
@@ -167,6 +169,9 @@ export const MyWeekPage: React.FC = () => {
 	}
 
 	if (worklogsError) {
+		// Route through the shared error→copy mapper (ADA-475): a Hoursmith-session
+		// 401 reads as "sign in again", a Jira 401 as "check your token", etc.
+		const errorCopy = describeServiceError(worklogsError);
 		return (
 			<div className={styles.container}>
 				<div className={styles.toolbar}>
@@ -181,8 +186,15 @@ export const MyWeekPage: React.FC = () => {
 				</div>
 				<div className={styles.error}>
 					<h2>Unable to load My Week</h2>
-					<p>{worklogsError}</p>
-					<Link to="/settings">Check your settings</Link>
+					<p>{errorCopy.message}</p>
+					{/* Recovery affordance: re-trigger the fetch, not just a Settings
+					    link (ADA-476). */}
+					<Button variant="secondary" onClick={refetchDashboard}>
+						Try again
+					</Button>
+					<Link to={errorCopy.action?.to ?? '/settings'}>
+						{errorCopy.action?.label ?? 'Check your settings'}
+					</Link>
 				</div>
 			</div>
 		);
@@ -266,10 +278,28 @@ export const MyWeekPage: React.FC = () => {
 
 			{!isLoadingWorklogs && daySummaries.length === 0 && (
 				<div className={styles.emptyWeek}>
-					<h3>No worklogs found for this week</h3>
-					<p>
-						Try another week, adjust your filters, or check your Jira settings.
-					</p>
+					{filteredOutEmpty ? (
+						<>
+							<h3>No worklogs match your Settings email</h3>
+							<p>
+								Loaded {filteredOutEmpty.rawCount} worklog
+								{filteredOutEmpty.rawCount === 1 ? '' : 's'} for this week, but
+								none were logged by{' '}
+								<strong>{filteredOutEmpty.email || '(no email set)'}</strong>.
+								My Week filters by your Settings email — update it to match the
+								account that owns these worklogs.
+							</p>
+							<Link to="/settings">Check your settings</Link>
+						</>
+					) : (
+						<>
+							<h3>No worklogs found for this week</h3>
+							<p>
+								Try another week, adjust your filters, or check your Jira
+								settings.
+							</p>
+						</>
+					)}
 				</div>
 			)}
 

@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { fromHttpResponse } from '../../../../services/serviceErrors';
 import type { TeamMemberSummary } from '../../../../services/teamService';
 import { ReportsWeeklyView } from '../ReportsWeeklyView';
 
@@ -227,5 +228,31 @@ describe('ReportsWeeklyView', () => {
 		);
 		expect(screen.getByText('Unable to load team data')).toBeTruthy();
 		expect(screen.getByText('Permission denied')).toBeTruthy();
+	});
+
+	it('maps an expired-session ServiceError to "sign in again" (ADA-475)', () => {
+		const err = fromHttpResponse('Jira search', 401, '', 'invalid_token');
+		render(
+			<MemoryRouter>
+				<ReportsWeeklyView {...baseProps} teamError={err} />
+			</MemoryRouter>,
+		);
+		expect(screen.getByText(/session expired/i)).toBeTruthy();
+		expect(screen.getByText('Sign in again')).toBeTruthy();
+	});
+
+	it('renders a "Try again" button that re-triggers the team fetch (ADA-476)', () => {
+		const onRetry = vi.fn();
+		render(
+			<MemoryRouter>
+				<ReportsWeeklyView
+					{...baseProps}
+					teamError={new Error('boom')}
+					onRetry={onRetry}
+				/>
+			</MemoryRouter>,
+		);
+		fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+		expect(onRetry).toHaveBeenCalledTimes(1);
 	});
 });

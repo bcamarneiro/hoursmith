@@ -36,10 +36,14 @@ export const PrivacyPage: React.FC = () => {
 				<p className={styles.body}>
 					Hoursmith is a Jira worklog dashboard. The product is designed so that
 					the data you care most about — your Jira tokens, your worklog content,
-					your report configurations — never leaves your browser and is never
-					sent to our servers. This policy describes the small amount of
-					personal data we do process to operate authentication, billing, and
-					the hosted CORS proxy.
+					your report configurations — is held in your browser and never stored
+					on our servers. On the hosted tier, your Jira token and the worklog
+					data it fetches are forwarded through our EU proxy in-transit so the
+					request can reach your Jira instance, but they are never persisted,
+					logged, or inspected. On the free / self-hosted tier they never leave
+					your machine. This policy describes the small amount of personal data
+					we do process to operate authentication, billing, and the hosted CORS
+					proxy.
 				</p>
 			</header>
 
@@ -83,8 +87,13 @@ export const PrivacyPage: React.FC = () => {
 					it records page views and a small set of product events (such as
 					starting checkout) to help us improve the product. It runs cookieless
 					with no persistent identifiers, no autocapture, and no session
-					recording, so it never captures your Jira data and no consent banner
-					is required. PostHog processes this in the EU.
+					recording. It also captures uncaught errors so we can fix bugs; before
+					any error event is sent, its message and stack trace are stripped and
+					replaced with a redaction marker, so no Jira-derived text (issue keys,
+					JQL, hostnames, or tokens) leaves your browser — only the error type
+					is retained. No consent banner is required, and you can turn analytics
+					off entirely from Settings (we also honor your browser's Do Not Track
+					setting). PostHog processes this in the EU.
 				</p>
 			</section>
 

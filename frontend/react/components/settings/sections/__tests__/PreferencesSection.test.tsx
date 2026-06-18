@@ -12,6 +12,8 @@ const baseProps = {
 	includeAbsenceInCsvId: 'include-absence',
 	includeCsvProvenance: false,
 	includeCsvProvenanceId: 'include-csv-provenance',
+	analyticsOptOut: false,
+	analyticsOptOutId: 'analytics-opt-out',
 };
 
 describe('PreferencesSection', () => {
@@ -95,5 +97,41 @@ describe('PreferencesSection', () => {
 		expect(toggle).not.toBeChecked();
 		fireEvent.click(toggle);
 		expect(handleChange).toHaveBeenCalled();
+	});
+
+	it('renders the analytics opt-out toggle and writes the flag (ADA-472)', () => {
+		const handleChange = vi.fn();
+		render(
+			<PreferencesSection
+				{...baseProps}
+				handleChange={handleChange}
+				theme="system"
+				timeRounding="off"
+				includeAbsenceInCsv
+				analyticsOptOut={false}
+			/>,
+		);
+		const toggle = screen.getByRole('checkbox', {
+			name: /Opt out of anonymous analytics/,
+		});
+		expect(toggle).not.toBeChecked();
+		expect(toggle).toHaveAttribute('name', 'analyticsOptOut');
+		fireEvent.click(toggle);
+		expect(handleChange).toHaveBeenCalled();
+	});
+
+	it('reflects an enabled analytics opt-out state (ADA-472)', () => {
+		render(
+			<PreferencesSection
+				{...baseProps}
+				theme="system"
+				timeRounding="off"
+				includeAbsenceInCsv
+				analyticsOptOut
+			/>,
+		);
+		expect(
+			screen.getByRole('checkbox', { name: /Opt out of anonymous analytics/ }),
+		).toBeChecked();
 	});
 });

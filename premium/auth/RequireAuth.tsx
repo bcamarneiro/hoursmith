@@ -17,7 +17,7 @@ export function RequireAuth({
 }: {
 	children: ReactNode;
 }): JSX.Element {
-	const { user, isLoading } = useAuth();
+	const { user, isLoading, sessionError } = useAuth();
 	const location = useLocation();
 
 	if (isLoading) {
@@ -26,12 +26,12 @@ export function RequireAuth({
 
 	if (!user) {
 		const target = `${location.pathname}${location.search}`;
-		return (
-			<Navigate
-				to={`/auth/sign-in?redirect=${encodeURIComponent(target)}`}
-				replace
-			/>
-		);
+		const params = new URLSearchParams({ redirect: target });
+		// Carry the reason so the sign-in screen can explain why the user was
+		// bounced (expired/failed session) instead of showing a bare login form
+		// (ADA-476). Falls back to a generic "auth required" reason.
+		params.set('reason', sessionError ? 'session-expired' : 'auth-required');
+		return <Navigate to={`/auth/sign-in?${params.toString()}`} replace />;
 	}
 
 	return <>{children}</>;
