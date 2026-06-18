@@ -92,14 +92,14 @@ export function buildTeamSummaries(
 		}
 	}
 
-	const now = new Date();
-	const yesterday = new Date(now);
-	yesterday.setDate(yesterday.getDate() - 1);
-	const yesterdayStr = toDateStr(yesterday);
-	const todayStr = toDateStr(now);
-	const effectiveEnd = weekEnd >= todayStr ? yesterdayStr : weekEnd;
+	// Weekly Reports targets the FULL week (8h/day → 40h for a standard 5-day
+	// week), matching the canonical My Week model (suggestionMerger builds a
+	// per-day target for every weekday in the week, with no "elapsed days only"
+	// proration) and Monthly Reports. Previously this prorated the target down to
+	// elapsed weekdays (excluding today + future), which made the same week read
+	// "OK / no gap" here while My Week showed a large gap (ADA-443). The target
+	// now spans the same weekdays the per-day totals are reported over.
 	const weekdays = getWeekdaysBetween(weekStart, weekEnd);
-	const targetWeekdays = getWeekdaysBetween(weekStart, effectiveEnd);
 
 	const summaries: TeamMemberSummary[] = [];
 	for (const [email, member] of memberMap) {
@@ -112,7 +112,7 @@ export function buildTeamSummaries(
 		const isAbsentOnDay = (day: string) => memberAbsenceMap?.has(day) ?? false;
 		const loggedOnDay = (day: string) => member.dailySeconds.get(day) ?? 0;
 		const targetSeconds = sumWeekdayTargetSeconds(
-			targetWeekdays,
+			weekdays,
 			isAbsentOnDay,
 			loggedOnDay,
 		);

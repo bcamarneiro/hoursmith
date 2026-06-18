@@ -15,10 +15,18 @@
 	color: var(--color-text);
 }
 
-.header span {
+.header span,
+.figure {
 	font-size: var(--text-xs);
 	font-weight: var(--font-semibold);
 	color: var(--color-text-secondary);
+}
+
+/* All hour/number figures render mono + tabular. */
+.figure,
+.count {
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
 }
 
 .message,
@@ -69,4 +77,28 @@
 
 .compact .detail {
 	font-size: 11px;
+}
+
+/* Indeterminate: no genuine total is known (e.g. Jira Cloud cursor
+   pagination). Render a sliding bar instead of a misleading fixed width so
+   the fetch visibly keeps moving and users don't think it has hung. */
+.indeterminate .fill {
+	width: 40%;
+	transition: none;
+	animation: worklogIndeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes worklogIndeterminate {
+	0% {
+		transform: translateX(-110%);
+	}
+	100% {
+		transform: translateX(260%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.indeterminate .fill {
+		animation-duration: 2.4s;
+	}
 }

@@ -45,6 +45,39 @@ describe('PreferencesSection', () => {
 		expect(handleSelectChange).toHaveBeenCalled();
 	});
 
+	it('applies the selected theme live to the document root (ADA-451)', () => {
+		document.documentElement.removeAttribute('data-theme');
+		const { rerender } = render(
+			<PreferencesSection
+				{...baseProps}
+				theme="dark"
+				timeRounding="off"
+				includeAbsenceInCsv
+			/>,
+		);
+		expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+
+		rerender(
+			<PreferencesSection
+				{...baseProps}
+				theme="light"
+				timeRounding="off"
+				includeAbsenceInCsv
+			/>,
+		);
+		expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+
+		rerender(
+			<PreferencesSection
+				{...baseProps}
+				theme="system"
+				timeRounding="off"
+				includeAbsenceInCsv
+			/>,
+		);
+		expect(document.documentElement.getAttribute('data-theme')).toBeNull();
+	});
+
 	it('reflects includeAbsenceInCsv state and forwards toggle changes', () => {
 		const handleChange = vi.fn();
 		render(

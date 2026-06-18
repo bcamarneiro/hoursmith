@@ -133,6 +133,19 @@ export function getInitialSelectedUserFromURL(): string {
 	return params.get('user')?.trim() || '';
 }
 
+/**
+ * Read the view= query param synchronously so the page can initialize its
+ * view-mode state from the URL on first render. Without this, the state
+ * defaults to 'weekly' and the URL-write effect can normalize a
+ * `?view=monthly` deep-link back to weekly before the read effect applies it
+ * (ADA-448). Defaults to 'weekly' for any missing/invalid value.
+ */
+export function getInitialViewModeFromURL(): ReportsViewMode {
+	if (typeof window === 'undefined') return 'weekly';
+	const params = new URLSearchParams(window.location.search);
+	return params.get('view') === 'monthly' ? 'monthly' : 'weekly';
+}
+
 export function useReportsURLState({
 	viewMode,
 	setViewMode,

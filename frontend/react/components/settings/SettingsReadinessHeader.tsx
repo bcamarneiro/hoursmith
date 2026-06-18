@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useProxyBadge } from '../../hooks/useProxyBadge';
 import type {
 	SettingsSetupModel,
 	SetupStatus,
@@ -6,6 +7,46 @@ import type {
 import { Button } from '../ui/Button';
 import { ProgressBar } from '../ui/ProgressBar';
 import * as styles from './SettingsReadinessHeader.module.css';
+
+/**
+ * ADA-445: when the hosted Premium proxy is the active route, the shared setup
+ * model (buildSettingsSetupModel) still describes traffic as "direct browser
+ * access" because it only inspects `config.corsProxy` — it has no view of the
+ * hosted-proxy bridge. We correct that copy here, at the presentation layer,
+ * without touching the model: direct-access claims are replaced with
+ * "Connected via the Hosted proxy".
+ */
+function applyHostedProxyCopy(model: SettingsSetupModel): SettingsSetupModel {
+	const hostedNote = 'Connected via the Hosted proxy.';
+	const rewriteDetail = (detail: string): string =>
+		/direct browser access/i.test(detail)
+			? detail.replace(
+					/Direct browser access is (?:already )?working[^.]*\.\s*/i,
+					`${hostedNote} `,
+				)
+			: detail;
+
+	return {
+		...model,
+		steps: model.steps.map((step) =>
+			step.id === 'connection'
+				? { ...step, detail: rewriteDetail(step.detail) }
+				: step,
+		),
+		diagnostics: model.diagnostics.map((diag) =>
+			diag.id === 'jira'
+				? { ...diag, detail: rewriteDetail(diag.detail) }
+				: diag,
+		),
+		accessPath: {
+			...model.accessPath,
+			title: 'Connected via the Hosted proxy',
+			summary:
+				'Jira traffic is routed through the Hoursmith hosted proxy. Your token never leaves the browser unencrypted — the proxy just forwards the request to Atlassian.',
+			detail: rewriteDetail(model.accessPath.detail),
+		},
+	};
+}
 
 /**
  * Readiness header — merges the old SetupWizard + DiagnosticsPanel into one
@@ -49,7 +90,7 @@ const statusClassMap: Record<SetupStatus, string> = {
 };
 
 export const SettingsReadinessHeader: React.FC<Props> = ({
-	model,
+	model: rawModel,
 	canRunChecks,
 	checksRunning,
 	lastRunAt,
@@ -60,6 +101,10 @@ export const SettingsReadinessHeader: React.FC<Props> = ({
 	onSelectSection,
 	onRunAvailableChecks,
 }) => {
+	// ADA-445: correct "direct access" copy when the hosted proxy is the live route.
+	const proxyBadge = useProxyBadge();
+	const model =
+		proxyBadge.mode === 'hosted' ? applyHostedProxyCopy(rawModel) : rawModel;
 	return (
 		<section
 			className={styles.header}

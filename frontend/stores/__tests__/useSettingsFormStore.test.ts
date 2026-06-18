@@ -1,5 +1,5 @@
 import { act } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useConfigStore } from '../useConfigStore';
 import { useSettingsFormStore } from '../useSettingsFormStore';
 import { useUIStore } from '../useUIStore';
@@ -122,6 +122,122 @@ describe('useSettingsFormStore', () => {
 		expect(useUIStore.getState().jiraConnectionEvidenceFingerprint).toBe(
 			'jira.example.com::user@example.com::token::',
 		);
+	});
+
+	describe('testJira', () => {
+		afterEach(() => {
+			vi.restoreAllMocks();
+			vi.useRealTimers();
+		});
+
+		it('warns on email mismatch and does not report success (ADA-436)', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: { ...baseConfig, email: 'settings@example.com' },
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						displayName: 'Token User',
+						emailAddress: 'token@example.com',
+					}),
+					{ status: 200 },
+				),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testJira();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.jira.result;
+			expect(result?.success).toBe(false);
+			expect(result?.message).toContain('token@example.com');
+			expect(result?.message).toContain('settings@example.com');
+			expect(
+				useSettingsFormStore.getState().integrationTests.jira.loading,
+			).toBe(false);
+		});
+
+		it('reports success when token email matches settings email (ADA-436)', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: { ...baseConfig, email: 'user@example.com' },
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+				new Response(
+					JSON.stringify({
+						displayName: 'User',
+						emailAddress: 'USER@example.com',
+					}),
+					{ status: 200 },
+				),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testJira();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.jira.result;
+			expect(result?.success).toBe(true);
+			expect(result?.message).toContain('Connected as User');
+		});
+
+		it('aborts and surfaces an actionable timeout message (ADA-444)', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: { ...baseConfig },
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			// Simulate fetch rejecting with an AbortError, as AbortController.abort()
+			// would after the timeout fires.
+			vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+				return new Promise((_resolve, reject) => {
+					const signal = (init as RequestInit | undefined)?.signal;
+					signal?.addEventListener('abort', () => {
+						reject(new DOMException('Aborted', 'AbortError'));
+					});
+				});
+			});
+
+			vi.useFakeTimers();
+			const promise = useSettingsFormStore.getState().testJira();
+			await vi.advanceTimersByTimeAsync(20_000);
+			await promise;
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.jira.result;
+			expect(result?.success).toBe(false);
+			expect(result?.message).toMatch(/within 20s/);
+			expect(result?.message).toMatch(/jira\.example\.com/);
+			expect(
+				useSettingsFormStore.getState().integrationTests.jira.loading,
+			).toBe(false);
+		});
 	});
 
 	it('clears Jira evidence when saving a different connection without a fresh pass', () => {

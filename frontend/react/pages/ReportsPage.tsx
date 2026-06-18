@@ -22,6 +22,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { useReportsTrendData } from '../hooks/useReportsTrendData';
 import {
 	getInitialSelectedUserFromURL,
+	getInitialViewModeFromURL,
 	useReportsURLState,
 } from '../hooks/useReportsURLState';
 import { useTeamData } from '../hooks/useTeamData';
@@ -119,7 +120,10 @@ export const ReportsPage: React.FC = () => {
 		}
 		return null;
 	});
-	const [viewMode, setViewMode] = useState<ViewMode>('weekly');
+	// Seed view mode from ?view= synchronously so a /reports?view=monthly
+	// deep-link isn't normalized back to weekly by the URL-write effect on the
+	// first render (ADA-448).
+	const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewModeFromURL);
 	const [sortField, setSortField] = useState<SortField>('name');
 	const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 	const [searchQuery, setSearchQuery] = useState('');
