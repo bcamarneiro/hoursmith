@@ -58,10 +58,21 @@ export interface SupabaseLikeClient {
 	/** Verify a JWT and return the user id, or `null` if invalid/expired. */
 	getUserIdFromToken(token: string): Promise<string | null>;
 	/** Read the subscriptions row for `user_id`, or `null` if none. */
-	getSubscription(
-		userId: string,
-	): Promise<{ tier: SubscriptionTier; status: SubscriptionStatus } | null>;
+	getSubscription(userId: string): Promise<{
+		tier: SubscriptionTier;
+		status: SubscriptionStatus;
+		current_period_end: string | null;
+	} | null>;
 }
+
+/**
+ * Grace window (ADA-454) added to `current_period_end` before access is cut.
+ * Matches the dunning intent of `isEntitledStatus` (Polar keeps retrying a
+ * failed renewal and only later emits `subscription.revoked`): a row whose
+ * period elapsed very recently is still honoured so a slightly-late renewal
+ * webhook doesn't flap a paying user offline. 2 days, in milliseconds.
+ */
+const ENTITLEMENT_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
 
 export interface GetEntitlementOptions {
 	/** Inject a client (tests). Defaults to the env-driven fetch client. */
@@ -113,7 +124,11 @@ export async function getEntitlement(
 	}
 
 	const subscription = await client.getSubscription(userId);
-	if (!subscription || !isEntitledStatus(subscription.status)) {
+	if (
+		!subscription ||
+		!isEntitledStatus(subscription.status) ||
+		!isWithinPeriod(subscription.current_period_end)
+	) {
 		return {
 			ok: false,
 			status: 403,
@@ -141,6 +156,21 @@ export async function getEntitlement(
  */
 function isEntitledStatus(status: SubscriptionStatus): boolean {
 	return status === 'active' || status === 'trialing' || status === 'past_due';
+}
+
+/**
+ * Period-expiry guard (ADA-454). A `current_period_end` of `null` means the
+ * row carries no expiry (e.g. an open-ended/free-of-expiry grant) and is
+ * honoured. Otherwise access is granted only until `current_period_end` plus a
+ * small grace window — so a stale `active`/`past_due` row whose period elapsed
+ * long ago (e.g. a renewal webhook never landed) no longer grants proxy access.
+ * Unparseable timestamps fail closed.
+ */
+function isWithinPeriod(currentPeriodEnd: string | null): boolean {
+	if (currentPeriodEnd == null) return true;
+	const end = Date.parse(currentPeriodEnd);
+	if (Number.isNaN(end)) return false;
+	return Date.now() < end + ENTITLEMENT_GRACE_MS;
 }
 
 function extractBearer(header: string | null): string | null {
@@ -192,13 +222,16 @@ class FetchSupabaseClient implements SupabaseLikeClient {
 		});
 	}
 
-	async getSubscription(
-		userId: string,
-	): Promise<{ tier: SubscriptionTier; status: SubscriptionStatus } | null> {
-		// PostgREST: SELECT tier, status FROM subscriptions WHERE user_id = ?
+	async getSubscription(userId: string): Promise<{
+		tier: SubscriptionTier;
+		status: SubscriptionStatus;
+		current_period_end: string | null;
+	} | null> {
+		// PostgREST: SELECT tier, status, current_period_end FROM subscriptions
+		// WHERE user_id = ? (current_period_end drives the expiry check, ADA-454).
 		const params = new URLSearchParams({
 			user_id: `eq.${userId}`,
-			select: 'tier,status',
+			select: 'tier,status,current_period_end',
 		});
 		const res = await fetch(
 			`${this.url}/rest/v1/subscriptions?${params.toString()}`,
@@ -214,6 +247,7 @@ class FetchSupabaseClient implements SupabaseLikeClient {
 		const rows = (await res.json()) as Array<{
 			tier: SubscriptionTier;
 			status: SubscriptionStatus;
+			current_period_end: string | null;
 		}>;
 		return rows[0] ?? null;
 	}

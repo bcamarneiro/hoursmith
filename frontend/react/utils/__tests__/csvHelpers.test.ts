@@ -27,6 +27,27 @@ describe('csvEscape', () => {
 	it('does not quote plain values', () => {
 		expect(csvEscape('Alex')).toBe('Alex');
 	});
+
+	describe('formula injection (ADA-460)', () => {
+		it('neutralises a leading = with a single quote', () => {
+			expect(csvEscape('=cmd')).toBe("'=cmd");
+		});
+
+		it('neutralises a leading = and still quotes when delimiters present', () => {
+			expect(csvEscape('=1+2;3')).toBe(`"'=1+2;3"`);
+		});
+
+		it('neutralises leading +, -, and @', () => {
+			expect(csvEscape('+1')).toBe("'+1");
+			expect(csvEscape('-1')).toBe("'-1");
+			expect(csvEscape('@SUM(A1)')).toBe("'@SUM(A1)");
+		});
+
+		it('does not touch values where the trigger is not the first char', () => {
+			expect(csvEscape('a=b')).toBe('a=b');
+			expect(csvEscape('user@example.com')).toBe('user@example.com');
+		});
+	});
 });
 
 describe('buildProvenanceFooter', () => {

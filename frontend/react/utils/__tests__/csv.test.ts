@@ -240,6 +240,23 @@ describe('buildTimesheetCsv', () => {
 		);
 	});
 
+	it('neutralises formula injection in the ticket key cell (ADA-460)', () => {
+		const result = buildTimesheetCsv({
+			worklogs: [
+				entry({
+					issue: { ...mockIssue, key: '=HYPERLINK("evil")' },
+				}),
+			],
+			issueSummaries: {},
+			policy: 'logged',
+			period: { year: 2025, month: 0 },
+			provenance: PROVENANCE,
+		}).split('\n');
+
+		// Leading `=` neutralised with `'`; the `(`,`"` force CSV quoting.
+		expect(result[1]).toContain(`"'=HYPERLINK(""evil"")"`);
+	});
+
 	it('uses ISO dates only', () => {
 		const result = buildTimesheetCsv({
 			worklogs: [entry({})],

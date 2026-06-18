@@ -43,6 +43,12 @@ function makeSupabase(
 const accept = async () => true;
 const SECRET = 'whsec_test';
 
+// Product ids the webhook must recognise (ADA-453). Mirrors the checkout env.
+const PRODUCT_ENV = {
+	POLAR_PRODUCT_HOSTED: 'prod_hosted',
+	POLAR_PRODUCT_LEAD: 'prod_lead',
+};
+
 function event(type: string, data: Record<string, unknown>): string {
 	return JSON.stringify({ type, data });
 }
@@ -50,6 +56,7 @@ function event(type: string, data: Record<string, unknown>): string {
 const ACTIVE = {
 	id: 'sub_1',
 	status: 'active',
+	product_id: 'prod_hosted',
 	current_period_end: '2027-05-18T00:00:00Z',
 	customer_id: 'cus_1',
 	customer: { external_id: 'user-123' },
@@ -125,6 +132,7 @@ describe('handlePolarWebhook', () => {
 				supabase,
 				verify: accept,
 				secret: SECRET,
+				env: PRODUCT_ENV,
 			},
 		);
 		expect(res.status).toBe(200);
@@ -167,7 +175,7 @@ describe('handlePolarWebhook', () => {
 					cancel_at_period_end: true,
 				}),
 			),
-			{ supabase, verify: accept, secret: SECRET },
+			{ supabase, verify: accept, secret: SECRET, env: PRODUCT_ENV },
 		);
 		expect(supabase.upsertSubscription).toHaveBeenCalledWith(
 			expect.objectContaining({ tier: 'premium', status: 'active' }),
@@ -185,10 +193,11 @@ describe('handlePolarWebhook', () => {
 				event('subscription.active', {
 					id: 'sub_2',
 					status: 'active',
+					product_id: 'prod_lead',
 					customer_id: 'cus_9',
 				}),
 			),
-			{ supabase, verify: accept, secret: SECRET },
+			{ supabase, verify: accept, secret: SECRET, env: PRODUCT_ENV },
 		);
 		expect(supabase.upsertSubscription).toHaveBeenCalledWith(
 			expect.objectContaining({ user_id: 'user-from-db' }),
@@ -217,7 +226,7 @@ describe('handlePolarWebhook', () => {
 			makeRequest(event('subscription.active', ACTIVE), 'POST', {
 				'webhook-id': 'evt_111',
 			}),
-			{ supabase, verify: accept, secret: SECRET },
+			{ supabase, verify: accept, secret: SECRET, env: PRODUCT_ENV },
 		);
 		expect(res.status).toBe(200);
 		expect(supabase.recordBillingEvent).toHaveBeenCalledWith('evt_111');
@@ -236,6 +245,43 @@ describe('handlePolarWebhook', () => {
 		);
 		expect(res.status).toBe(200);
 		expect(supabase.recordBillingEvent).toHaveBeenCalledWith('evt_dup');
+		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('rejects a delivery with no webhook-id (ADA-455)', async () => {
+		const supabase = makeSupabase();
+		// Build a request WITHOUT the default webhook-id header.
+		const req = new Request('https://hoursmith.io/api/polar/webhook', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: event('subscription.active', ACTIVE),
+		});
+		const res = await handlePolarWebhook(req, {
+			supabase,
+			verify: accept,
+			secret: SECRET,
+			env: PRODUCT_ENV,
+		});
+		expect(res.status).toBe(400);
+		expect(supabase.recordBillingEvent).not.toHaveBeenCalled();
+		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('treats production with POLAR_SERVER unset as wrong environment (ADA-455)', async () => {
+		const supabase = makeSupabase();
+		const res = await handlePolarWebhook(
+			makeRequest(event('subscription.active', ACTIVE)),
+			{
+				supabase,
+				verify: accept,
+				secret: SECRET,
+				// POLAR_SERVER unset ⇒ defaultPolarConfig resolves to sandbox, so a
+				// prod deploy is cross-wired and the event must be ignored.
+				env: { VERCEL_ENV: 'production', ...PRODUCT_ENV },
+			},
+		);
+		expect(res.status).toBe(200);
+		expect(supabase.recordBillingEvent).not.toHaveBeenCalled();
 		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
 	});
 
@@ -263,10 +309,60 @@ describe('handlePolarWebhook', () => {
 				supabase,
 				verify: accept,
 				secret: SECRET,
-				env: { VERCEL_ENV: 'production', POLAR_SERVER: 'production' },
+				env: {
+					VERCEL_ENV: 'production',
+					POLAR_SERVER: 'production',
+					...PRODUCT_ENV,
+				},
 			},
 		);
 		expect(supabase.upsertSubscription).toHaveBeenCalled();
+	});
+
+	it('does not grant premium for an unrecognised product_id (ADA-453)', async () => {
+		const supabase = makeSupabase();
+		const res = await handlePolarWebhook(
+			makeRequest(
+				event('subscription.active', { ...ACTIVE, product_id: 'prod_other' }),
+			),
+			{ supabase, verify: accept, secret: SECRET, env: PRODUCT_ENV },
+		);
+		expect(res.status).toBe(200);
+		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('does not grant premium when product_id is absent (ADA-453)', async () => {
+		const supabase = makeSupabase();
+		const { product_id: _omit, ...noProduct } = ACTIVE;
+		const res = await handlePolarWebhook(
+			makeRequest(event('subscription.active', noProduct)),
+			{ supabase, verify: accept, secret: SECRET, env: PRODUCT_ENV },
+		);
+		expect(res.status).toBe(200);
+		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('does not grant premium when product env is unconfigured (fails closed, ADA-453)', async () => {
+		const supabase = makeSupabase();
+		const res = await handlePolarWebhook(
+			makeRequest(event('subscription.active', ACTIVE)),
+			{ supabase, verify: accept, secret: SECRET, env: {} },
+		);
+		expect(res.status).toBe(200);
+		expect(supabase.upsertSubscription).not.toHaveBeenCalled();
+	});
+
+	it('still downgrades on revoke regardless of product_id (ADA-453)', async () => {
+		const supabase = makeSupabase();
+		await handlePolarWebhook(
+			makeRequest(
+				event('subscription.revoked', { ...ACTIVE, product_id: 'prod_other' }),
+			),
+			{ supabase, verify: accept, secret: SECRET, env: PRODUCT_ENV },
+		);
+		expect(supabase.upsertSubscription).toHaveBeenCalledWith(
+			expect.objectContaining({ tier: 'free', status: 'canceled' }),
+		);
 	});
 
 	it('ignores a stale event (older than the stored row)', async () => {

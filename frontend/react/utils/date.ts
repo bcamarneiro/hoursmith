@@ -1,3 +1,30 @@
+/**
+ * Days of the week (0 = Sunday … 6 = Saturday) treated as non-working days.
+ *
+ * Single source of truth for the weekend definition (ADA-464). All weekend
+ * checks across the app route through {@link isWeekend} / {@link isWeekendDay}
+ * so a future "configurable workweek" change (ADA-392) only needs one edit.
+ * Defaults to Saturday + Sunday, preserving the previous hardcoded behaviour.
+ */
+export const WEEKEND_DAYS: ReadonlySet<number> = new Set([0, 6]);
+
+/**
+ * True when the given JS weekday index (0 = Sunday … 6 = Saturday) is a
+ * weekend day. Prefer {@link isWeekend} when you have a `YYYY-MM-DD` string.
+ */
+export function isWeekendDay(dayOfWeek: number): boolean {
+	return WEEKEND_DAYS.has(dayOfWeek);
+}
+
+/**
+ * True when the given `YYYY-MM-DD` date string falls on a weekend. Parses the
+ * date in local time (via {@link parseIsoDateLocal}) so the weekday is read
+ * from the wall-clock date, not a UTC-shifted one.
+ */
+export function isWeekend(dateStr: string): boolean {
+	return isWeekendDay(parseIsoDateLocal(dateStr).getDay());
+}
+
 export function getMonthStartWeekday(
 	year: number,
 	monthZeroIndexed: number,
@@ -48,7 +75,7 @@ export function getWorkingDaysInMonth(
 	let count = 0;
 	for (let d = 1; d <= numDays; d++) {
 		const day = new Date(Date.UTC(year, monthZeroIndexed, d)).getUTCDay();
-		if (day !== 0 && day !== 6) count++;
+		if (!isWeekendDay(day)) count++;
 	}
 	return count;
 }
@@ -66,7 +93,7 @@ export function getWorkdayDatesInMonth(
 	const dates: string[] = [];
 	for (let d = 1; d <= numDays; d++) {
 		const day = new Date(Date.UTC(year, monthZeroIndexed, d)).getUTCDay();
-		if (day !== 0 && day !== 6) {
+		if (!isWeekendDay(day)) {
 			dates.push(isoDateFromYMD(year, monthZeroIndexed, d));
 		}
 	}
@@ -156,6 +183,24 @@ export function getMondayOfWeek(date: Date): string {
 	const diff = d.getDate() - day + (day === 0 ? -6 : 1);
 	d.setDate(diff);
 	return toLocalDateString(d);
+}
+
+/**
+ * The calendar month a Monday-anchored week "belongs" to.
+ *
+ * When a week straddles a month boundary, attributing the week to its Monday
+ * (which may still sit in the previous month) makes a month view show the wrong
+ * month (ADA-457/463). We follow the ISO-8601 rule and anchor on the week's
+ * Thursday (Monday + 3 days) — the week belongs to whichever month contains the
+ * majority of its days. Returns `{ year, month }` with a zero-indexed month.
+ */
+export function getWeekMonthAnchor(weekStartIso: string): {
+	year: number;
+	month: number;
+} {
+	const thursdayIso = addDaysToIsoDate(weekStartIso, 3);
+	const anchor = parseIsoDateLocal(thursdayIso);
+	return { year: anchor.getFullYear(), month: anchor.getMonth() };
 }
 
 export function formatDateTimeLocalValue(date: Date): string {

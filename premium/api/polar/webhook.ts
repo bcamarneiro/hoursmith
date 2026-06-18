@@ -47,6 +47,7 @@ type Outcome =
 	| 'ignored_stale_event'
 	| 'ignored_duplicate_event'
 	| 'ignored_wrong_environment'
+	| 'ignored_unknown_product'
 	| 'missing_signature'
 	| 'invalid_signature'
 	| 'invalid_payload'
@@ -58,6 +59,7 @@ type Outcome =
 interface PolarSubscriptionData {
 	id: string;
 	status: string;
+	product_id?: string | null;
 	current_period_end?: string | null;
 	modified_at?: string | null;
 	customer_id?: string;
@@ -85,20 +87,26 @@ export interface PolarWebhookDeps {
 }
 
 /**
- * Environment guard (ADA-308). Polar's payload doesn't reliably expose the
- * event environment, so we assert the deployment's configured `POLAR_SERVER`
- * matches the deployment mode: a production deployment must talk to Polar
- * production. A mismatch means a sandbox⇄prod cross-wire — we ignore the event
- * rather than mutate live subscription state from the wrong environment.
+ * Environment guard (ADA-308, hardened ADA-455). Polar's payload doesn't
+ * reliably expose the event environment, so we assert the deployment's
+ * effective Polar server matches the deployment mode: a production deployment
+ * must talk to Polar production.
+ *
+ * Critically, this must agree with `defaultPolarConfig`, where an UNSET
+ * `POLAR_SERVER` resolves to **sandbox**. A previous version only flagged a
+ * mismatch when `POLAR_SERVER` was explicitly set to a non-production value,
+ * so a prod deploy that simply forgot to set `POLAR_SERVER` was silently
+ * treated as "right environment" while the REST client pointed at sandbox —
+ * processing events (and dropping legit revokes) against the wrong org. We now
+ * treat unset as sandbox too: in production, anything other than an explicit
+ * `production` is a cross-wire and the event is ignored.
  */
 export function isWrongEnvironment(
 	env: Partial<Record<string, string | undefined>>,
 ): boolean {
-	return (
-		env.VERCEL_ENV === 'production' &&
-		!!env.POLAR_SERVER &&
-		env.POLAR_SERVER !== 'production'
-	);
+	if (env.VERCEL_ENV !== 'production') return false;
+	const effectiveServer = env.POLAR_SERVER ?? 'sandbox';
+	return effectiveServer !== 'production';
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -193,24 +201,36 @@ export async function handlePolarWebhook(
 		return jsonResponse(200, { received: true });
 	}
 
+	// Idempotency guard (ADA-308, hardened ADA-455): the Standard Webhooks
+	// `webhook-id` is the per-delivery dedup key. Reject a delivery with no
+	// `webhook-id` rather than silently skipping dedup — without it we cannot
+	// detect a replay, so a missing header is treated as malformed (400).
+	// (verifyPolarWebhook already requires this header; this is defence-in-depth
+	// in case a future verifier is injected that doesn't.)
+	const webhookId = request.headers.get('webhook-id');
+	if (!webhookId) {
+		logWebhook({
+			eventType: event.type,
+			userId: null,
+			outcome: 'invalid_payload',
+			status: 400,
+			note: 'missing_webhook_id',
+		});
+		return jsonResponse(400, { error: 'invalid_payload' });
+	}
+
 	try {
-		// Idempotency guard (ADA-308): the Standard Webhooks `webhook-id` is the
-		// per-delivery key. A duplicate delivery is short-circuited so we don't
-		// re-run the upsert. (verifyPolarWebhook already required this header.)
-		const webhookId = request.headers.get('webhook-id');
-		if (webhookId) {
-			const isNew = await supabase.recordBillingEvent(webhookId);
-			if (!isNew) {
-				logWebhook({
-					eventType: event.type,
-					userId: null,
-					outcome: 'ignored_duplicate_event',
-					status: 200,
-				});
-				return jsonResponse(200, { received: true });
-			}
+		const isNew = await supabase.recordBillingEvent(webhookId);
+		if (!isNew) {
+			logWebhook({
+				eventType: event.type,
+				userId: null,
+				outcome: 'ignored_duplicate_event',
+				status: 200,
+			});
+			return jsonResponse(200, { received: true });
 		}
-		return await handleSubscription(event, supabase);
+		return await handleSubscription(event, supabase, env);
 	} catch (err) {
 		logWebhook({
 			eventType: event.type,
@@ -227,6 +247,7 @@ export async function handlePolarWebhook(
 async function handleSubscription(
 	event: PolarEvent,
 	supabase: SupabaseAdminClient,
+	env: Partial<Record<string, string | undefined>>,
 ): Promise<Response> {
 	const data = event.data;
 	const userId = await resolveUserId(data, supabase);
@@ -235,6 +256,23 @@ async function handleSubscription(
 			eventType: event.type,
 			userId: null,
 			outcome: 'missing_user_id',
+			status: 200,
+		});
+		return jsonResponse(200, { received: true });
+	}
+
+	const revoked = event.type === 'subscription.revoked';
+
+	// Product validation (ADA-453): a non-revoked event may only grant premium
+	// for a product we actually sell. Polar can deliver subscriptions for other
+	// products in the same org (or a spoofed/legacy payload); granting premium
+	// off an unrecognised product_id is privilege escalation. Revokes are exempt
+	// — downgrading to free is always safe regardless of product.
+	if (!revoked && !isKnownProduct(data.product_id, env)) {
+		logWebhook({
+			eventType: event.type,
+			userId,
+			outcome: 'ignored_unknown_product',
 			status: 200,
 		});
 		return jsonResponse(200, { received: true });
@@ -258,7 +296,6 @@ async function handleSubscription(
 	}
 
 	const customerId = data.customer_id ?? '';
-	const revoked = event.type === 'subscription.revoked';
 	const upsert: SubscriptionUpsert = revoked
 		? {
 				user_id: userId,
@@ -309,6 +346,23 @@ async function resolveUserId(
 		return existing?.user_id ?? null;
 	}
 	return null;
+}
+
+/**
+ * Is `product_id` one of the products we actually sell (ADA-453)? Reads the
+ * same env vars the checkout flow uses (`POLAR_PRODUCT_HOSTED`,
+ * `POLAR_PRODUCT_LEAD`). An unset env var is never a match, so a misconfigured
+ * deploy fails closed (no premium granted) rather than open.
+ */
+function isKnownProduct(
+	productId: string | null | undefined,
+	env: Partial<Record<string, string | undefined>>,
+): boolean {
+	if (!productId) return false;
+	const known = [env.POLAR_PRODUCT_HOSTED, env.POLAR_PRODUCT_LEAD].filter(
+		(id): id is string => typeof id === 'string' && id.length > 0,
+	);
+	return known.includes(productId);
 }
 
 /** Clamp Polar's subscription status onto the values our DB CHECK accepts. */

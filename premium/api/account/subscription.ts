@@ -61,11 +61,12 @@ export async function handleSubscription(
 	try {
 		admin = deps.admin ?? defaultSupabaseAdmin();
 	} catch (err) {
-		logEvent({ userId: null, status: 500, note: 'server_misconfigured' });
-		return jsonResponse(500, {
-			error: 'server_misconfigured',
-			detail: (err as Error).message,
+		logEvent({
+			userId: null,
+			status: 500,
+			note: `server_misconfigured:${(err as Error).message}`,
 		});
+		return jsonResponse(500, { error: 'server_misconfigured' });
 	}
 
 	const verifyJwt =
@@ -80,11 +81,12 @@ export async function handleSubscription(
 	try {
 		row = await admin.getSubscription(userId);
 	} catch (err) {
-		logEvent({ userId, status: 500, note: 'supabase_read_failed' });
-		return jsonResponse(500, {
-			error: 'subscription_read_failed',
-			detail: (err as Error).message,
+		logEvent({
+			userId,
+			status: 500,
+			note: `supabase_read_failed:${(err as Error).message}`,
 		});
+		return jsonResponse(500, { error: 'subscription_read_failed' });
 	}
 
 	logEvent({ userId, status: 200 });

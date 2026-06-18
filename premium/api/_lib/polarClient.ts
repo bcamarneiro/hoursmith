@@ -226,6 +226,20 @@ function candidateKeyBytes(secret: string): Uint8Array<ArrayBuffer>[] {
 	return out;
 }
 
+/** Default replay-protection window for `webhook-timestamp` (Standard Webhooks). */
+const WEBHOOK_TIMESTAMP_TOLERANCE_SEC = 5 * 60;
+
+export interface VerifyPolarWebhookOptions {
+	/** Current time in ms (tests). Defaults to `Date.now()`. */
+	now?: number;
+	/**
+	 * Allowed clock skew, in seconds, between `webhook-timestamp` and now.
+	 * Defaults to 5 minutes. Deliveries outside the window are rejected as
+	 * potential replays (ADA-455).
+	 */
+	toleranceSec?: number;
+}
+
 /**
  * Verify a Polar webhook using the Standard Webhooks scheme.
  *
@@ -234,17 +248,30 @@ function candidateKeyBytes(secret: string): Uint8Array<ArrayBuffer>[] {
  * against each `v1,<sig>` entry in the header. Tries every plausible key
  * derivation for the secret. NEVER throws — returns `false` on any missing
  * header, decode error, or mismatch, so the caller maps `false` → 400.
+ *
+ * Replay protection (ADA-455): the `webhook-timestamp` must be within
+ * `toleranceSec` (default 5min) of now, so a captured-but-old signed delivery
+ * can't be replayed long after the fact.
  */
 export async function verifyPolarWebhook(
 	rawBody: string,
 	headers: Headers,
 	secret: string,
+	options: VerifyPolarWebhookOptions = {},
 ): Promise<boolean> {
 	try {
 		const id = headers.get('webhook-id');
 		const timestamp = headers.get('webhook-timestamp');
 		const signatureHeader = headers.get('webhook-signature');
 		if (!id || !timestamp || !signatureHeader) return false;
+
+		// Timestamp freshness (ADA-455). Reject non-numeric or stale/future
+		// timestamps before doing any HMAC work.
+		const tsSec = Number(timestamp);
+		if (!Number.isFinite(tsSec)) return false;
+		const nowSec = (options.now ?? Date.now()) / 1000;
+		const tolerance = options.toleranceSec ?? WEBHOOK_TIMESTAMP_TOLERANCE_SEC;
+		if (Math.abs(nowSec - tsSec) > tolerance) return false;
 
 		const signedContent = utf8ToBytes(`${id}.${timestamp}.${rawBody}`);
 		const provided = signatureHeader.split(' ').map((entry) => {

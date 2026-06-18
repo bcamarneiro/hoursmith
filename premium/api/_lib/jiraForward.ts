@@ -158,14 +158,16 @@ export async function forwardToJira(
 			...(hasBody ? ({ duplex: 'half' } as Record<string, unknown>) : {}),
 		});
 	} catch (err) {
-		return jsonError(
-			502,
-			{
-				error: 'upstream_error',
-				detail: (err as Error).message,
-			},
-			origin,
-		);
+		// Info-disclosure hardening (ADA-459): never echo the raw upstream error
+		// (it can leak internal hostnames, IPs, or stack detail). Log it
+		// server-side; return a generic code to the client.
+		logForwardError(err, target.host);
+		// Map an aborted/timed-out upstream to a 504 so the declared
+		// `upstream_timeout` code is actually produced (ADA-459).
+		if (isAbortOrTimeout(err)) {
+			return jsonError(504, { error: 'upstream_timeout' }, origin);
+		}
+		return jsonError(502, { error: 'upstream_error' }, origin);
 	}
 
 	// Strip CORS + hop-by-hop headers from upstream; add our own CORS.
@@ -203,6 +205,42 @@ function buildOutboundHeaders(
 	// Atlassian's CSRF prevention header — harmless for endpoints that don't need it.
 	out.set('x-atlassian-token', 'no-check');
 	return out;
+}
+
+/**
+ * Classify a `fetch` rejection as an abort/timeout (ADA-459). Covers the
+ * standard `AbortError` (DOMException name) and undici's `TimeoutError` /
+ * `UND_ERR_*` codes so an aborted or timed-out upstream maps to a 504.
+ */
+function isAbortOrTimeout(err: unknown): boolean {
+	if (typeof err !== 'object' || err === null) return false;
+	const name = (err as { name?: unknown }).name;
+	const code = (err as { code?: unknown }).code;
+	const causeCode = (err as { cause?: { code?: unknown } }).cause?.code;
+	return (
+		name === 'AbortError' ||
+		name === 'TimeoutError' ||
+		code === 'ABORT_ERR' ||
+		code === 'UND_ERR_CONNECT_TIMEOUT' ||
+		code === 'UND_ERR_HEADERS_TIMEOUT' ||
+		code === 'UND_ERR_BODY_TIMEOUT' ||
+		causeCode === 'UND_ERR_CONNECT_TIMEOUT' ||
+		causeCode === 'UND_ERR_HEADERS_TIMEOUT' ||
+		causeCode === 'UND_ERR_BODY_TIMEOUT'
+	);
+}
+
+/** Log an upstream forward failure server-side only (no client disclosure). */
+function logForwardError(err: unknown, targetHost: string): void {
+	console.log(
+		JSON.stringify({
+			ts: new Date().toISOString(),
+			svc: 'hoursmith-jira-proxy',
+			event: 'upstream_error',
+			target_host: targetHost,
+			error: (err as Error)?.message ?? String(err),
+		}),
+	);
 }
 
 function jsonError(

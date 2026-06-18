@@ -128,6 +128,36 @@ describe('classifyWorklog', () => {
 		expect(result.isBackdated).toBe(false);
 	});
 
+	it('does not flag a same-evening log in a negative-offset TZ crossing a month boundary (ADA-457/463)', () => {
+		// Author in -0300 logs at 23:30 on Oct 31 (their wall clock). Jira stores
+		// `created` shortly after but serialises it in UTC: 2025-11-01T02:35:00Z.
+		// Slicing created's own prefix gives 2025-11-01 (UTC day) vs started day
+		// 2025-10-31 — a spurious cross-month "jira-native" backdate. Re-basing
+		// created onto started's -0300 frame yields 2025-10-31 for both.
+		const result = classifyWorklog({
+			started: '2025-10-31T23:30:00.000-0300',
+			created: '2025-11-01T02:35:00.000Z',
+		});
+
+		expect(result.source).toBe('none');
+		expect(result.isBackdated).toBe(false);
+		expect(result.loggedOn).toBe('2025-10-31');
+		expect(result.intendedFor).toBe('2025-10-31');
+	});
+
+	it('still flags a genuine cross-month backdate when offsets are accounted for', () => {
+		// started Sep 28 (-0300 wall clock), created Oct 2 — a real late entry.
+		const result = classifyWorklog({
+			started: '2025-09-28T10:00:00.000-0300',
+			created: '2025-10-02T10:00:00.000-0300',
+		});
+
+		expect(result.source).toBe('jira-native');
+		expect(result.isBackdated).toBe(true);
+		expect(result.intendedFor).toBe('2025-09-28');
+		expect(result.loggedOn).toBe('2025-10-02');
+	});
+
 	it('accepts custom comment patterns', () => {
 		const result = classifyWorklog(
 			{

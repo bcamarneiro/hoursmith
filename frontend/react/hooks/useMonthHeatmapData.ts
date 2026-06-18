@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { EnrichedJiraWorklog } from '../../../types/jira';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
-import { parseIsoDateLocal } from '../utils/date';
+import { getWeekMonthAnchor } from '../utils/date';
 import { classifyWorklog } from '../utils/worklogClassifier';
 import { useMonthWorklogs } from './useMonthWorklogs';
 
@@ -61,9 +61,10 @@ export function useMonthHeatmapData(): MonthHeatmapResult {
 	const weekStart = useDashboardStore((s) => s.weekStart);
 	const email = useConfigStore((s) => s.config.email);
 	const jqlFilter = useConfigStore((s) => s.config.jqlFilter);
-	const weekStartDate = parseIsoDateLocal(weekStart);
-	const month = weekStartDate.getMonth();
-	const year = weekStartDate.getFullYear();
+	// Anchor the heatmap month on the week's "majority" month (its Thursday),
+	// not the Monday — otherwise a week straddling a month boundary whose
+	// Monday is still in the previous month shows the wrong month (ADA-457/463).
+	const { year, month } = getWeekMonthAnchor(weekStart);
 
 	const { data: worklogs, isLoading } = useMonthWorklogs(year, month, {
 		jqlFilter: jqlFilter?.trim() || undefined,

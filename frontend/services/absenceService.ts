@@ -1,4 +1,5 @@
 import type { AbsenceKind } from '../../types/absence';
+import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
 import type { AbsenceAssignment, CalendarFeed } from '../stores/useConfigStore';
 import { fromHttpResponse } from './serviceErrors';
@@ -81,13 +82,6 @@ function parseIcsDate(value: string): string | null {
 	return null;
 }
 
-function toLocalDateStr(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const day = String(date.getDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
-}
-
 function parseRRule(rrule: string): Record<string, string> {
 	const result: Record<string, string> = {};
 	for (const part of rrule.split(';')) {
@@ -98,6 +92,16 @@ function parseRRule(rrule: string): Record<string, string> {
 	}
 	return result;
 }
+
+const ICS_DAY_MAP: Record<string, number> = {
+	SU: 0,
+	MO: 1,
+	TU: 2,
+	WE: 3,
+	TH: 4,
+	FR: 5,
+	SA: 6,
+};
 
 function parseAbsenceEvents(text: string): AbsenceEvent[] {
 	const lines = unfoldLines(text);
@@ -203,7 +207,7 @@ function expandAbsenceDates(
 		const endDate = new Date(`${effectiveEnd}T00:00:00`);
 
 		while (cursor < endDate) {
-			const iso = toLocalDateStr(cursor);
+			const iso = toLocalDateString(cursor);
 			if (iso >= rangeStart && iso <= rangeEnd && !exdateSet.has(iso)) {
 				// Weekends are kept too — they have a zero target so they
 				// don't change compliance %, but they remain visible on the
@@ -221,10 +225,33 @@ function expandAbsenceDates(
 	const interval = Number.parseInt(rule.INTERVAL || '1', 10);
 	const count = rule.COUNT ? Number.parseInt(rule.COUNT, 10) : undefined;
 
-	let until: Date | null = null;
+	// Per-occurrence span in days. ICS all-day DTEND is exclusive, so a single
+	// day has DTEND = DTSTART + 1 → span 1. Multi-day vacations carry their full
+	// duration into every recurrence (ADA-462a).
+	let spanDays = 1;
+	if (endIso) {
+		const startMs = new Date(`${startIso}T00:00:00`).getTime();
+		const endMs = new Date(`${endIso}T00:00:00`).getTime();
+		const diff = Math.round((endMs - startMs) / 86400000);
+		if (diff >= 1) spanDays = diff;
+	}
+
+	// UNTIL: reduce to a local calendar day so the comparison stays local↔local
+	// regardless of whether the ICS UNTIL was a UTC DATE-TIME (…Z) or a DATE
+	// (ADA-462c). The final occurrence is inclusive of the UNTIL day.
+	let untilIso: string | null = null;
 	if (rule.UNTIL) {
-		const parsed = parseIcsDate(rule.UNTIL);
-		if (parsed) until = new Date(`${parsed}T23:59:59`);
+		untilIso = parseIcsDate(rule.UNTIL);
+	}
+
+	// Parse BYDAY (e.g. "MO,WE,FR") for WEEKLY expansion (ADA-462b).
+	const byDay: number[] = [];
+	if (rule.BYDAY) {
+		for (const dayStr of rule.BYDAY.split(',')) {
+			const cleaned = dayStr.trim().replace(/^-?\d+/, '');
+			const dayNum = ICS_DAY_MAP[cleaned];
+			if (dayNum !== undefined) byDay.push(dayNum);
+		}
 	}
 
 	const rangeStartDate = new Date(`${rangeStart}T00:00:00`);
@@ -236,48 +263,83 @@ function expandAbsenceDates(
 	let generated = 0;
 	const maxOccurrences = count || 500;
 
-	const addIfInRange = (d: Date) => {
-		const iso = toLocalDateStr(d);
-		if (d >= rangeStartDate && d <= rangeEndDate && !exdateSet.has(iso)) {
-			// Weekends kept (see expansion of non-recurring events above).
-			results.push({ date: iso, summary: event.summary });
+	// Emit each day of an occurrence's [start, start+spanDays) range that falls
+	// inside the requested window. `occStart` is the occurrence's first day.
+	const addOccurrenceSpan = (occStart: Date) => {
+		const dayCursor = new Date(occStart);
+		for (let i = 0; i < spanDays; i++) {
+			const iso = toLocalDateString(dayCursor);
+			if (
+				dayCursor >= rangeStartDate &&
+				dayCursor <= rangeEndDate &&
+				!exdateSet.has(iso)
+			) {
+				// Weekends kept (see expansion of non-recurring events above).
+				results.push({ date: iso, summary: event.summary });
+			}
+			dayCursor.setDate(dayCursor.getDate() + 1);
 		}
 	};
+
+	// An occurrence counts (against COUNT/UNTIL) by its start day; spanning is
+	// applied afterwards. `pastUntil` checks the occurrence start day against the
+	// UNTIL day, both as local calendar dates.
+	const pastUntil = (occStart: Date) =>
+		untilIso !== null && toLocalDateString(occStart) > untilIso;
 
 	if (freq === 'YEARLY') {
 		const cursor = new Date(originDate);
 		while (cursor <= rangeEndDate && cursor <= hardLimit) {
-			if (until && cursor > until) break;
+			if (pastUntil(cursor)) break;
 			if (generated >= maxOccurrences) break;
 			generated++;
-			addIfInRange(cursor);
+			addOccurrenceSpan(cursor);
 			cursor.setFullYear(cursor.getFullYear() + interval);
 		}
 	} else if (freq === 'MONTHLY') {
 		const cursor = new Date(originDate);
 		while (cursor <= rangeEndDate && cursor <= hardLimit) {
-			if (until && cursor > until) break;
+			if (pastUntil(cursor)) break;
 			if (generated >= maxOccurrences) break;
 			generated++;
-			addIfInRange(cursor);
+			addOccurrenceSpan(cursor);
 			cursor.setMonth(cursor.getMonth() + interval);
 		}
 	} else if (freq === 'WEEKLY') {
-		const cursor = new Date(originDate);
-		while (cursor <= rangeEndDate && cursor <= hardLimit) {
-			if (until && cursor > until) break;
+		// Honor BYDAY: emit each listed weekday within each `interval`-week block.
+		// Without BYDAY, fall back to the origin weekday.
+		const effectiveDays = byDay.length > 0 ? byDay : [originDate.getDay()];
+		// Align the week cursor to the start of the origin week (Sunday).
+		const weekCursor = new Date(originDate);
+		weekCursor.setDate(weekCursor.getDate() - weekCursor.getDay());
+
+		while (weekCursor <= rangeEndDate && weekCursor <= hardLimit) {
 			if (generated >= maxOccurrences) break;
-			generated++;
-			addIfInRange(cursor);
-			cursor.setDate(cursor.getDate() + 7 * interval);
+			for (const targetDay of effectiveDays) {
+				const occStart = new Date(weekCursor);
+				occStart.setDate(weekCursor.getDate() + targetDay);
+				// Skip days before the actual start, and stop past UNTIL.
+				if (occStart < originDate) continue;
+				if (pastUntil(occStart)) continue;
+				if (generated >= maxOccurrences) break;
+				generated++;
+				addOccurrenceSpan(occStart);
+			}
+			if (untilIso !== null && toLocalDateString(weekCursor) > untilIso) {
+				// Whole week is past UNTIL — no later week can qualify.
+				const weekEnd = new Date(weekCursor);
+				weekEnd.setDate(weekEnd.getDate() + 6);
+				if (toLocalDateString(weekEnd) > untilIso) break;
+			}
+			weekCursor.setDate(weekCursor.getDate() + 7 * interval);
 		}
 	} else if (freq === 'DAILY') {
 		const cursor = new Date(originDate);
 		while (cursor <= rangeEndDate && cursor <= hardLimit) {
-			if (until && cursor > until) break;
+			if (pastUntil(cursor)) break;
 			if (generated >= maxOccurrences) break;
 			generated++;
-			addIfInRange(cursor);
+			addOccurrenceSpan(cursor);
 			cursor.setDate(cursor.getDate() + interval);
 		}
 	}

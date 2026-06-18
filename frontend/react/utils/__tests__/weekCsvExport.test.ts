@@ -216,7 +216,7 @@ describe('generateWeeklyCsv', () => {
 					issueKey: 'PROJ-200',
 					issueSummary: 'Backdated entry',
 					timeSpentSeconds: 1800, // 0.5h backdated
-					comment: 'Original Worklog Date was: 2026/02/01',
+					isBackdated: true,
 				},
 			],
 			fixedProvenance,
@@ -231,14 +231,16 @@ describe('generateWeeklyCsv', () => {
 		);
 	});
 
-	it('should mark backdated entries when created month differs from started date', () => {
+	it('marks entries backdated via the fetch-time isBackdated flag (ADA-461)', () => {
 		const worklogs: WeekWorklogEntry[] = [
 			{
 				date: '2026-03-10',
 				issueKey: 'PROJ-100',
-				issueSummary: 'Logged a month later',
+				issueSummary: 'Jira-native backdate',
 				timeSpentSeconds: 3600,
-				created: '2026-04-15T08:00:00.000Z',
+				// `isBackdated` is set at fetch time from classifyWorklog and is
+				// the single source of truth — no re-derivation from date.
+				isBackdated: true,
 			},
 		];
 
@@ -254,15 +256,21 @@ describe('generateWeeklyCsv', () => {
 		expect(fields[6]).toBe('true');
 	});
 
-	it('should mark backdated entries flagged via comment marker', () => {
+	it('does NOT re-derive backdating from date alone (ADA-461 regression)', () => {
+		// Before ADA-461 the exporter synthesised {started:`${date}T00:00:00`}
+		// and re-ran the classifier, which returned false for Jira-native
+		// backdates even when created/comment indicated one. We now read the
+		// fetch-time flag, so an unflagged entry is non-backdated regardless of
+		// any created/comment metadata.
 		const worklogs: WeekWorklogEntry[] = [
 			{
 				date: '2026-03-10',
 				issueKey: 'PROJ-100',
-				issueSummary: 'Same month but flagged',
+				issueSummary: 'Looks late but flag is false',
 				timeSpentSeconds: 3600,
-				created: '2026-03-10T17:00:00.000Z',
-				comment: 'Original Worklog Date was: 2026/03/03',
+				created: '2026-04-15T08:00:00.000Z',
+				comment: 'Original Worklog Date was: 2026/02/01',
+				isBackdated: false,
 			},
 		];
 
@@ -274,7 +282,64 @@ describe('generateWeeklyCsv', () => {
 		);
 		const fields = result.split('\n')[2].split(';');
 
-		expect(fields[6]).toBe('true');
+		expect(fields[6]).toBe('false');
+	});
+
+	it('reconciles Backdated/Non-backdated/Total subtotals using the flag (ADA-461)', () => {
+		const worklogs: WeekWorklogEntry[] = [
+			{
+				date: '2026-03-10',
+				issueKey: 'PROJ-100',
+				issueSummary: 'Regular',
+				timeSpentSeconds: 14400, // 4h
+				isBackdated: false,
+			},
+			{
+				date: '2026-03-11',
+				issueKey: 'PROJ-200',
+				issueSummary: 'Jira-native backdate',
+				timeSpentSeconds: 28800, // 8h backdated
+				isBackdated: true,
+			},
+		];
+
+		const result = generateWeeklyCsv(
+			weekStart,
+			weekEnd,
+			worklogs,
+			fixedProvenance,
+		);
+		const lines = result.split('\n');
+		expect(lines.find((l) => l.startsWith('Backdated;'))).toBe(
+			'Backdated;;;;8.00;8h;',
+		);
+		expect(lines.find((l) => l.startsWith('Non-backdated;'))).toBe(
+			'Non-backdated;;;;4.00;4h;',
+		);
+		expect(lines.find((l) => l.startsWith('Week Total;'))).toBe(
+			'Week Total;;;;12.00;12h;',
+		);
+	});
+
+	it('neutralises formula injection in the issue key cell (ADA-460)', () => {
+		const worklogs: WeekWorklogEntry[] = [
+			{
+				date: '2026-03-10',
+				issueKey: '=cmd|/c calc',
+				issueSummary: 'Evil',
+				timeSpentSeconds: 3600,
+			},
+		];
+
+		const result = generateWeeklyCsv(
+			weekStart,
+			weekEnd,
+			worklogs,
+			fixedProvenance,
+		);
+		const fields = result.split('\n')[2].split(';');
+		// Leading `=` is neutralised with a `'`; the `|` does not force quoting.
+		expect(fields[2]).toBe("'=cmd|/c calc");
 	});
 
 	it('adds IsAbsence/AbsenceKind columns and an Absence Days subtotal when enabled', () => {

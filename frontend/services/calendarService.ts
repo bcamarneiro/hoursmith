@@ -1,4 +1,5 @@
 import type { WorklogSuggestion } from '../../types/Suggestion';
+import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
 import type { CalendarFeed } from '../stores/useConfigStore';
 import type { CalendarMapping } from '../stores/useUserDataStore';
@@ -104,7 +105,17 @@ function parseIcsDateTime(value: string): { iso: string; date: Date } | null {
 		const ss = digits.slice(13, 15);
 		const isUtc = clean.endsWith('Z');
 		const isoStr = `${y}-${m}-${d}T${hh}:${mm}:${ss}${isUtc ? 'Z' : ''}`;
-		return { iso: `${y}-${m}-${d}`, date: new Date(isoStr) };
+		const date = new Date(isoStr);
+		// Day attribution (ADA-463): for a UTC-stamped time the raw digits name
+		// the UTC day, but the user worked it on their *local* calendar day. A
+		// 23:00Z event is already "tomorrow" for a UTC+ user and "still today"
+		// shifted for UTC- users. Derive `iso` from the parsed Date in local TZ
+		// so the consumer's week filter sees the right day. Floating/local times
+		// have no offset, so local conversion is a no-op for them.
+		const iso = Number.isNaN(date.getTime())
+			? `${y}-${m}-${d}`
+			: toLocalDateString(date);
+		return { iso, date };
 	}
 
 	return null;
@@ -218,7 +229,7 @@ function expandRecurring(
 				if (generated >= maxOccurrences) break;
 
 				generated++;
-				const iso = occurrence.toISOString().slice(0, 10);
+				const iso = toLocalDateString(occurrence);
 
 				if (occurrence < rangeStartDate || occurrence > rangeEndDate) continue;
 				if (exdateSet.has(iso)) continue;
@@ -233,7 +244,7 @@ function expandRecurring(
 				const ymd = iso.replace(/-/g, '');
 
 				const endDate = new Date(occurrence.getTime() + durationMs);
-				const endYmd = endDate.toISOString().slice(0, 10).replace(/-/g, '');
+				const endYmd = toLocalDateString(endDate).replace(/-/g, '');
 
 				occurrences.push({
 					...event,
@@ -254,7 +265,7 @@ function expandRecurring(
 			if (generated >= maxOccurrences) break;
 
 			generated++;
-			const iso = cursor.toISOString().slice(0, 10);
+			const iso = toLocalDateString(cursor);
 
 			if (cursor >= rangeStartDate && cursor <= rangeEndDate) {
 				if (!exdateSet.has(iso)) {
@@ -263,7 +274,7 @@ function expandRecurring(
 						? event.dtstart.slice(event.dtstart.indexOf('T'))
 						: '';
 					const endDate = new Date(cursor.getTime() + durationMs);
-					const endYmd = endDate.toISOString().slice(0, 10).replace(/-/g, '');
+					const endYmd = toLocalDateString(endDate).replace(/-/g, '');
 					const endTimeStr = event.dtend.includes('T')
 						? event.dtend.slice(event.dtend.indexOf('T'))
 						: '';
@@ -287,7 +298,7 @@ function expandRecurring(
 			if (generated >= maxOccurrences) break;
 
 			generated++;
-			const iso = cursor.toISOString().slice(0, 10);
+			const iso = toLocalDateString(cursor);
 
 			if (cursor >= rangeStartDate && cursor <= rangeEndDate) {
 				if (!exdateSet.has(iso)) {
@@ -296,7 +307,7 @@ function expandRecurring(
 						? event.dtstart.slice(event.dtstart.indexOf('T'))
 						: '';
 					const endDate = new Date(cursor.getTime() + durationMs);
-					const endYmd = endDate.toISOString().slice(0, 10).replace(/-/g, '');
+					const endYmd = toLocalDateString(endDate).replace(/-/g, '');
 					const endTimeStr = event.dtend.includes('T')
 						? event.dtend.slice(event.dtend.indexOf('T'))
 						: '';
