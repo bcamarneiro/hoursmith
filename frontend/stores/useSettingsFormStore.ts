@@ -41,6 +41,47 @@ interface SettingsFormState {
 	testRescueTime: () => Promise<void>;
 }
 
+/**
+ * Connection-test network timeout (ADA-444). Without it, a hung proxy / Jira
+ * leaves the request pending forever and the UI shows "Testing…" with no error.
+ */
+const JIRA_TEST_TIMEOUT_MS = 20_000;
+
+/**
+ * fetch() wrapper that aborts after `timeoutMs` and rethrows a typed timeout
+ * error so callers can surface an actionable message. ADA-444.
+ */
+class TestTimeoutError extends Error {
+	constructor(public readonly host: string) {
+		super(`No response from ${host} within ${JIRA_TEST_TIMEOUT_MS / 1000}s`);
+		this.name = 'TestTimeoutError';
+	}
+}
+
+async function fetchWithTimeout(
+	input: string,
+	init: RequestInit,
+	timeoutMs: number,
+	hostLabel: string,
+): Promise<Response> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		return await fetch(input, { ...init, signal: controller.signal });
+	} catch (error) {
+		// AbortController.abort() surfaces as an AbortError DOMException.
+		if (
+			controller.signal.aborted ||
+			(error instanceof DOMException && error.name === 'AbortError')
+		) {
+			throw new TestTimeoutError(hostLabel);
+		}
+		throw error;
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 const emptyTest: IntegrationTestResult = { loading: false, result: null };
 const resetIntegrationTests = () => ({
 	jira: { ...emptyTest },
@@ -121,6 +162,12 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				? `${normalizedConfig.corsProxy.replace(/\/$/, '')}/https://${normalizedConfig.jiraHost}`
 				: `https://${normalizedConfig.jiraHost}`;
 
+			// Human-readable label for timeout messages — the proxy host if one is
+			// configured, otherwise the Jira host (ADA-444).
+			const timeoutHostLabel = normalizedConfig.corsProxy
+				? `${normalizedConfig.corsProxy.replace(/\/$/, '')} (proxy)`
+				: normalizedConfig.jiraHost;
+
 			const baseHeaders: Record<string, string> = {
 				Authorization: `Bearer ${normalizedConfig.apiToken}`,
 				Accept: 'application/json',
@@ -138,24 +185,43 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 
 			const startTime = performance.now();
 			const myselfReq = jiraReq(`${host}/rest/api/2/myself`);
-			const myselfRes = await fetch(myselfReq.url, {
-				headers: myselfReq.headers,
-			});
+			const myselfRes = await fetchWithTimeout(
+				myselfReq.url,
+				{ headers: myselfReq.headers },
+				JIRA_TEST_TIMEOUT_MS,
+				timeoutHostLabel,
+			);
 			if (!myselfRes.ok) {
 				throw new Error(`Jira API error: ${myselfRes.status}`);
 			}
-			const myself = (await myselfRes.json()) as { displayName?: string };
+			const myself = (await myselfRes.json()) as {
+				displayName?: string;
+				emailAddress?: string;
+			};
 			const duration = Math.round(performance.now() - startTime);
 			logger.debug(`[Test] Jira OK in ${duration}ms: ${myself.displayName}`);
+
+			// ADA-436: My Week filters by the Settings email. If the token belongs to
+			// a different account than `config.email`, My Week will silently show
+			// nothing — warn the user instead of reporting a clean success.
+			const tokenEmail = myself.emailAddress?.trim() ?? '';
+			const settingsEmail = normalizedConfig.email.trim();
+			const emailMismatch =
+				!!tokenEmail &&
+				!!settingsEmail &&
+				tokenEmail.toLowerCase() !== settingsEmail.toLowerCase();
 
 			// Auto-detect worklog permissions
 			try {
 				const permsReq = jiraReq(
 					`${host}/rest/api/2/mypermissions?permissions=WORK_ON_ISSUES,EDIT_ALL_WORKLOGS,EDIT_OWN_WORKLOGS,DELETE_ALL_WORKLOGS,DELETE_OWN_WORKLOGS`,
 				);
-				const permsRes = await fetch(permsReq.url, {
-					headers: permsReq.headers,
-				});
+				const permsRes = await fetchWithTimeout(
+					permsReq.url,
+					{ headers: permsReq.headers },
+					JIRA_TEST_TIMEOUT_MS,
+					timeoutHostLabel,
+				);
 				if (permsRes.ok) {
 					const perms = (await permsRes.json()) as {
 						permissions?: Record<string, { havePermission: boolean }>;
@@ -185,6 +251,25 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				// permissions check is optional
 			}
 
+			if (emailMismatch) {
+				// Connection authenticated, but the token's account != Settings email.
+				// Report as a failure so it isn't treated as verified evidence and the
+				// user is steered to fix the email (ADA-436).
+				set((s) => ({
+					integrationTests: {
+						...s.integrationTests,
+						jira: {
+							loading: false,
+							result: {
+								success: false,
+								message: `Token belongs to ${tokenEmail} but Settings email is ${settingsEmail} — My Week filters by Settings email, so it may show nothing. Update the email to match.`,
+							},
+						},
+					},
+				}));
+				return;
+			}
+
 			set((s) => ({
 				integrationTests: {
 					...s.integrationTests,
@@ -210,6 +295,12 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 			}
 		} catch (error) {
 			logger.error('[Test] Jira failed:', error);
+			const message =
+				error instanceof TestTimeoutError
+					? `No response from ${error.host} within ${JIRA_TEST_TIMEOUT_MS / 1000}s — check the proxy is running / the host is reachable.`
+					: error instanceof Error
+						? error.message
+						: 'Connection failed';
 			set((s) => ({
 				integrationTests: {
 					...s.integrationTests,
@@ -217,8 +308,7 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 						loading: false,
 						result: {
 							success: false,
-							message:
-								error instanceof Error ? error.message : 'Connection failed',
+							message,
 						},
 					},
 				},

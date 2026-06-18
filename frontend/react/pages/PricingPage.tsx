@@ -54,7 +54,12 @@ const LEAD_V2_ROADMAP = [
 const TRUST_LINE = 'Cancel anytime · EU VAT handled · Powered by Polar';
 
 /**
- * Paid-tier CTA, gated by the operational flags (ADA-341):
+ * Paid-tier CTA, gated by the operational flags (ADA-341) and auth state:
+ *   - already signed in → a "current plan" state (a logged-in user on the
+ *     pricing page is effectively a subscriber in this app; the frontend-safe
+ *     `useIsAuthenticated` signal only exposes auth, not the exact tier, so we
+ *     can't distinguish Hosted vs Lead without crossing the premium boundary —
+ *     ADA-451 / ADA-379)
  *   - checkout disabled → an inline "temporarily unavailable" note
  *   - paywall not open for me → the waitlist embed ("Coming soon")
  *   - open → the real checkout CTA (routes to /account → Polar)
@@ -63,7 +68,19 @@ const PaidCta: React.FC<{
 	flags: PublicFlags;
 	href: string;
 	label: string;
-}> = ({ flags, href, label }) => {
+	tierName: string;
+	isAuthed: boolean;
+}> = ({ flags, href, label, tierName, isAuthed }) => {
+	if (isAuthed) {
+		return (
+			<>
+				<Link to="/account" className={styles.secondaryCta}>
+					Manage your plan
+				</Link>
+				<p className={styles.trustLine}>You're on {tierName}.</p>
+			</>
+		);
+	}
 	if (!flags.checkoutEnabled) {
 		return (
 			<p className={styles.trustLine}>Checkout is temporarily unavailable.</p>
@@ -187,6 +204,8 @@ export const PricingPage: React.FC = () => {
 							flags={flags}
 							href="/account?upgrade=hosted"
 							label="Get Hosted — €19/year (founding)"
+							tierName="Hosted"
+							isAuthed={isAuthed}
 						/>
 					</div>
 				</article>
@@ -232,6 +251,8 @@ export const PricingPage: React.FC = () => {
 								flags={flags}
 								href="/account?upgrade=lead"
 								label="Get Lead — €60/year (founding)"
+								tierName="Lead"
+								isAuthed={isAuthed}
 							/>
 						</div>
 					</article>

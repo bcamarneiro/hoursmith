@@ -61,6 +61,48 @@ describe('buildTeamSummaries', () => {
 		expect(summaries[2]?.targetSeconds).toBe(40 * 3600);
 	});
 
+	it('targets the full week for the current week, matching My Week (ADA-443)', () => {
+		// Regression for ADA-443: previously the current week's target was
+		// prorated down to elapsed weekdays (excluding today + future), so a
+		// member could read "OK / no gap" in weekly Reports while My Week (which
+		// always targets the full 40h week) showed a large gap. The target must
+		// now span all 5 weekdays regardless of where "today" falls.
+		const now = new Date();
+		const monday = new Date(now);
+		// Move back to Monday of the current week (getDay: 0=Sun..6=Sat).
+		const offsetToMonday = (now.getDay() + 6) % 7;
+		monday.setDate(now.getDate() - offsetToMonday);
+		const toIso = (d: Date) => {
+			const y = d.getFullYear();
+			const m = String(d.getMonth() + 1).padStart(2, '0');
+			const day = String(d.getDate()).padStart(2, '0');
+			return `${y}-${m}-${day}`;
+		};
+		const weekStart = toIso(monday);
+		const sunday = new Date(monday);
+		sunday.setDate(monday.getDate() + 6);
+		const weekEnd = toIso(sunday);
+
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					`${weekStart}T09:00:00.000+0000`,
+					21.5 * 3600,
+				),
+			],
+			weekStart,
+			weekEnd,
+			'alice@example.com',
+		);
+
+		// Full-week target (5 × 8h) regardless of which day "today" is, and the
+		// gap reflects the same 40h expectation My Week uses.
+		expect(summaries[0]?.targetSeconds).toBe(40 * 3600);
+		expect(summaries[0]?.gapSeconds).toBe((40 - 21.5) * 3600);
+	});
+
 	it('excludes backdated worklogs from a member weekly total and gap', () => {
 		const summaries = buildTeamSummaries(
 			[

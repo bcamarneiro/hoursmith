@@ -64,6 +64,7 @@ export const DayCard = memo<Props>(function DayCard({
 		(s) => s.unmarkMultipleSuggestionsLogged,
 	);
 	const {
+		createWorklog,
 		createMultipleWorklogs,
 		deleteWorklog,
 		updateWorklog,
@@ -98,6 +99,41 @@ export const DayCard = memo<Props>(function DayCard({
 	} | null>(null);
 	const [isEditOpening, setIsEditOpening] = useState(false);
 	const [deleteTarget, setDeleteTarget] = useState<LoggedWorklog | null>(null);
+	const [addingWorklog, setAddingWorklog] = useState<{
+		issueKey: string;
+		timeSpent: string;
+		comment: string;
+		started: string;
+	} | null>(null);
+
+	// Open a blank worklog form prefilled with this day's date (09:00) and the
+	// remaining gap as the suggested duration, so a user with no suggestions can
+	// still log time manually from My Week.
+	const handleAddOpen = () => {
+		setAddingWorklog({
+			issueKey: '',
+			timeSpent: day.gapSeconds > 0 ? formatJiraTimeSpent(day.gapSeconds) : '',
+			comment: '',
+			started: formatDateTimeLocalValue(new Date(`${day.date}T09:00`)),
+		});
+	};
+
+	const handleAddSubmit = async (data: {
+		issueKey: string;
+		timeSpent: string;
+		comment: string;
+		started: string;
+	}) => {
+		try {
+			await createWorklog(data);
+			setAddingWorklog(null);
+			toast.success(`Logged ${data.timeSpent} on ${data.issueKey}`);
+		} catch (e) {
+			// Re-throw so WorklogForm surfaces the error inline and keeps the modal
+			// open with the user's input intact.
+			throw e instanceof Error ? e : new Error('Failed to create worklog');
+		}
+	};
 
 	// Open the edit form for a logged worklog. We fetch the worklog first so the
 	// form prefills the real comment/started — editing only the time then keeps
@@ -311,6 +347,16 @@ export const DayCard = memo<Props>(function DayCard({
 							{isBatchLogging ? 'Logging...' : 'Log All'}
 						</button>
 					)}
+					{!day.isWeekend && !isTimeOff && (
+						<button
+							type="button"
+							className={styles.addButton}
+							onClick={handleAddOpen}
+							aria-label={`Add a worklog for ${DAY_NAMES[day.dayOfWeek]}`}
+						>
+							+ Add worklog
+						</button>
+					)}
 					{isClosed && !isTimeOff && (
 						<span className={styles.closedChip}>✓ Closed</span>
 					)}
@@ -420,7 +466,15 @@ export const DayCard = memo<Props>(function DayCard({
 						day.gapSeconds > 0 &&
 						activeSuggestions.length === 0 && (
 							<div className={styles.noSuggestions}>
-								No suggestions available for this day
+								<span>No suggestions available for this day</span>
+								<button
+									type="button"
+									className={styles.addButtonInline}
+									onClick={handleAddOpen}
+									aria-label={`Add a worklog for ${DAY_NAMES[day.dayOfWeek]}`}
+								>
+									+ Add worklog
+								</button>
 							</div>
 						)}
 
@@ -491,6 +545,21 @@ export const DayCard = memo<Props>(function DayCard({
 						sourceDate={day.date}
 						onClone={(dates) => handleClone(cloneSource, dates)}
 						onCancel={() => setCloneSource(null)}
+					/>
+				</Modal>
+			)}
+
+			{addingWorklog && (
+				<Modal
+					isOpen
+					onClose={() => setAddingWorklog(null)}
+					title={`Add worklog — ${DAY_NAMES[day.dayOfWeek]} ${formatDate(day.date)}`}
+				>
+					<WorklogForm
+						initialData={addingWorklog}
+						onSubmit={handleAddSubmit}
+						onCancel={() => setAddingWorklog(null)}
+						isLoading={isWorklogOpLoading}
 					/>
 				</Modal>
 			)}

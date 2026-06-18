@@ -7,8 +7,14 @@ import {
 	Route,
 	Routes,
 } from 'react-router-dom';
-import { BUILD_TIER, isPremiumBuild } from '../buildTier';
+import { isPremiumBuild } from '../buildTier';
 import * as styles from './App.module.css';
+
+// Inlined by DefinePlugin (rspack.config.js) as a string literal. Branching on
+// this raw macro directly — instead of the re-exported `BUILD_TIER` constant —
+// lets the bundler statically evaluate the guard and dead-code-eliminate the
+// premium dynamic import (and its Supabase chunk) from Free-tier builds.
+declare const __BUILD_TIER__: 'free' | 'premium';
 
 import { Navigation } from './components/Navigation';
 import { BuildInfoFooter } from './components/ui/BuildInfoFooter';
@@ -81,17 +87,25 @@ interface PremiumRoutesModule {
 	PremiumAuthProvider: React.ComponentType<{ children: React.ReactNode }>;
 }
 
-// Static `import()` call gated by BUILD_TIER. The boundary script only flags
-// `from '...'` ES-module imports; dynamic `import('...')` is intentionally
-// allowed for this gating pattern. With BUILD_TIER inlined by DefinePlugin,
-// the bundler dead-code-eliminates the import call entirely in Free builds.
+// Static `import()` call gated by the raw `__BUILD_TIER__` define. The boundary
+// script only flags `from '...'` ES-module imports; dynamic `import('...')` is
+// intentionally allowed for this gating pattern. Branching on the inlined macro
+// (not the re-exported `BUILD_TIER` constant, which is an indirection the
+// minifier can't prove dead) lets the bundler statically resolve the guard to
+// `false` in Free builds and dead-code-eliminate the import — and the Supabase
+// chunk it pulls in — entirely.
 function loadPremiumRoutes(): Promise<PremiumRoutesModule> {
-	if (BUILD_TIER !== 'premium') {
-		return Promise.reject(new Error('not_a_premium_build'));
+	// The dynamic import MUST live inside the statically-true branch. rspack's
+	// parser only skips an `import()` dependency (and the chunk it pulls in) when
+	// it sits inside an `if (false) { … }` dead branch. In Free builds DefinePlugin
+	// inlines `__BUILD_TIER__` to `'free'`, so this becomes `if (false)` and the
+	// Supabase chunk is never emitted; Premium builds inline `'premium'`.
+	if (__BUILD_TIER__ === 'premium') {
+		return import(
+			/* webpackChunkName: "premium-auth" */ '../../premium/auth/routes'
+		) as Promise<PremiumRoutesModule>;
 	}
-	return import(
-		/* webpackChunkName: "premium-auth" */ '../../premium/auth/routes'
-	) as Promise<PremiumRoutesModule>;
+	return Promise.reject(new Error('not_a_premium_build'));
 }
 
 const AppShell: React.FC = () => {

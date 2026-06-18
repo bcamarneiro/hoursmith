@@ -44,6 +44,19 @@
 					"value": "public, max-age=3600"
 				}
 			]
+		},
+		{
+			"source": "/(.*)\\.map",
+			"headers": [
+				{
+					"key": "X-Robots-Tag",
+					"value": "noindex"
+				},
+				{
+					"key": "Cache-Control",
+					"value": "no-store"
+				}
+			]
 		}
 	]
 }

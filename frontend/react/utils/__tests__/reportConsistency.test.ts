@@ -114,7 +114,11 @@ describe('validateReportsConsistency', () => {
 		]);
 	});
 
-	it('Pattern A (comment backdate): bucket by loggedOn for the week containing started', () => {
+	it('Pattern A (comment backdate): excluded from the monthly side, matching the weekly source', () => {
+		// A comment-backdated log is dropped from weekly totals by
+		// buildTeamSummaries, so the weekly member shows 0h. The consistency
+		// check must drop it from the monthly side too — otherwise it would
+		// surface a false mismatch (ADA-449). Both sides are 0 → consistent.
 		const worklog = createWorklog(
 			'alice@example.com',
 			'Alice',
@@ -124,7 +128,7 @@ describe('validateReportsConsistency', () => {
 		);
 
 		const loggedWeek = validateReportsConsistency(
-			[createMember('alice@example.com', 'Alice', 3600)],
+			[createMember('alice@example.com', 'Alice', 0)],
 			[worklog],
 			'2025-10-05',
 			'2025-10-11',
@@ -150,7 +154,7 @@ describe('validateReportsConsistency', () => {
 		});
 	});
 
-	it('Pattern B (jira-native backdate): bucket by created when started is in a prior month', () => {
+	it('Pattern B (jira-native backdate): excluded from the monthly side, matching the weekly source', () => {
 		const worklog = createWorklog(
 			'alice@example.com',
 			'Alice',
@@ -160,7 +164,7 @@ describe('validateReportsConsistency', () => {
 		);
 
 		const createdWeek = validateReportsConsistency(
-			[createMember('alice@example.com', 'Alice', 3600)],
+			[createMember('alice@example.com', 'Alice', 0)],
 			[worklog],
 			'2025-09-29',
 			'2025-10-05',
@@ -184,5 +188,58 @@ describe('validateReportsConsistency', () => {
 			checkedUsers: 1,
 			mismatches: [],
 		});
+	});
+
+	it('non-backdated same-week log is counted on the monthly side (true match)', () => {
+		// A normal (non-backdated) log inside the week must still be counted on
+		// the monthly side, so a genuinely-matching week reads consistent.
+		const result = validateReportsConsistency(
+			[createMember('alice@example.com', 'Alice', 3600)],
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-24T09:00:00.000+0000',
+					3600,
+				),
+			],
+			'2026-03-23',
+			'2026-03-29',
+			'alice@example.com',
+		);
+		expect(result).toEqual({
+			matches: true,
+			checkedUsers: 1,
+			mismatches: [],
+		});
+	});
+
+	it('flags a genuine cross-source mismatch on the same week range', () => {
+		// Weekly source says Alice logged 4h; the monthly worklog source only has
+		// 1h of non-backdated time in the same week → a real mismatch that must
+		// still be flagged.
+		const result = validateReportsConsistency(
+			[createMember('alice@example.com', 'Alice', 4 * 3600)],
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-24T09:00:00.000+0000',
+					3600,
+				),
+			],
+			'2026-03-23',
+			'2026-03-29',
+			'alice@example.com',
+		);
+		expect(result.matches).toBe(false);
+		expect(result.mismatches).toEqual([
+			{
+				email: 'alice@example.com',
+				displayName: 'Alice',
+				weeklySeconds: 4 * 3600,
+				monthlySeconds: 3600,
+			},
+		]);
 	});
 });

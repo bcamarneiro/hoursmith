@@ -111,6 +111,36 @@
 	cursor: pointer;
 }
 
+/* ADA-446 — masked API Token input with a reveal/hide toggle */
+.secretInputRow {
+	display: flex;
+	align-items: stretch;
+	gap: var(--space-2);
+}
+
+.secretInputRow input {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.revealButton {
+	flex: 0 0 auto;
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface-muted, var(--color-surface));
+	color: var(--color-text-secondary);
+	font: inherit;
+	font-size: var(--text-sm);
+	cursor: pointer;
+	transition: all var(--transition-fast);
+}
+
+.revealButton:hover {
+	color: var(--color-text);
+	border-color: var(--color-primary);
+}
+
 .linkButton:hover {
 	color: var(--color-primary-hover, var(--color-primary));
 }

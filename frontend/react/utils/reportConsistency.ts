@@ -51,7 +51,16 @@ export function validateReportsConsistency(
 		if (!email) continue;
 		if (allowedSet && !allowedSet.has(email)) continue;
 
-		const day = classifyWorklog(worklog).loggedOn;
+		const classified = classifyWorklog(worklog);
+		// Backdated worklogs never contribute to weekly/monthly totals anywhere
+		// in the app (buildTeamSummaries and the Monthly Reports view + CSV both
+		// drop them — see the ghost-reconciliation invariant). The consistency
+		// check must use the SAME canonical aggregation, otherwise a backdated
+		// log that the weekly source excludes but this side counted would show a
+		// false "Inconsistent" (ADA-449).
+		if (classified.isBackdated) continue;
+
+		const day = classified.loggedOn;
 		if (!day) continue;
 		if (day < weekStart || day > weekEnd) continue;
 

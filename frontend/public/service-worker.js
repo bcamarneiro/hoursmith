@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hoursmith-shell-v3';
+const CACHE_NAME = 'hoursmith-shell-v4';
 // Stable, fixed-name shell assets only. The JS/CSS bundles are content-hashed
 // (`main.<hash>.js`, etc.) and change every build, so they are NOT precached
 // here — listing them would 404 and, because `addAll` is atomic, abort the
@@ -45,6 +45,16 @@ self.addEventListener('fetch', (event) => {
 
 	const requestUrl = new URL(event.request.url);
 	if (requestUrl.origin !== self.location.origin) return;
+
+	// Never cache API traffic. The hosted proxy is same-origin
+	// (`/api/proxy/...`), so cache-first would persist Jira worklog data and
+	// identity to disk (privacy leak) and replay frozen first responses
+	// (stale data — edits/new/deleted worklogs never appear). Always go to the
+	// network and never `cache.put` these. (ADA-450)
+	if (requestUrl.pathname.startsWith('/api/')) {
+		event.respondWith(fetch(event.request));
+		return;
+	}
 
 	if (event.request.mode === 'navigate') {
 		event.respondWith(
