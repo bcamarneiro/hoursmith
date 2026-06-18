@@ -152,6 +152,36 @@ export function trackEvent(
 }
 
 /**
+ * Opaque, one-way hash of a user identifier (DJB2 → 32-bit, hex). We never send
+ * the raw Supabase user id or email to PostHog — only this digest — so the
+ * resulting distinct_id can't be reversed back to a person while still being
+ * stable across sessions for the same user. Synchronous on purpose: `identify`
+ * must run inline at call time, so we can't use the async `crypto.subtle` digest.
+ */
+export function hashUserId(userId: string): string {
+	let hash = 5381;
+	for (let i = 0; i < userId.length; i++) {
+		// hash * 33 + charCode, kept in 32-bit unsigned space.
+		hash = (hash * 33) ^ userId.charCodeAt(i);
+	}
+	// `>>> 0` coerces to unsigned 32-bit before hex encoding.
+	return `u_${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
+/**
+ * Give an authenticated user a stable, pseudonymous PostHog identity. Pass the
+ * raw user id; we hash it (see `hashUserId`) so no raw id/email leaves the
+ * browser. No-op when analytics is disabled / opted out, or before the SDK
+ * chunk has resolved (anonymous pre-signup traffic is never identified).
+ */
+export function identifyUser(userId: string): void {
+	if (!KEY || !userId) return;
+	if (isOptedOut()) return; // honor opt-out / DNT
+	if (!instance) return; // SDK not ready — don't buffer identity
+	instance.identify(hashUserId(userId));
+}
+
+/**
  * Report a caught error to PostHog Error Tracking (e.g. from a React error
  * boundary — those don't reach the global handler `capture_exceptions` hooks).
  * No-op until the SDK is initialised.

@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useId, useState } from 'react';
+import { trackEvent } from '../../../analytics';
 import * as styles from './PremiumWaitlistForm.module.css';
 
 /**
@@ -12,8 +13,9 @@ import * as styles from './PremiumWaitlistForm.module.css';
  * 200 with `saved: false`, so the user still gets a "Thanks" reply and the
  * form does not block the launch of the Pricing page.
  *
- * TODO: once Plausible is wired (ADA-249), fire `plausible('waitlist',
- *       { props: { source } })` on successful submit.
+ * On a successful submit we fire the `waitlist_submitted` analytics event
+ * (gated by opt-out / DNT via `trackEvent`); only the benign `source` enum is
+ * sent, never the email.
  */
 
 export type WaitlistSource = 'pricing' | 'in-app-settings';
@@ -73,6 +75,7 @@ export const PremiumWaitlistForm: React.FC<Props> = ({
 				body: JSON.stringify({ email: trimmed, source }),
 			});
 			if (res.ok) {
+				trackEvent('waitlist_submitted', { source });
 				setStatus({ kind: 'success' });
 				return;
 			}

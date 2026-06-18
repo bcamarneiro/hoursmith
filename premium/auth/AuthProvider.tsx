@@ -20,6 +20,7 @@ import {
 	useMemo,
 	useState,
 } from 'react';
+import { identifyUser } from '../../frontend/analytics';
 import { getSupabase, hasSupabaseEnv } from './supabaseClient';
 
 const MISSING_ENV_ERROR =
@@ -148,6 +149,10 @@ function ConfiguredAuthProvider({
 				setUser(data.session?.user ?? null);
 				hadSession = !!data.session;
 				setSessionError(null);
+				// Give the authenticated user a stable, pseudonymous analytics id
+				// (hashed inside identifyUser; no-op when opted out / no key). Anonymous
+				// pre-signup traffic is never identified.
+				if (data.session?.user) identifyUser(data.session.user.id);
 			})
 			.catch(() => {
 				// Network/config failure — surface a signal so the route guard can
@@ -168,6 +173,9 @@ function ConfiguredAuthProvider({
 				if (nextSession) {
 					hadSession = true;
 					setSessionError(null);
+					// Identify on (re)authentication — e.g. fresh sign-in or token
+					// refresh. Pseudonymous + opt-out-gated inside identifyUser.
+					if (nextSession.user) identifyUser(nextSession.user.id);
 				} else if (event === 'SIGNED_OUT' && hadSession) {
 					// Expired / revoked / cross-tab sign-out after being authenticated.
 					hadSession = false;

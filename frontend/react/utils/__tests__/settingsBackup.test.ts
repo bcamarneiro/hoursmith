@@ -270,6 +270,16 @@ describe('settingsBackup', () => {
 			gitlabHost: 'gitlab.example.com',
 			gitlabToken: 'gitlab-token',
 			rescueTimeApiKey: 'rescue-token',
+			calendarFeeds: [
+				{
+					label: 'Holidays',
+					url: 'https://calendar.google.com/ical/secret-TOKEN123/basic.ics',
+					type: 'holiday' as const,
+				},
+			],
+			absenceAssignments: [
+				{ pattern: 'PTO', userEmails: ['teammate@example.com'] },
+			],
 			theme: 'dark' as const,
 			timeRounding: '30m' as const,
 		};
@@ -283,9 +293,15 @@ describe('settingsBackup', () => {
 			jqlFilter: 'project = APP',
 			allowedUsers: 'one@example.com',
 			gitlabHost: 'gitlab.example.com',
-			calendarFeeds: [],
-			absenceAssignments: [],
 		});
+
+		// ADA-486: calendar feed URLs can embed private ICS tokens, and absence
+		// assignments carry teammate emails — neither may travel in a share pack.
+		expect(sharePack.config.calendarFeeds).toBeUndefined();
+		expect(sharePack.config.absenceAssignments).toBeUndefined();
+		const serialized = JSON.stringify(sharePack);
+		expect(serialized).not.toContain('secret-TOKEN123');
+		expect(serialized).not.toContain('teammate@example.com');
 
 		const parsed = parseSettingsBackup(
 			JSON.stringify(sharePack),

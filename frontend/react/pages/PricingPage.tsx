@@ -69,8 +69,10 @@ const PaidCta: React.FC<{
 	href: string;
 	label: string;
 	tierName: string;
+	/** Benign tier enum for analytics on the checkout CTA click. */
+	tier: 'hosted' | 'lead';
 	isAuthed: boolean;
-}> = ({ flags, href, label, tierName, isAuthed }) => {
+}> = ({ flags, href, label, tierName, tier, isAuthed }) => {
 	if (isAuthed) {
 		return (
 			<>
@@ -91,7 +93,11 @@ const PaidCta: React.FC<{
 	}
 	return (
 		<>
-			<a href={href} className={styles.primaryCta}>
+			<a
+				href={href}
+				className={styles.primaryCta}
+				onClick={() => trackEvent('checkout_started', { tier })}
+			>
 				{label}
 			</a>
 			<p className={styles.trustLine}>{TRUST_LINE}</p>
@@ -205,6 +211,7 @@ export const PricingPage: React.FC = () => {
 							href="/account?upgrade=hosted"
 							label="Get Hosted — €19/year (founding)"
 							tierName="Hosted"
+							tier="hosted"
 							isAuthed={isAuthed}
 						/>
 					</div>
@@ -252,6 +259,7 @@ export const PricingPage: React.FC = () => {
 								href="/account?upgrade=lead"
 								label="Get Lead — €60/year (founding)"
 								tierName="Lead"
+								tier="lead"
 								isAuthed={isAuthed}
 							/>
 						</div>

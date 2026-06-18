@@ -1,8 +1,15 @@
 import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { trackEvent } from '../../analytics';
 import { useConfigStore } from '../useConfigStore';
 import { useSettingsFormStore } from '../useSettingsFormStore';
 import { useUIStore } from '../useUIStore';
+
+// Spy on analytics so we can assert the `jira_connection_tested` event shape
+// (result + fixed failure-reason enum + http_status + duration_bucket) without
+// sending anything.
+vi.mock('../../analytics', () => ({ trackEvent: vi.fn() }));
+const trackEventMock = vi.mocked(trackEvent);
 
 const baseConfig = {
 	jiraHost: 'jira.example.com',
@@ -28,6 +35,7 @@ const baseConfig = {
 
 describe('useSettingsFormStore', () => {
 	beforeEach(() => {
+		trackEventMock.mockClear();
 		act(() => {
 			useConfigStore.setState({ config: baseConfig });
 			useSettingsFormStore.setState({
@@ -165,6 +173,22 @@ describe('useSettingsFormStore', () => {
 			expect(
 				useSettingsFormStore.getState().integrationTests.jira.loading,
 			).toBe(false);
+
+			// Analytics: a benign failure event with the email_mismatch enum — no
+			// email / host text in the props.
+			expect(trackEventMock).toHaveBeenCalledWith(
+				'jira_connection_tested',
+				expect.objectContaining({
+					result: 'failure',
+					failure_reason: 'email_mismatch',
+					http_status: 200,
+				}),
+			);
+			const mismatchProps = trackEventMock.mock.calls.at(-1)?.[1] as Record<
+				string,
+				unknown
+			>;
+			expect(JSON.stringify(mismatchProps)).not.toContain('@example.com');
 		});
 
 		it('reports success when token email matches settings email (ADA-436)', async () => {
@@ -198,6 +222,88 @@ describe('useSettingsFormStore', () => {
 				useSettingsFormStore.getState().integrationTests.jira.result;
 			expect(result?.success).toBe(true);
 			expect(result?.message).toContain('Connected as User');
+
+			// Analytics: a success event with the 'ok' reason and a duration bucket.
+			expect(trackEventMock).toHaveBeenCalledWith(
+				'jira_connection_tested',
+				expect.objectContaining({
+					result: 'success',
+					failure_reason: 'ok',
+					http_status: 200,
+					duration_bucket: expect.stringMatching(/^(<1s|1-3s|3-10s|>10s)$/),
+				}),
+			);
+		});
+
+		it('maps an HTTP 401 to the auth failure enum (no raw message in props)', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: { ...baseConfig },
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+				new Response('nope', { status: 401 }),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testJira();
+			});
+
+			expect(
+				useSettingsFormStore.getState().integrationTests.jira.result?.success,
+			).toBe(false);
+			expect(trackEventMock).toHaveBeenCalledWith(
+				'jira_connection_tested',
+				expect.objectContaining({
+					result: 'failure',
+					failure_reason: 'auth',
+					http_status: 401,
+				}),
+			);
+			// The fixed enum is sent, never the raw status-specific message text.
+			const authProps = trackEventMock.mock.calls.at(-1)?.[1] as Record<
+				string,
+				unknown
+			>;
+			expect(JSON.stringify(authProps)).not.toContain('jira.example.com');
+		});
+
+		it('maps a CORS / network failure to the cors enum', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: { ...baseConfig },
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+				new TypeError('Failed to fetch'),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testJira();
+			});
+
+			expect(trackEventMock).toHaveBeenCalledWith(
+				'jira_connection_tested',
+				expect.objectContaining({
+					result: 'failure',
+					failure_reason: 'cors',
+					http_status: 0,
+				}),
+			);
 		});
 
 		it('aborts and surfaces an actionable timeout message (ADA-444)', async () => {
@@ -237,6 +343,15 @@ describe('useSettingsFormStore', () => {
 			expect(
 				useSettingsFormStore.getState().integrationTests.jira.loading,
 			).toBe(false);
+
+			// Analytics: a timeout maps to the timeout enum.
+			expect(trackEventMock).toHaveBeenCalledWith(
+				'jira_connection_tested',
+				expect.objectContaining({
+					result: 'failure',
+					failure_reason: 'timeout',
+				}),
+			);
 		});
 	});
 

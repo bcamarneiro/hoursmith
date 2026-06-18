@@ -1,6 +1,7 @@
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { trackEvent } from '../../analytics';
 import { describeServiceError } from '../../services/serviceErrors';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
@@ -33,6 +34,11 @@ import { generateWeeklySummary } from '../utils/weekSummary';
 import * as styles from './MyWeekPage.module.css';
 
 const GAP_DAYS_SECTION_ID = 'dashboard-gap-days';
+
+// Session-scoped guard so `first_value_reached` fires at most once per page load
+// (the activation milestone — real worklog data on screen), not on every week
+// navigation or re-render within the same session.
+let firstValueTracked = false;
 
 export const MyWeekPage: React.FC = () => {
 	usePageTitle('My Week');
@@ -99,6 +105,30 @@ export const MyWeekPage: React.FC = () => {
 			}),
 		[daySummaries, weekWorklogs, canRemind, reminderEnabled, totalGapHours],
 	);
+
+	// Activation milestone: the page is showing real worklog data. Fire once per
+	// session (module-level guard) so week navigation / re-renders don't inflate it.
+	useEffect(() => {
+		if (firstValueTracked) return;
+		if (daySummaries.length === 0) return;
+		firstValueTracked = true;
+		trackEvent('first_value_reached', { surface: 'my_week' });
+	}, [daySummaries.length]);
+
+	// Empty-state funnel: map the three distinct empty branches to a fixed reason
+	// enum. `needs_setup` (no Jira) and the two settled-but-empty cases
+	// (`no_match` = worklogs filtered out by Settings email, `no_data` = none this
+	// week). Guarded on the same conditions the corresponding render branch uses.
+	useEffect(() => {
+		if (!jiraHost) {
+			trackEvent('my_week_empty', { reason: 'needs_setup' });
+			return;
+		}
+		if (isLoadingWorklogs || daySummaries.length > 0) return;
+		trackEvent('my_week_empty', {
+			reason: filteredOutEmpty ? 'no_match' : 'no_data',
+		});
+	}, [jiraHost, isLoadingWorklogs, daySummaries.length, filteredOutEmpty]);
 
 	const handleExportMd = async () => {
 		const markdown = generateWeeklySummary(weekStart, weekEnd, weekWorklogs);

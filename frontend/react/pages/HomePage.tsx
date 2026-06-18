@@ -133,6 +133,9 @@ export const HomePage: React.FC = () => {
 											? styles.secondaryButton
 											: styles.primaryButton
 									}
+									onClick={() =>
+										trackEvent('demo_viewed', { source: 'home_cta' })
+									}
 								>
 									Try the demo
 								</Link>

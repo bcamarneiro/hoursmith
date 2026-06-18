@@ -175,7 +175,13 @@ export function AccountPage(): JSX.Element {
 	useEffect(() => {
 		if (searchParams.get('upgrade') !== 'success') return;
 		setJustUpgraded(true);
-		trackEvent('checkout_succeeded');
+		// Activation funnel: checkout completed (best-effort). The success redirect
+		// carries no tier, and the `subscriptions` row collapses every paid product
+		// to 'premium', so we report the only live paid tier ('hosted'). When Lead
+		// (ADA-358) persists its own plan on the row this should read it instead.
+		// TODO(analytics): checkout_completed — refine `tier` once the success
+		// redirect (or the subscription row) distinguishes Hosted vs Lead.
+		trackEvent('checkout_completed', { tier: 'hosted' });
 		const next = new URLSearchParams(searchParams);
 		next.delete('upgrade');
 		setSearchParams(next, { replace: true });
