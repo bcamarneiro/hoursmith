@@ -88,6 +88,60 @@ describe('ConnectionSection', () => {
 		);
 	});
 
+	it('links to the Atlassian API token docs in a new tab (ADA-468)', () => {
+		render(
+			<ConnectionSection
+				formData={{
+					jiraHost: 'h',
+					email: 'e',
+					apiToken: 't',
+					corsProxy: '',
+				}}
+				handleChange={vi.fn()}
+				testJira={vi.fn()}
+				canTestJira={true}
+				integrationTest={{ loading: false, result: null }}
+				jiraHostId="jh"
+				emailId="em"
+				apiTokenId="at"
+				corsProxyId="cp"
+			/>,
+		);
+		const link = screen.getByRole('link', {
+			name: /How do I get an API token\?/i,
+		});
+		expect(link).toHaveAttribute(
+			'href',
+			'https://id.atlassian.com/manage-profile/security/api-tokens',
+		);
+		expect(link).toHaveAttribute('target', '_blank');
+		expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+	});
+
+	it('shows an inline hint for the Jira Host field (ADA-468)', () => {
+		render(
+			<ConnectionSection
+				formData={{
+					jiraHost: '',
+					email: '',
+					apiToken: '',
+					corsProxy: '',
+				}}
+				handleChange={vi.fn()}
+				testJira={vi.fn()}
+				canTestJira={false}
+				integrationTest={{ loading: false, result: null }}
+				jiraHostId="jh"
+				emailId="em"
+				apiTokenId="at"
+				corsProxyId="cp"
+			/>,
+		);
+		expect(
+			screen.getByText(/The domain you see in Jira, like/i),
+		).toBeInTheDocument();
+	});
+
 	it('shows the integration test result message when present', () => {
 		render(
 			<ConnectionSection

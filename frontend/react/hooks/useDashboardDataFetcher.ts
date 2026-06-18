@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { RescueTimeDaySummary } from '../../../types/Suggestion';
 import { fetchCalendarSuggestions } from '../../services/calendarService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
@@ -108,7 +108,19 @@ export function deriveWeekGhosts(
 	return ghosts;
 }
 
-export function useDashboardDataFetcher() {
+/**
+ * Surfaces of the My Week fetch the page needs beyond the dashboard store:
+ *  - `refetch` re-runs the effect (the "Try again" recovery affordance, ADA-476);
+ *  - `filteredOutEmpty` flags the runtime case where the raw fetch returned
+ *    worklogs but the `author.emailAddress === config.email` filter left zero —
+ *    so the empty state can say "Loaded N but none match <email>" (ADA-436/476).
+ */
+export interface DashboardFetchStatus {
+	refetch: () => void;
+	filteredOutEmpty: { rawCount: number; email: string } | null;
+}
+
+export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const jiraHost = useConfigStore((s) => s.config.jiraHost);
 	const email = useConfigStore((s) => s.config.email);
 	const apiToken = useConfigStore((s) => s.config.apiToken);
@@ -136,6 +148,13 @@ export function useDashboardDataFetcher() {
 	const templates = useUserDataStore((s) => s.templates);
 	const calendarMappings = useUserDataStore((s) => s.calendarMappings);
 	const queryClient = useQueryClient();
+	// Bumping this nonce re-runs the fetch effect — the "Try again" affordance.
+	const [refetchNonce, setRefetchNonce] = useState(0);
+	const refetch = useCallback(() => setRefetchNonce((n) => n + 1), []);
+	const [filteredOutEmpty, setFilteredOutEmpty] = useState<{
+		rawCount: number;
+		email: string;
+	} | null>(null);
 	const hasAbsenceFeeds = (calendarFeeds ?? []).some(
 		(feed) =>
 			(feed.type === 'absence' || feed.type === 'holiday') && feed.url.trim(),
@@ -145,6 +164,9 @@ export function useDashboardDataFetcher() {
 	});
 
 	useEffect(() => {
+		// Reference refetchNonce so the effect re-runs when `refetch()` bumps it
+		// (mirrors the pattern in useSubscription's refetchTick).
+		void refetchNonce;
 		if (!jiraHost || !apiToken) return;
 		// Do NOT block on absence-feed readiness. If the absence query is
 		// slow / unreachable, the dashboard renders with an empty absence
@@ -268,8 +290,27 @@ export function useDashboardDataFetcher() {
 								'fetch',
 							);
 
+						const entries = deriveWeekWorklogs(
+							allData,
+							email,
+							weekStart,
+							weekEnd,
+						);
+						// ADA-436/476: the raw fetch may return worklogs that all belong
+						// to other authors — the email filter then leaves zero and My Week
+						// looks empty for no obvious reason. Flag it so the empty state can
+						// explain it ("Loaded N but none match <email>"). ADA-436 only
+						// emitted a test-time warning; this surfaces it at runtime.
+						if (!signal.aborted) {
+							setFilteredOutEmpty(
+								allData.length > 0 && entries.length === 0
+									? { rawCount: allData.length, email }
+									: null,
+							);
+						}
+
 						return {
-							entries: deriveWeekWorklogs(allData, email, weekStart, weekEnd),
+							entries,
 							ghosts: deriveWeekGhosts(allData, email, weekStart, weekEnd),
 						};
 					} catch (e) {
@@ -399,5 +440,8 @@ export function useDashboardDataFetcher() {
 		templates,
 		calendarMappings,
 		queryClient,
+		refetchNonce,
 	]);
+
+	return { refetch, filteredOutEmpty };
 }

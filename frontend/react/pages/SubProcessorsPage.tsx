@@ -57,7 +57,7 @@ const ACTIVE_SUB_PROCESSORS: SubProcessorRow[] = [
 	{
 		name: 'PostHog',
 		purpose:
-			'Cookieless product analytics: page views and a small set of product events. No autocapture, no session recording, and no persistent identifiers — so no consent banner is required.',
+			'Cookieless product analytics: page views and a small set of product events. No autocapture, no session recording, and no persistent identifiers — so no consent banner is required. Uncaught errors are captured for debugging with their message and stack trace stripped before sending, so no Jira data leaves the browser. Can be turned off in Settings (Do Not Track is honored).',
 		region: 'EU (Germany), via PostHog EU Cloud',
 		dpa: { label: 'posthog.com/dpa', href: 'https://posthog.com/dpa' },
 	},
@@ -136,10 +136,14 @@ export const SubProcessorsPage: React.FC = () => {
 			<section className={styles.section}>
 				<h2 className={styles.heading}>What we don't process</h2>
 				<p className={styles.body}>
-					Hoursmith is designed so that the data you care most about never
-					leaves your browser and is never sent to our servers. The hosted
-					service exists to handle authentication, billing, and a stateless CORS
-					proxy for Jira requests — nothing else.
+					Hoursmith is designed so that the data you care most about is never
+					stored on our servers. On the free / self-hosted tier it never leaves
+					your browser at all. On the hosted tier, Jira requests (and the token
+					that signs them) are forwarded through our EU CORS proxy in-transit so
+					they can reach your Jira instance, but nothing is inspected, logged,
+					or persisted. The hosted service exists to handle authentication,
+					billing, and that stateless CORS proxy for Jira requests — nothing
+					else.
 				</p>
 
 				<div className={styles.bodyList}>
@@ -153,8 +157,9 @@ export const SubProcessorsPage: React.FC = () => {
 					<p className={styles.body}>
 						<strong>Jira workspace data.</strong> Issues, worklogs, comments,
 						attachments, sprints, and any other content fetched from your Jira
-						instance are processed entirely in the browser. No Jira payload is
-						written to any Hoursmith database, log, or cache.
+						instance are processed in the browser. On the hosted tier the
+						response passes back through the CORS proxy in-transit; no Jira
+						payload is written to any Hoursmith database, log, or cache.
 					</p>
 					<p className={styles.body}>
 						<strong>User settings, templates, and favorites.</strong> Report

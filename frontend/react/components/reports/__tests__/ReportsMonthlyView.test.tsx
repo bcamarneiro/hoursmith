@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ReportsMonthlyView } from '../ReportsMonthlyView';
 
 const noop = () => {};
@@ -46,5 +46,45 @@ describe('ReportsMonthlyView', () => {
 			</MemoryRouter>,
 		);
 		expect(screen.getByText('Unable to load timesheets')).toBeTruthy();
+	});
+
+	it('maps a 401 error to a credentials message via the mapper (ADA-475)', () => {
+		render(
+			<MemoryRouter>
+				<ReportsMonthlyView
+					{...baseProps}
+					errorMessage="Jira search unauthorized (HTTP 401)"
+				/>
+			</MemoryRouter>,
+		);
+		expect(screen.getByText(/api token/i)).toBeTruthy();
+	});
+
+	it('renders a "Try again" button that re-triggers the fetch (ADA-476)', () => {
+		const onRetry = vi.fn();
+		render(
+			<MemoryRouter>
+				<ReportsMonthlyView
+					{...baseProps}
+					errorMessage="Jira search unauthorized (HTTP 401)"
+					onRetry={onRetry}
+				/>
+			</MemoryRouter>,
+		);
+		fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+		expect(onRetry).toHaveBeenCalledTimes(1);
+	});
+
+	it('omits "Try again" for the not-configured error (only a Settings nudge)', () => {
+		render(
+			<MemoryRouter>
+				<ReportsMonthlyView
+					{...baseProps}
+					errorMessage="Jira host not configured"
+					onRetry={() => {}}
+				/>
+			</MemoryRouter>,
+		);
+		expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
 	});
 });

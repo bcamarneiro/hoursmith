@@ -58,6 +58,7 @@ function buildMisconfiguredContext(): AuthContextValue {
 		user: null,
 		session: null,
 		isLoading: false,
+		sessionError: null,
 		signIn: fail,
 		signUp: async () => ({
 			error: MISSING_ENV_ERROR,
@@ -72,6 +73,13 @@ export interface AuthContextValue {
 	user: User | null;
 	session: Session | null;
 	isLoading: boolean;
+	/**
+	 * Non-PII signal that the initial session could not be restored (network /
+	 * config failure on `getSession`, or a SIGNED_OUT event after having been
+	 * signed in). `RequireAuth` reads this to explain the redirect instead of
+	 * dropping the user on a bare login screen (ADA-476). `null` when healthy.
+	 */
+	sessionError: string | null;
 	signIn: (
 		email: string,
 		password: string,
@@ -124,9 +132,13 @@ function ConfiguredAuthProvider({
 	const [session, setSession] = useState<Session | null>(null);
 	const [user, setUser] = useState<User | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
+	const [sessionError, setSessionError] = useState<string | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
+		// Track whether we ever had a session, so a later SIGNED_OUT means the
+		// session expired (vs. simply never having been signed in).
+		let hadSession = false;
 
 		supabase.auth
 			.getSession()
@@ -134,18 +146,33 @@ function ConfiguredAuthProvider({
 				if (cancelled) return;
 				setSession(data.session);
 				setUser(data.session?.user ?? null);
+				hadSession = !!data.session;
+				setSessionError(null);
 			})
 			.catch(() => {
-				// Network/config failure — leave unauthenticated.
+				// Network/config failure — surface a signal so the route guard can
+				// explain the redirect instead of failing silently (ADA-476).
+				if (cancelled) return;
+				setSessionError(
+					'We couldn’t restore your session. Please sign in again.',
+				);
 			})
 			.finally(() => {
 				if (!cancelled) setIsLoading(false);
 			});
 
 		const { data: sub } = supabase.auth.onAuthStateChange(
-			(_event, nextSession) => {
+			(event, nextSession) => {
 				setSession(nextSession);
 				setUser(nextSession?.user ?? null);
+				if (nextSession) {
+					hadSession = true;
+					setSessionError(null);
+				} else if (event === 'SIGNED_OUT' && hadSession) {
+					// Expired / revoked / cross-tab sign-out after being authenticated.
+					hadSession = false;
+					setSessionError('Your session expired — please sign in again.');
+				}
 			},
 		);
 
@@ -218,12 +245,22 @@ function ConfiguredAuthProvider({
 			user,
 			session,
 			isLoading,
+			sessionError,
 			signIn,
 			signUp,
 			signInWithGitHub,
 			signOut,
 		}),
-		[user, session, isLoading, signIn, signUp, signInWithGitHub, signOut],
+		[
+			user,
+			session,
+			isLoading,
+			sessionError,
+			signIn,
+			signUp,
+			signInWithGitHub,
+			signOut,
+		],
 	);
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

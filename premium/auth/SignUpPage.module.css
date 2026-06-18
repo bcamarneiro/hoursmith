@@ -127,3 +127,23 @@
 	color: var(--color-primary);
 	text-decoration: none;
 }
+
+/* ADA-471 — inline password-rule hint under the password field. */
+.hint {
+	margin: 0;
+	font-size: var(--text-xs);
+	color: var(--color-text-muted);
+}
+
+/* ADA-471 — Terms/Privacy acknowledgement under the create-account button. */
+.terms {
+	margin: 0;
+	font-size: var(--text-xs);
+	color: var(--color-text-muted);
+	text-align: center;
+}
+
+.terms a {
+	color: var(--color-primary);
+	text-decoration: none;
+}

@@ -105,7 +105,11 @@ export function SignUpPage(): JSX.Element {
 							minLength={8}
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
+							aria-describedby="signup-password-hint"
 						/>
+						<p id="signup-password-hint" className={styles.hint}>
+							At least 8 characters.
+						</p>
 					</div>
 					{error && (
 						<p className={styles.error} role="alert">
@@ -115,6 +119,11 @@ export function SignUpPage(): JSX.Element {
 					<button type="submit" className={styles.primary} disabled={pending}>
 						{pending ? 'Creating account…' : 'Create account'}
 					</button>
+					<p className={styles.terms}>
+						By creating an account you agree to the{' '}
+						<Link to="/terms">Terms</Link> and{' '}
+						<Link to="/privacy">Privacy Policy</Link>.
+					</p>
 				</form>
 
 				<p className={styles.footer}>

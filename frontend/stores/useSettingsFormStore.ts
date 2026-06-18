@@ -82,6 +82,28 @@ async function fetchWithTimeout(
 	}
 }
 
+/**
+ * Status-specific copy for a failed Jira connection test (ADA-475). Mirrors the
+ * GitLab test's status-specific messages right below `testJira`, instead of the
+ * bare `Jira API error: <status>` it threw before. `host` is the effective Jira
+ * (or proxy/Jira) base the request hit, so the message names what failed.
+ */
+function describeJiraTestStatus(status: number, host: string): string {
+	if (status === 401) {
+		return `Jira rejected the credentials for ${host} (401). Check the email and API token are correct and the token is still active.`;
+	}
+	if (status === 403) {
+		return `Jira accepted the request but denied access on ${host} (403). Check the account's permissions.`;
+	}
+	if (status === 404) {
+		return `Could not find the Jira API on ${host} (404). Confirm the host name (and proxy URL, if used).`;
+	}
+	if (status >= 500) {
+		return `Jira returned a server error on ${host} (${status}). This is usually temporary — please retry.`;
+	}
+	return `Jira API error on ${host}: ${status}.`;
+}
+
 const emptyTest: IntegrationTestResult = { loading: false, result: null };
 const resetIntegrationTests = () => ({
 	jira: { ...emptyTest },
@@ -192,7 +214,7 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				timeoutHostLabel,
 			);
 			if (!myselfRes.ok) {
-				throw new Error(`Jira API error: ${myselfRes.status}`);
+				throw new Error(describeJiraTestStatus(myselfRes.status, host));
 			}
 			const myself = (await myselfRes.json()) as {
 				displayName?: string;
@@ -295,12 +317,17 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 			}
 		} catch (error) {
 			logger.error('[Test] Jira failed:', error);
+			const rawMessage =
+				error instanceof Error ? error.message : 'Connection failed';
+			const isCorsFailure =
+				error instanceof TypeError ||
+				/failed to fetch|networkerror|load failed|cors/i.test(rawMessage);
 			const message =
 				error instanceof TestTimeoutError
 					? `No response from ${error.host} within ${JIRA_TEST_TIMEOUT_MS / 1000}s — check the proxy is running / the host is reachable.`
-					: error instanceof Error
-						? error.message
-						: 'Connection failed';
+					: isCorsFailure
+						? 'Your browser blocked direct access to Jira (CORS). Configure a CORS proxy in Settings, or use the hosted proxy.'
+						: rawMessage;
 			set((s) => ({
 				integrationTests: {
 					...s.integrationTests,

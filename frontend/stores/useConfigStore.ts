@@ -60,6 +60,14 @@ export interface Config {
 	 * so exports are clean and don't leak the Jira host / build version.
 	 */
 	includeCsvProvenance: boolean;
+	/**
+	 * When true, anonymous product analytics are suppressed. Default false
+	 * (analytics on, so a missing/undefined value behaves as opted-in). Read by
+	 * `analytics.ts` to gate capture; this store only owns the field + its
+	 * normalisation. Optional so existing full-`Config` fixtures/literals keep
+	 * compiling — `createDefaultConfig`/`normalizeConfig` always populate it.
+	 */
+	analyticsOptOut?: boolean;
 }
 
 interface ConfigState {
@@ -67,7 +75,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 6;
+export const CONFIG_STORAGE_VERSION = 7;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -178,6 +186,7 @@ export function createDefaultConfig(): Config {
 		timeRounding: 'off',
 		includeAbsenceInCsv: true,
 		includeCsvProvenance: false,
+		analyticsOptOut: false,
 	};
 }
 
@@ -278,6 +287,10 @@ export function normalizeConfig(
 			typeof config?.includeCsvProvenance === 'boolean'
 				? config.includeCsvProvenance
 				: fallback.includeCsvProvenance,
+		analyticsOptOut:
+			typeof config?.analyticsOptOut === 'boolean'
+				? config.analyticsOptOut
+				: fallback.analyticsOptOut,
 	};
 }
 
@@ -292,6 +305,8 @@ export function normalizeConfig(
  *   v6 → AbsenceAssignment.userEmail (string) → userEmails (string[]). The
  *        legacy shape is handled by `normalizeAbsenceAssignment` so the
  *        migrate step is a no-op pass-through normaliser.
+ *   v7 → added analyticsOptOut (boolean, default false). No shape change;
+ *        `normalizeConfig` fills the field for pre-v7 blobs.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -299,7 +314,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v6(
+function migrateLegacy_v0_to_v7(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -313,7 +328,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v6(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v7(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and

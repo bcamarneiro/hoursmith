@@ -91,7 +91,9 @@ export const HomePage: React.FC = () => {
 					<p className={styles.description}>
 						A team-lead's dashboard that pulls everyone's logged hours into one
 						view. Spot missed days at a glance, then export clean CSVs at
-						month-end. Browser-only — your team's data stays where it is.
+						month-end. Runs in your browser — self-host and nothing leaves your
+						machine, or use the hosted tier and your data is only forwarded
+						through our EU proxy in-transit, never stored.
 					</p>
 
 					<div className={styles.buttonContainer}>

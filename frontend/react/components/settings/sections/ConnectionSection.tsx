@@ -88,6 +88,10 @@ export const ConnectionSection: React.FC<Props> = ({
 					required
 				/>
 				<small>
+					The domain you see in Jira, like{' '}
+					<code>your-company.atlassian.net</code>.
+				</small>
+				<small>
 					Hostname only is ideal, but pasted <code>https://</code> URLs are
 					normalized for you
 				</small>
@@ -134,6 +138,15 @@ export const ConnectionSection: React.FC<Props> = ({
 						{showApiToken ? 'Hide' : 'Show'}
 					</button>
 				</div>
+				<small>
+					<a
+						href="https://id.atlassian.com/manage-profile/security/api-tokens"
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						How do I get an API token?
+					</a>
+				</small>
 			</div>
 			<div className={styles.formGroup}>
 				<label htmlFor={corsProxyId}>

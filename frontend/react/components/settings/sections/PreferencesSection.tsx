@@ -25,12 +25,14 @@ type Props = {
 	timeRounding: 'off' | '15m' | '30m';
 	includeAbsenceInCsv: boolean;
 	includeCsvProvenance: boolean;
+	analyticsOptOut: boolean;
 	handleSelectChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 	handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 	themeId: string;
 	timeRoundingId: string;
 	includeAbsenceInCsvId: string;
 	includeCsvProvenanceId: string;
+	analyticsOptOutId: string;
 };
 
 /**
@@ -42,12 +44,14 @@ export const PreferencesSection: React.FC<Props> = ({
 	timeRounding,
 	includeAbsenceInCsv,
 	includeCsvProvenance,
+	analyticsOptOut,
 	handleSelectChange,
 	handleChange,
 	themeId,
 	timeRoundingId,
 	includeAbsenceInCsvId,
 	includeCsvProvenanceId,
+	analyticsOptOutId,
 }) => {
 	// ADA-451: apply the selected theme live as the user changes it, instead of
 	// only after Save. On unmount (e.g. navigating away without saving) restore
@@ -123,6 +127,23 @@ export const PreferencesSection: React.FC<Props> = ({
 					Appends a `# generated=… jira=… policy=… period=…` line for
 					audit/traceability. Off by default so exports stay clean and don't
 					expose the Jira host or build version.
+				</small>
+			</div>
+			<div className={styles.formGroup}>
+				<span className={styles.fieldLabel}>Product analytics</span>
+				<label>
+					<input
+						type="checkbox"
+						id={analyticsOptOutId}
+						name="analyticsOptOut"
+						checked={analyticsOptOut}
+						onChange={handleChange}
+					/>{' '}
+					Opt out of anonymous analytics
+				</label>
+				<small>
+					When checked, Hoursmith stops sending anonymous, privacy-preserving
+					product analytics. No personal data or Jira content is ever collected.
 				</small>
 			</div>
 		</fieldset>

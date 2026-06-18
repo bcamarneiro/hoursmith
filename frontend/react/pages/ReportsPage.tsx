@@ -138,6 +138,7 @@ export const ReportsPage: React.FC = () => {
 		dataUpdatedAt: monthlyDataUpdatedAt,
 		errorMessage,
 		worklogProgress: monthlyWorklogProgress,
+		refetch: refetchMonthly,
 	} = useTimesheetDataFetcher({
 		enabled: viewMode === 'monthly',
 	});
@@ -299,6 +300,18 @@ export const ReportsPage: React.FC = () => {
 		});
 		return sorted;
 	}, [filteredTeamMembers, sortField, sortDirection]);
+
+	// Recovery affordance (ADA-476): re-run the active view's fetch from the
+	// data-error surface, rather than only linking to Settings.
+	const handleRetryMonthly = useCallback(() => {
+		void refetchMonthly?.();
+	}, [refetchMonthly]);
+
+	const handleRetryWeekly = useCallback(() => {
+		// useTeamData has no refetch handle; invalidating the month worklog
+		// queries forces the mounted team queries to refetch.
+		void queryClient.invalidateQueries({ queryKey: ['monthWorklogs'] });
+	}, [queryClient]);
 
 	const handleSort = (field: SortField) => {
 		if (sortField === field) {
@@ -657,6 +670,7 @@ export const ReportsPage: React.FC = () => {
 					monthlyWorklogProgress={monthlyWorklogProgress}
 					monthlySummary={monthlySummary}
 					errorMessage={errorMessage}
+					onRetry={handleRetryMonthly}
 					onUserChange={handleUserChange}
 					onDownloadUser={handleDownloadUser}
 				/>
@@ -808,6 +822,7 @@ export const ReportsPage: React.FC = () => {
 					trendsError={trendsError}
 					hasNoFilteredWeeklyResults={hasNoFilteredWeeklyResults}
 					weeklySummary={weeklySummary}
+					onRetry={handleRetryWeekly}
 					onMemberClick={handleMemberClick}
 					notConfigured={!config.jiraHost || !config.apiToken}
 				/>
@@ -829,6 +844,7 @@ export const ReportsPage: React.FC = () => {
 					monthlyWorklogProgress={monthlyWorklogProgress}
 					monthlySummary={monthlySummary}
 					errorMessage={errorMessage}
+					onRetry={handleRetryMonthly}
 					onUserChange={handleUserChange}
 					onDownloadUser={handleDownloadUser}
 				/>

@@ -4,7 +4,10 @@ import type {
 	AbsenceAssignment,
 	CalendarFeed,
 } from '../../../stores/useConfigStore';
-import { useConfigStore } from '../../../stores/useConfigStore';
+import {
+	createDefaultConfig,
+	useConfigStore,
+} from '../../../stores/useConfigStore';
 import { useSettingsFormStore } from '../../../stores/useSettingsFormStore';
 import { useUserDataStore } from '../../../stores/useUserDataStore';
 import {
@@ -172,6 +175,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const themeId = useId();
 	const includeAbsenceInCsvId = useId();
 	const includeCsvProvenanceId = useId();
+	const analyticsOptOutId = useId();
 	const isDirty = JSON.stringify(formData) !== JSON.stringify(savedConfig);
 	const canTestJira =
 		!!formData.jiraHost.trim() &&
@@ -349,6 +353,28 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 
 	const handleImportClick = () => {
 		fileInputRef.current?.click();
+	};
+
+	// ADA-474: wipe the locally-stored config (including the Jira API token) from
+	// localStorage and reset the in-memory config to defaults. Guarded by a
+	// confirm so a stray click can't destroy a working setup.
+	const handleClearLocalData = () => {
+		const confirmed =
+			typeof window === 'undefined' ||
+			window.confirm(
+				'Clear local data? This removes your saved configuration and Jira API token from this browser. This cannot be undone.',
+			);
+		if (!confirmed) return;
+		const cleared = createDefaultConfig();
+		useConfigStore.getState().setConfig(cleared);
+		replaceFormData(cleared);
+		try {
+			window.localStorage?.removeItem('hoursmith-config');
+		} catch {
+			// Ignore storage access failures (private mode / disabled storage) —
+			// the in-memory reset above is the source of truth either way.
+		}
+		toast.success('Local data cleared');
 	};
 
 	const handleImportSettings = async (
@@ -534,12 +560,14 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							timeRounding={formData.timeRounding}
 							includeAbsenceInCsv={formData.includeAbsenceInCsv}
 							includeCsvProvenance={formData.includeCsvProvenance}
+							analyticsOptOut={formData.analyticsOptOut ?? false}
 							handleSelectChange={handleSelectChange}
 							handleChange={handleChange}
 							themeId={themeId}
 							timeRoundingId={timeRoundingId}
 							includeAbsenceInCsvId={includeAbsenceInCsvId}
 							includeCsvProvenanceId={includeCsvProvenanceId}
+							analyticsOptOutId={analyticsOptOutId}
 						/>
 					</div>
 
@@ -551,6 +579,65 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 								teammate, or import a saved file. Save and Discard for the
 								current form are always available in the bar below.
 							</p>
+
+							<div className={styles.dataActionRow}>
+								<div className={styles.dataActionCopy}>
+									<strong>Full backup</strong>
+									<p className={styles.dataActionWarning}>
+										Includes your API token — keep it private. Use{' '}
+										<strong>Share Pack</strong> to share with teammates.
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={handleExportSettings}
+								>
+									Backup
+								</Button>
+							</div>
+
+							<div className={styles.dataActionRow}>
+								<div className={styles.dataActionCopy}>
+									<strong>Share Pack</strong>
+									<p className={styles.dataSectionHint}>
+										The safe way to share with a teammate — strips your API
+										token and other local secrets before export.
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={handleExportSharePack}
+								>
+									Share Pack
+								</Button>
+							</div>
+
+							<div className={styles.dataActionRow}>
+								<div className={styles.dataActionCopy}>
+									<strong>Clear local data</strong>
+									<p className={styles.dataSectionHint}>
+										Removes your saved configuration and Jira API token from
+										this browser. You can also{' '}
+										<a
+											href="https://id.atlassian.com/manage-profile/security/api-tokens"
+											target="_blank"
+											rel="noopener noreferrer"
+										>
+											revoke your Jira token
+										</a>{' '}
+										at Atlassian.
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={handleClearLocalData}
+								>
+									Clear local data
+								</Button>
+							</div>
 						</section>
 					</div>
 				</div>

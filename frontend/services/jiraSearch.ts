@@ -24,7 +24,7 @@
  */
 
 import { rewriteForHostedProxy } from './jiraGateway';
-import { fromHttpResponse } from './serviceErrors';
+import { fromHttpResponseAsync } from './serviceErrors';
 
 /**
  * The slice of connection config the search seam needs. A structural subset of
@@ -125,7 +125,10 @@ export async function fetchSearchPage<T = unknown>(
 		headers: rewritten.headers,
 		signal,
 	});
-	if (!res.ok) throw fromHttpResponse('Jira search', res.status);
+	// On 401/403 the hosted proxy returns an entitlement code in the body — read
+	// it so the UI can distinguish "Hoursmith session expired" from "bad Jira
+	// token" (ADA-475). A genuine Jira 401 (direct/self-host) has no code.
+	if (!res.ok) throw await fromHttpResponseAsync('Jira search', res);
 
 	const data = (await res.json()) as {
 		issues?: T[];

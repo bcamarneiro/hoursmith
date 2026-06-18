@@ -78,6 +78,27 @@ describe('deriveWeekWorklogs', () => {
 			deriveWeekWorklogs([wl], EMAIL, '2025-10-13', '2025-10-19'),
 		).toHaveLength(0);
 	});
+
+	it('leaves zero entries when raw worklogs are all other-author (the filtered-out-empty precondition, ADA-436/476)', () => {
+		// The hook flags `filteredOutEmpty` when the raw fetch is non-empty but the
+		// email filter leaves zero — exactly this shape: 2 raw worklogs, none ours.
+		const raw = [
+			makeWorklog({
+				id: '1',
+				started: '2025-10-15T09:00:00Z',
+				authorEmail: 'a@other.com',
+			}),
+			makeWorklog({
+				id: '2',
+				started: '2025-10-16T09:00:00Z',
+				authorEmail: 'b@other.com',
+			}),
+		];
+		expect(raw.length).toBeGreaterThan(0);
+		expect(
+			deriveWeekWorklogs(raw, EMAIL, '2025-10-13', '2025-10-19'),
+		).toHaveLength(0);
+	});
 });
 
 describe('deriveWeekGhosts', () => {
