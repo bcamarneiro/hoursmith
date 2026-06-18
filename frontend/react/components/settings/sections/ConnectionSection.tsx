@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useState } from 'react';
 import { SETTINGS_SECTION_IDS } from '../../../constants/settingsSections';
 import { useProxyBadge } from '../../../hooks/useProxyBadge';
 import { PremiumWaitlistForm } from '../../marketing/PremiumWaitlistForm';
@@ -43,6 +44,8 @@ export const ConnectionSection: React.FC<Props> = ({
 	apiTokenId,
 	corsProxyId,
 }) => {
+	// ADA-446: API token renders masked by default with a reveal/hide toggle.
+	const [showApiToken, setShowApiToken] = useState(false);
 	// ADA-273: when the user is signed in with an active Premium subscription
 	// we auto-route through the hosted CORS proxy. The badge + override link
 	// below makes this visible and keeps an escape hatch.
@@ -106,14 +109,31 @@ export const ConnectionSection: React.FC<Props> = ({
 			</div>
 			<div className={styles.formGroup}>
 				<label htmlFor={apiTokenId}>API Token</label>
-				<input
-					type="password"
-					id={apiTokenId}
-					name="apiToken"
-					value={formData.apiToken}
-					onChange={handleChange}
-					required
-				/>
+				<div className={styles.secretInputRow}>
+					<input
+						type={showApiToken ? 'text' : 'password'}
+						id={apiTokenId}
+						name="apiToken"
+						value={formData.apiToken}
+						onChange={handleChange}
+						autoComplete="off"
+						autoCapitalize="off"
+						autoCorrect="off"
+						spellCheck={false}
+						required
+					/>
+					<button
+						type="button"
+						className={styles.revealButton}
+						onClick={() => setShowApiToken((value) => !value)}
+						aria-pressed={showApiToken}
+						aria-controls={apiTokenId}
+						aria-label={showApiToken ? 'Hide API token' : 'Show API token'}
+						title={showApiToken ? 'Hide API token' : 'Show API token'}
+					>
+						{showApiToken ? 'Hide' : 'Show'}
+					</button>
+				</div>
 			</div>
 			<div className={styles.formGroup}>
 				<label htmlFor={corsProxyId}>

@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { parseReportsURLParams } from '../useReportsURLState';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+	getInitialViewModeFromURL,
+	parseReportsURLParams,
+} from '../useReportsURLState';
 
 describe('parseReportsURLParams', () => {
 	it('parses a canonical reports URL', () => {
@@ -76,5 +79,34 @@ describe('parseReportsURLParams', () => {
 			false,
 		);
 		expect(parseReportsURLParams('?manager=yes').managerMode).toBe(false);
+	});
+});
+
+describe('getInitialViewModeFromURL (ADA-448)', () => {
+	const originalSearch = window.location.search;
+
+	afterEach(() => {
+		window.history.replaceState({}, '', `/${originalSearch}`);
+	});
+
+	function setSearch(search: string) {
+		window.history.replaceState({}, '', `/reports${search}`);
+	}
+
+	it('honors ?view=monthly on initial load', () => {
+		setSearch('?view=monthly&year=2025&month=10');
+		expect(getInitialViewModeFromURL()).toBe('monthly');
+	});
+
+	it('returns weekly when the param is absent', () => {
+		setSearch('');
+		expect(getInitialViewModeFromURL()).toBe('weekly');
+	});
+
+	it('returns weekly for any non-monthly value', () => {
+		setSearch('?view=weekly');
+		expect(getInitialViewModeFromURL()).toBe('weekly');
+		setSearch('?view=nonsense');
+		expect(getInitialViewModeFromURL()).toBe('weekly');
 	});
 });

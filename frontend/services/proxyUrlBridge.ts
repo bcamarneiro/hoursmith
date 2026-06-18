@@ -46,6 +46,88 @@ const STATE: ProxyOverrideState = {
 	supabaseAccessToken: null,
 };
 
+/**
+ * Compute the hosted proxy URL the app should hit. Reads `VITE_APP_ORIGIN`
+ * (tests / dev override) and falls back to `window.location.origin` so prod
+ * "just works" wherever it's deployed. Mirrors `getHostedProxyUrl()` in
+ * `premium/auth/useSubscription.ts` — kept here so the bridge can self-bootstrap
+ * without importing across the premium boundary.
+ */
+function computeHostedProxyUrl(): string | null {
+	if (typeof window === 'undefined') return null;
+	const fromEnv =
+		typeof process !== 'undefined' && process.env?.VITE_APP_ORIGIN
+			? process.env.VITE_APP_ORIGIN
+			: null;
+	const origin = fromEnv || window.location.origin;
+	if (!origin) return null;
+	return `${origin.replace(/\/+$/, '')}/api/proxy`;
+}
+
+/**
+ * Read the access token from any persisted Supabase session in localStorage.
+ *
+ * The browser Supabase client (`premium/auth/supabaseClient.ts`) is created with
+ * `persistSession: true`, which stores the session as JSON under a key of the
+ * form `sb-<project-ref>-auth-token`. On a COLD page load the React effect in
+ * `useSubscription` that populates this bridge has not run yet when the first
+ * worklog query fires — so the gateway would see no hosted URL and go *direct*
+ * to Atlassian, CORS-failing before React Query retries through `/api/proxy`
+ * (ADA-447). Reading the persisted token synchronously at module init lets us
+ * route through the hosted proxy from the very first request for an already
+ * signed-in premium user. The server still enforces entitlement (401 if not
+ * premium), and `useSubscription` clears the bridge on a confirmed non-active
+ * subscription — so a logged-in free user safely falls back to their own proxy.
+ *
+ * Pure localStorage read of a generic value: no import from `premium/**`, so the
+ * cross-tier boundary stays intact.
+ */
+function readPersistedSupabaseToken(): string | null {
+	if (typeof window === 'undefined') return null;
+	let storage: Storage;
+	try {
+		storage = window.localStorage;
+		if (!storage) return null;
+	} catch {
+		// Access can throw (privacy mode, blocked storage). Treat as signed-out.
+		return null;
+	}
+	try {
+		for (let i = 0; i < storage.length; i += 1) {
+			const key = storage.key(i);
+			if (!key || !/^sb-.*-auth-token$/.test(key)) continue;
+			const raw = storage.getItem(key);
+			if (!raw) continue;
+			const parsed = JSON.parse(raw) as {
+				access_token?: unknown;
+				currentSession?: { access_token?: unknown };
+			} | null;
+			const token =
+				parsed?.access_token ?? parsed?.currentSession?.access_token ?? null;
+			if (typeof token === 'string' && token.length > 0) return token;
+		}
+	} catch {
+		// Malformed/partial entry — ignore and stay signed-out.
+		return null;
+	}
+	return null;
+}
+
+/**
+ * Synchronously bootstrap the bridge from a persisted Supabase session so the
+ * very first Jira query on a cold load routes through the hosted proxy for an
+ * already-authenticated user, instead of racing the `useSubscription` effect and
+ * firing a direct-to-Atlassian (CORS-failing) request first (ADA-447).
+ */
+function bootstrapFromPersistedSession(): void {
+	const token = readPersistedSupabaseToken();
+	if (!token) return;
+	STATE.supabaseAccessToken = token;
+	STATE.hostedProxyUrl = computeHostedProxyUrl();
+}
+
+bootstrapFromPersistedSession();
+
 // Cached frozen snapshot — returned by `getProxyOverrideState()` until a
 // mutation triggers `emit()`. Required by `useSyncExternalStore`: the getter
 // must return a stable reference between renders, otherwise React flags an

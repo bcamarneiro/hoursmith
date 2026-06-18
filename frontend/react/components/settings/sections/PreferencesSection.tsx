@@ -1,6 +1,24 @@
 import type React from 'react';
+import { useEffect } from 'react';
+import { useConfigStore } from '../../../../stores/useConfigStore';
 import { SETTINGS_SECTION_IDS } from '../../../constants/settingsSections';
 import * as styles from '../SettingsForm.module.css';
+
+/**
+ * Apply a theme to the document root. Mirrors the shared `useTheme` hook's DOM
+ * mechanism (data-theme attribute) so we can offer a live preview from inside
+ * Settings without editing the App-owned theme provider (ADA-451).
+ */
+function applyThemeToDocument(theme: 'system' | 'light' | 'dark'): void {
+	if (typeof document === 'undefined') return;
+	if (theme === 'light') {
+		document.documentElement.setAttribute('data-theme', 'light');
+	} else if (theme === 'dark') {
+		document.documentElement.setAttribute('data-theme', 'dark');
+	} else {
+		document.documentElement.removeAttribute('data-theme');
+	}
+}
 
 type Props = {
 	theme: 'system' | 'light' | 'dark';
@@ -31,6 +49,17 @@ export const PreferencesSection: React.FC<Props> = ({
 	includeAbsenceInCsvId,
 	includeCsvProvenanceId,
 }) => {
+	// ADA-451: apply the selected theme live as the user changes it, instead of
+	// only after Save. On unmount (e.g. navigating away without saving) restore
+	// the persisted theme so an un-saved preview never sticks. The App-owned
+	// `useTheme` hook remains the source of truth for the saved value.
+	useEffect(() => {
+		applyThemeToDocument(theme);
+		return () => {
+			applyThemeToDocument(useConfigStore.getState().config.theme);
+		};
+	}, [theme]);
+
 	return (
 		<fieldset id={SETTINGS_SECTION_IDS.preferences} className={styles.section}>
 			<legend className={styles.sectionTitle}>Preferences</legend>

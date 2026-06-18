@@ -55,7 +55,10 @@ module.exports = {
 		ignored: /node_modules/,
 		poll: 1000,
 	},
-	devtool: isDevelopment ? 'eval-cheap-module-source-map' : 'source-map',
+	// Prod uses 'hidden-source-map': maps are still emitted (for error-reporting
+	// upload / debugging) but no `//# sourceMappingURL=` comment is added to the
+	// chunks, so the full source isn't discoverable/fetchable by visitors.
+	devtool: isDevelopment ? 'eval-cheap-module-source-map' : 'hidden-source-map',
 	plugins: [
 		new HtmlWebpackPlugin({
 			template: './frontend/index.html',
