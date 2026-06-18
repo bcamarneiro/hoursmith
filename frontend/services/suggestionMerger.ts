@@ -4,7 +4,11 @@ import type {
 	RescueTimeDaySummary,
 	WorklogSuggestion,
 } from '../../types/Suggestion';
-import { addDaysToIsoDate, parseIsoDateLocal } from '../react/utils/date';
+import {
+	addDaysToIsoDate,
+	isWeekend,
+	parseIsoDateLocal,
+} from '../react/utils/date';
 import { computeDayTargetSeconds } from '../react/utils/dayTarget';
 import type {
 	FavoriteIssue,
@@ -320,8 +324,7 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 	for (const date of dates) {
 		const d = parseIsoDateLocal(date);
 		const dayOfWeek = d.getDay();
-		const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-		if (isWeekend) continue;
+		if (isWeekend(date)) continue;
 
 		for (const fav of favorites) {
 			const key = `${date}::${fav.issueKey}`;
@@ -368,13 +371,13 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 	return dates.map((date) => {
 		const d = parseIsoDateLocal(date);
 		const dayOfWeek = d.getDay();
-		const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+		const weekend = isWeekend(date);
 		const loggedSeconds = loggedByDay.get(date) || 0;
 		const absenceDay = absenceDays?.get(date);
 		const isTimeOff =
-			!isWeekend && (absenceDay ? true : (absenceDates?.has(date) ?? false));
+			!weekend && (absenceDay ? true : (absenceDates?.has(date) ?? false));
 		const targetSeconds = computeDayTargetSeconds(
-			isWeekend,
+			weekend,
 			isTimeOff,
 			loggedSeconds,
 		);
@@ -419,7 +422,7 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 		return {
 			date,
 			dayOfWeek,
-			isWeekend,
+			isWeekend: weekend,
 			loggedSeconds,
 			targetSeconds,
 			gapSeconds,

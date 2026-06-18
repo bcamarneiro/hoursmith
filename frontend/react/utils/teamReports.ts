@@ -1,30 +1,29 @@
 import type { UserAbsenceDays } from '../../services/absenceService';
 import type { WorklogItem } from '../../services/monthWorklogService';
 import type { TeamMemberSummary } from '../../services/teamService';
-import { addDaysToIsoDate } from './date';
+import {
+	addDaysToIsoDate,
+	isWeekend,
+	parseIsoDateLocal,
+	toLocalDateString,
+} from './date';
 import { sumWeekdayTargetSeconds } from './dayTarget';
 import { classifyWorklog } from './worklogClassifier';
 
-function toDateStr(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const day = String(date.getDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
-}
-
 function isWeekday(dateStr: string): boolean {
-	const date = new Date(dateStr);
-	const day = date.getDay();
-	return day !== 0 && day !== 6;
+	return !isWeekend(dateStr);
 }
 
 export function getWeekdaysBetween(start: string, end: string): string[] {
 	const days: string[] = [];
-	const current = new Date(start);
-	const last = new Date(end);
+	// Parse the bounds as local dates (parseIsoDateLocal) rather than via
+	// `new Date(string)`, which interprets a bare YYYY-MM-DD as UTC midnight and
+	// then drifts a day when read back in a negative-offset timezone (ADA-457).
+	const current = parseIsoDateLocal(start);
+	const last = parseIsoDateLocal(end);
 
 	while (current <= last) {
-		const dateStr = toDateStr(current);
+		const dateStr = toLocalDateString(current);
 		if (isWeekday(dateStr)) {
 			days.push(dateStr);
 		}
@@ -50,15 +49,31 @@ export function buildTeamSummaries(
 	absenceDaysByUser?: UserAbsenceDays,
 ): TeamMemberSummary[] {
 	const allowedSet = parseAllowedUsers(allowedUsers);
+	// Group on a STABLE key so we never (a) drop authors that have no
+	// emailAddress, nor (b) merge two distinct people who share a displayName
+	// (ADA-458). Preference: accountId → email → a clearly-marked synthetic
+	// fallback. `email` is still tracked separately because it drives the
+	// absence-map lookup and the downstream summary field.
 	const memberMap = new Map<
 		string,
-		{ displayName: string; dailySeconds: Map<string, number> }
+		{
+			displayName: string;
+			email: string;
+			dailySeconds: Map<string, number>;
+		}
 	>();
+
+	let fallbackKeySeq = 0;
+	const fallbackKeyByWorklog = new WeakMap<object, string>();
 
 	for (const worklog of worklogs) {
 		const email = worklog.author?.emailAddress?.toLowerCase();
-		if (!email) continue;
-		if (allowedSet && !allowedSet.has(email)) continue;
+		const accountId = worklog.author?.accountId;
+		if (allowedSet) {
+			// Allow-list filtering is email-based; an author with no email can't
+			// match the allow-list, so skip it when a list is configured.
+			if (!email || !allowedSet.has(email)) continue;
+		}
 
 		const c = classifyWorklog(worklog);
 		const day = c.loggedOn;
@@ -68,13 +83,32 @@ export function buildTeamSummaries(
 		// AGENTS.md ghost-reconciliation invariant.
 		if (c.isBackdated) continue;
 
-		let member = memberMap.get(email);
+		let groupKey: string;
+		if (accountId) {
+			groupKey = `acct:${accountId}`;
+		} else if (email) {
+			groupKey = `email:${email}`;
+		} else {
+			// No stable identifier at all: keep this author visible but never
+			// merge them with anyone else. Derive a per-author synthetic key
+			// (stable across this worklog object's repeats only — distinct
+			// authors get distinct keys).
+			let synthetic = fallbackKeyByWorklog.get(worklog as object);
+			if (!synthetic) {
+				synthetic = `unknown:${fallbackKeySeq++}`;
+				fallbackKeyByWorklog.set(worklog as object, synthetic);
+			}
+			groupKey = synthetic;
+		}
+
+		let member = memberMap.get(groupKey);
 		if (!member) {
 			member = {
-				displayName: worklog.author?.displayName || email,
+				displayName: worklog.author?.displayName || email || 'Unknown user',
+				email: email ?? '',
 				dailySeconds: new Map(),
 			};
-			memberMap.set(email, member);
+			memberMap.set(groupKey, member);
 		}
 
 		const existing = member.dailySeconds.get(day) || 0;
@@ -83,9 +117,16 @@ export function buildTeamSummaries(
 
 	if (allowedSet) {
 		for (const email of allowedSet) {
-			if (!memberMap.has(email)) {
-				memberMap.set(email, {
+			const key = `email:${email}`;
+			// An allowed user already grouped by accountId is present under an
+			// `acct:` key; only add a placeholder if no row references this email.
+			const alreadyPresent = [...memberMap.values()].some(
+				(m) => m.email === email,
+			);
+			if (!alreadyPresent) {
+				memberMap.set(key, {
 					displayName: email,
+					email,
 					dailySeconds: new Map(),
 				});
 			}
@@ -102,13 +143,14 @@ export function buildTeamSummaries(
 	const weekdays = getWeekdaysBetween(weekStart, weekEnd);
 
 	const summaries: TeamMemberSummary[] = [];
-	for (const [email, member] of memberMap) {
+	for (const member of memberMap.values()) {
+		const email = member.email;
 		const dailyHours = new Map<string, number>();
 		const totalSeconds = [...member.dailySeconds.values()].reduce(
 			(sum, seconds) => sum + seconds,
 			0,
 		);
-		const memberAbsenceMap = absenceDaysByUser?.get(email);
+		const memberAbsenceMap = email ? absenceDaysByUser?.get(email) : undefined;
 		const isAbsentOnDay = (day: string) => memberAbsenceMap?.has(day) ?? false;
 		const loggedOnDay = (day: string) => member.dailySeconds.get(day) ?? 0;
 		const targetSeconds = sumWeekdayTargetSeconds(
@@ -200,9 +242,13 @@ export function buildManagerTrendModel(
 		const compliantMembers = members.filter(
 			(member) => member.gapSeconds === 0,
 		).length;
+		// Floor (not round) so a near-complete team can never display "100%"
+		// while a member still has a gap — e.g. 199/200 = 99.5 would round up
+		// to 100 and contradict the gap signal (ADA-458). 100% is reserved for
+		// a genuinely gap-free team (compliantMembers === members.length).
 		const complianceRate =
 			members.length > 0
-				? Math.round((compliantMembers / members.length) * 100)
+				? Math.floor((compliantMembers / members.length) * 100)
 				: 0;
 
 		return {
@@ -223,6 +269,7 @@ export function buildManagerTrendModel(
 	const recurringMap = new Map<
 		string,
 		{
+			email: string;
 			displayName: string;
 			gapWeeks: number;
 			totalGapSeconds: number;
@@ -234,7 +281,11 @@ export function buildManagerTrendModel(
 	weekSummaries.forEach(({ members }, index) => {
 		const isCurrentWeek = index === weekSummaries.length - 1;
 		for (const member of members) {
-			const existing = recurringMap.get(member.email) ?? {
+			// Email-less members would all collide on '' — fall back to the
+			// displayName so distinct unknown-email authors aren't merged.
+			const key = member.email || `name:${member.displayName}`;
+			const existing = recurringMap.get(key) ?? {
+				email: member.email,
 				displayName: member.displayName,
 				gapWeeks: 0,
 				totalGapSeconds: 0,
@@ -252,14 +303,14 @@ export function buildManagerTrendModel(
 				existing.currentLoggedSeconds = member.totalSeconds;
 			}
 
-			recurringMap.set(member.email, existing);
+			recurringMap.set(key, existing);
 		}
 	});
 
 	const weeks = weekSummaries.map((item) => item.point);
-	const recurringGapMembers = [...recurringMap.entries()]
-		.map(([email, value]) => ({
-			email,
+	const recurringGapMembers = [...recurringMap.values()]
+		.map((value) => ({
+			email: value.email,
 			displayName: value.displayName,
 			gapWeeks: value.gapWeeks,
 			currentGapSeconds: value.currentGapSeconds,

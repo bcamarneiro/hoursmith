@@ -15,7 +15,9 @@ export const TeamStatsCards: React.FC<Props> = ({ teamMembers }) => {
 	const totalSeconds = teamMembers.reduce((s, m) => s + m.totalSeconds, 0);
 	const hasTarget = teamMembers.some((m) => m.targetSeconds > 0);
 	const compliant = teamMembers.filter((m) => m.gapSeconds === 0).length;
-	const complianceRate = hasTarget ? Math.round((compliant / count) * 100) : -1;
+	// Floor so a near-complete team can't show "100%" while a member still has
+	// a gap (ADA-458); 100% is reserved for compliant === count.
+	const complianceRate = hasTarget ? Math.floor((compliant / count) * 100) : -1;
 	const avgSeconds = Math.round(totalSeconds / count);
 
 	const complianceColor =

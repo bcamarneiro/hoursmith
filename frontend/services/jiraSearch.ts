@@ -165,8 +165,12 @@ export interface SearchAllOptions<T> {
  *   total` (or an empty page is returned).
  *
  * Calls `onPage` after each page (with the running `fetched` count and, on
- * Server, the `total`). Respects `signal`: if aborted, returns whatever was
- * gathered so far.
+ * Server, the `total`).
+ *
+ * Cancellation (ADA-456): an aborted signal throws an `AbortError` rather than
+ * returning a truncated list — a partial result must never be presented as a
+ * complete one. Callers that want a clean cancel can detect `name ===
+ * 'AbortError'`.
  */
 export async function searchAllIssues<T = unknown>(
 	config: JiraSearchConfig,
@@ -180,7 +184,9 @@ export async function searchAllIssues<T = unknown>(
 	let nextPageToken: string | undefined;
 
 	while (true) {
-		if (opts?.signal?.aborted) return all;
+		if (opts?.signal?.aborted) {
+			throw new DOMException('Aborted', 'AbortError');
+		}
 
 		const page = await fetchSearchPage<T>(
 			config,
@@ -203,8 +209,15 @@ export async function searchAllIssues<T = unknown>(
 			if (!page.nextPageToken) break;
 			nextPageToken = page.nextPageToken;
 		} else {
-			const total = page.total ?? 0;
-			if (page.issues.length === 0 || all.length >= total) break;
+			// Server/DC offset pagination. An empty or short page always means the
+			// end. Only trust the `total`-based break when `total` was actually
+			// present in the response — a Server that omits `total` must NOT be
+			// treated as `total = 0` (that would silently drop every page after
+			// the first). When `total` is absent, keep paging until a short/empty
+			// page signals the end. (ADA-456)
+			if (page.issues.length === 0) break;
+			if (page.total !== undefined && all.length >= page.total) break;
+			if (page.issues.length < maxResults) break;
 			startAt += maxResults;
 		}
 	}

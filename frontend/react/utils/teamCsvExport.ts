@@ -77,7 +77,7 @@ export function buildTeamCsv(
 
 		return [
 			csvEscape(m.displayName),
-			m.email,
+			csvEscape(m.email),
 			...dailyCells,
 			(m.totalSeconds / 3600).toFixed(1),
 			backdatedHours,

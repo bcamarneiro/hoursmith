@@ -188,6 +188,34 @@ describe('ReportsWeeklyView', () => {
 		).toBeTruthy();
 	});
 
+	it('guards the per-member progress against a zero target (no NaN width) (ADA-458)', () => {
+		// A member whose whole week is PTO has targetSeconds === 0. A bare
+		// totalSeconds/targetSeconds would feed NaN into ProgressBar's width.
+		const member: TeamMemberSummary = {
+			email: 'pat@example.com',
+			displayName: 'Pat',
+			dailyHours: new Map(),
+			totalSeconds: 0,
+			targetSeconds: 0,
+			gapSeconds: 0,
+		};
+		const { container } = render(
+			<MemoryRouter>
+				<ReportsWeeklyView
+					{...baseProps}
+					teamMembers={[member]}
+					sortedMembers={[member]}
+				/>
+			</MemoryRouter>,
+		);
+		// No rendered style attribute may contain NaN.
+		expect(container.innerHTML).not.toContain('NaN');
+		const fills = container.querySelectorAll('[style*="width"]');
+		for (const el of fills) {
+			expect((el as HTMLElement).style.width).not.toContain('NaN');
+		}
+	});
+
 	it('renders the team error block when teamError is provided', () => {
 		render(
 			<MemoryRouter>

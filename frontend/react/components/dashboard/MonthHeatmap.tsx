@@ -1,7 +1,7 @@
 import type React from 'react';
 import type { AbsenceDay } from '../../../services/absenceService';
 import { getAbsenceKindLabel } from '../../utils/absence';
-import { monthLabel } from '../../utils/date';
+import { isWeekendDay, monthLabel } from '../../utils/date';
 import { formatHours } from '../../utils/format';
 import * as styles from './MonthHeatmap.module.css';
 
@@ -45,11 +45,6 @@ function getLevel(seconds: number): string {
 	if (hours < 7) return 'level2';
 	if (hours <= 8) return 'level3';
 	return 'level4';
-}
-
-function isWeekend(dayOfWeek: number): boolean {
-	// dayOfWeek: 0 = Sunday, 6 = Saturday
-	return dayOfWeek === 0 || dayOfWeek === 6;
 }
 
 export const MonthHeatmap: React.FC<Props> = ({
@@ -99,7 +94,7 @@ export const MonthHeatmap: React.FC<Props> = ({
 			dateStr,
 			seconds,
 			isPlaceholder: false,
-			isWeekend: isWeekend(dayOfWeek),
+			isWeekend: isWeekendDay(dayOfWeek),
 		});
 	}
 

@@ -4,11 +4,15 @@ import {
 	formatDateTimeLocalValue,
 	getDaysInMonth,
 	getMonthStartWeekday,
+	getWeekMonthAnchor,
 	isDateInMonth,
 	isoDateFromYMD,
+	isWeekend,
+	isWeekendDay,
 	monthLabel,
 	parseIsoDateLocal,
 	toLocalDateString,
+	WEEKEND_DAYS,
 	wallClockDay,
 	withLocalOffset,
 } from '../date';
@@ -190,6 +194,58 @@ describe('wallClockDay', () => {
 
 	it('returns empty string for unparseable input', () => {
 		expect(wallClockDay('not-a-date')).toBe('');
+	});
+});
+
+describe('isWeekendDay / isWeekend / WEEKEND_DAYS', () => {
+	it('WEEKEND_DAYS defaults to Saturday + Sunday', () => {
+		expect([...WEEKEND_DAYS].sort()).toEqual([0, 6]);
+	});
+
+	it('isWeekendDay flags Sat (6) and Sun (0)', () => {
+		expect(isWeekendDay(0)).toBe(true);
+		expect(isWeekendDay(6)).toBe(true);
+		for (let d = 1; d <= 5; d++) expect(isWeekendDay(d)).toBe(false);
+	});
+
+	it('isWeekend reads the wall-clock weekday from a YYYY-MM-DD string', () => {
+		// 2025-10-04 is a Saturday, 2025-10-05 a Sunday, 2025-10-06 a Monday.
+		expect(isWeekend('2025-10-04')).toBe(true);
+		expect(isWeekend('2025-10-05')).toBe(true);
+		expect(isWeekend('2025-10-06')).toBe(false);
+	});
+
+	it('isWeekend parses the date in local time, not UTC (TZ-safe)', () => {
+		// A bare YYYY-MM-DD parsed via `new Date(string)` is UTC midnight; read
+		// back in a negative-offset TZ it rolls to the previous day. The helper
+		// uses parseIsoDateLocal so the weekday is stable regardless of TZ.
+		// 2025-10-06 (Mon) must never be treated as Sun under any runner TZ.
+		expect(isWeekend('2025-10-06')).toBe(false);
+		// 2025-10-12 (Sun) must always read as weekend.
+		expect(isWeekend('2025-10-12')).toBe(true);
+	});
+});
+
+describe('getWeekMonthAnchor', () => {
+	it('anchors on the week month when the whole week is in one month', () => {
+		// Week of Mon 2025-10-06 → Sun 2025-10-12, fully October.
+		expect(getWeekMonthAnchor('2025-10-06')).toEqual({ year: 2025, month: 9 });
+	});
+
+	it('anchors on the majority month when the week straddles a boundary', () => {
+		// Mon 2025-09-29 → Sun 2025-10-05. Monday is in September but the week's
+		// Thursday (2025-10-02) is in October, so the heatmap should show October.
+		expect(getWeekMonthAnchor('2025-09-29')).toEqual({ year: 2025, month: 9 });
+	});
+
+	it('stays in the earlier month when its Thursday is still there', () => {
+		// Mon 2025-10-27 → Sun 2025-11-02. Thursday 2025-10-30 is October.
+		expect(getWeekMonthAnchor('2025-10-27')).toEqual({ year: 2025, month: 9 });
+	});
+
+	it('handles a year boundary straddle', () => {
+		// Mon 2025-12-29 → Sun 2026-01-04. Thursday 2026-01-01 → January 2026.
+		expect(getWeekMonthAnchor('2025-12-29')).toEqual({ year: 2026, month: 0 });
 	});
 });
 

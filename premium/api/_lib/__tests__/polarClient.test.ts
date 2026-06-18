@@ -24,12 +24,17 @@ function vectorHeaders(overrides: Record<string, string> = {}): Headers {
 	});
 }
 
+// Pin "now" to the vector's timestamp so the freshness window (ADA-455) does
+// not reject this fixed historical test vector.
+const NOW_AT_VECTOR = { now: Number(VECTOR.timestamp) * 1000 };
+
 describe('verifyPolarWebhook', () => {
 	it('accepts a valid Standard Webhooks signature', async () => {
 		const ok = await verifyPolarWebhook(
 			VECTOR.payload,
 			vectorHeaders(),
 			VECTOR.secret,
+			NOW_AT_VECTOR,
 		);
 		expect(ok).toBe(true);
 	});
@@ -39,6 +44,7 @@ describe('verifyPolarWebhook', () => {
 			'{"test": 9999999999}',
 			vectorHeaders(),
 			VECTOR.secret,
+			NOW_AT_VECTOR,
 		);
 		expect(ok).toBe(false);
 	});
@@ -50,6 +56,7 @@ describe('verifyPolarWebhook', () => {
 				'webhook-signature': 'v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
 			}),
 			VECTOR.secret,
+			NOW_AT_VECTOR,
 		);
 		expect(ok).toBe(false);
 	});
@@ -57,7 +64,12 @@ describe('verifyPolarWebhook', () => {
 	it('rejects when a required header is missing', async () => {
 		const headers = vectorHeaders();
 		headers.delete('webhook-signature');
-		const ok = await verifyPolarWebhook(VECTOR.payload, headers, VECTOR.secret);
+		const ok = await verifyPolarWebhook(
+			VECTOR.payload,
+			headers,
+			VECTOR.secret,
+			NOW_AT_VECTOR,
+		);
 		expect(ok).toBe(false);
 	});
 
@@ -68,6 +80,7 @@ describe('verifyPolarWebhook', () => {
 				'webhook-signature': `v1,wrongsig ${VECTOR.signature}`,
 			}),
 			VECTOR.secret,
+			NOW_AT_VECTOR,
 		);
 		expect(ok).toBe(true);
 	});
@@ -80,6 +93,40 @@ describe('verifyPolarWebhook', () => {
 			VECTOR.payload,
 			vectorHeaders({ 'webhook-signature': 'v1,not-the-real-signature' }),
 			'polar_whs_u7ss4HAF-some_url-safe_chars',
+			NOW_AT_VECTOR,
+		);
+		expect(ok).toBe(false);
+	});
+
+	// ADA-455: replay protection — a captured-but-stale signed delivery must be
+	// rejected even though its signature is otherwise valid.
+	it('rejects a stale timestamp outside the freshness window (ADA-455)', async () => {
+		const ok = await verifyPolarWebhook(
+			VECTOR.payload,
+			vectorHeaders(),
+			VECTOR.secret,
+			// 10 minutes after the signed timestamp — beyond the 5min tolerance.
+			{ now: (Number(VECTOR.timestamp) + 600) * 1000 },
+		);
+		expect(ok).toBe(false);
+	});
+
+	it('rejects a far-future timestamp outside the freshness window (ADA-455)', async () => {
+		const ok = await verifyPolarWebhook(
+			VECTOR.payload,
+			vectorHeaders(),
+			VECTOR.secret,
+			{ now: (Number(VECTOR.timestamp) - 600) * 1000 },
+		);
+		expect(ok).toBe(false);
+	});
+
+	it('rejects a non-numeric timestamp (ADA-455)', async () => {
+		const ok = await verifyPolarWebhook(
+			VECTOR.payload,
+			vectorHeaders({ 'webhook-timestamp': 'not-a-number' }),
+			VECTOR.secret,
+			NOW_AT_VECTOR,
 		);
 		expect(ok).toBe(false);
 	});

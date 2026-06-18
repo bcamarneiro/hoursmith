@@ -5,7 +5,11 @@ import type { AbsenceDay } from '../../services/absenceService';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { useCalendar } from '../hooks/useCalendar';
 import { useMonthTotalCalculation } from '../hooks/useMonthTotalCalculation';
-import { getWorkdayDatesInMonth, isoDateFromYMD } from '../utils/date';
+import {
+	getWorkdayDatesInMonth,
+	isoDateFromYMD,
+	isWeekendDay,
+} from '../utils/date';
 import { sumWeekdayTargetSeconds } from '../utils/dayTarget';
 import { computeCompliancePct } from '../utils/format';
 import { projectDays } from '../utils/projectDays';
@@ -86,7 +90,7 @@ export const TimesheetGrid: React.FC<Props> = ({
 		const ghosts = projected.ghostsByDay[iso];
 		const jsDate = new Date(Date.UTC(year, monthZeroIndexed, d));
 		const weekday = jsDate.getUTCDay();
-		const isWeekend = weekday === 0 || weekday === 6;
+		const isWeekend = isWeekendDay(weekday);
 		const absenceDay = absenceDays?.get(iso);
 		const isAbsent = !!absenceDay;
 

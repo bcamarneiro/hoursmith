@@ -57,12 +57,9 @@ export async function handleExport(
 		logEvent({
 			event: 'data_export',
 			status: 500,
-			note: 'server_misconfigured',
+			note: `server_misconfigured:${(err as Error).message}`,
 		});
-		return jsonResponse(500, {
-			error: 'server_misconfigured',
-			detail: (err as Error).message,
-		});
+		return jsonResponse(500, { error: 'server_misconfigured' });
 	}
 
 	// GDPR data export discloses personal data — require the live server check so
@@ -85,12 +82,9 @@ export async function handleExport(
 		logEvent({
 			event: 'data_export',
 			status: 500,
-			note: 'supabase_read_failed',
+			note: `supabase_read_failed:${(err as Error).message}`,
 		});
-		return jsonResponse(500, {
-			error: 'export_failed',
-			detail: (err as Error).message,
-		});
+		return jsonResponse(500, { error: 'export_failed' });
 	}
 
 	if (!profile) {

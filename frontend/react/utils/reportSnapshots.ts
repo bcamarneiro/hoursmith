@@ -66,6 +66,15 @@ function escapeHtml(value: string): string {
 		.replace(/'/g, '&#39;');
 }
 
+/**
+ * Neutralise Markdown-injection in interpolated text cells: escape the `|`
+ * column delimiter (so a value can't forge extra table columns) and strip
+ * CR/LF (so it can't break out of the row / inject new Markdown blocks).
+ */
+function escapeMdCell(value: string): string {
+	return value.replace(/\r?\n|\r/g, ' ').replace(/\|/g, '\\|');
+}
+
 function formatDateLabel(dateStr: string): string {
 	const date = parseIsoDateLocal(dateStr);
 	return date.toLocaleDateString(undefined, {
@@ -151,19 +160,21 @@ function buildDailyBreakdown(
 
 function buildHeaderSummary(input: ReportsSnapshotInput): string[] {
 	const lines = ['# Hoursmith Report Snapshot', ''];
-	lines.push(`Source: ${input.jiraHost || 'Unconfigured Jira host'}`);
+	lines.push(
+		`Source: ${escapeMdCell(input.jiraHost || 'Unconfigured Jira host')}`,
+	);
 
 	if (input.viewMode === 'weekly') {
 		lines.push(`View: Weekly (${input.weekStart} to ${input.weekEnd})`);
 		lines.push(`Sort: ${input.sortField} (${input.sortDirection})`);
 		lines.push(
-			`Filters: ${input.searchQuery || 'none'}${input.onlyAttentionNeeded ? ', attention-only' : ''}${input.managerMode ? `, manager mode (${input.trendWeeks} weeks)` : ''}`,
+			`Filters: ${escapeMdCell(input.searchQuery || 'none')}${input.onlyAttentionNeeded ? ', attention-only' : ''}${input.managerMode ? `, manager mode (${input.trendWeeks} weeks)` : ''}`,
 		);
 	} else {
-		lines.push(`View: Monthly (${input.monthLabel})`);
-		lines.push(`Filters: ${input.searchQuery || 'none'}`);
+		lines.push(`View: Monthly (${escapeMdCell(input.monthLabel)})`);
+		lines.push(`Filters: ${escapeMdCell(input.searchQuery || 'none')}`);
 		if (input.selectedUser) {
-			lines.push(`Selected user: ${input.selectedUser}`);
+			lines.push(`Selected user: ${escapeMdCell(input.selectedUser)}`);
 		}
 	}
 
@@ -189,17 +200,19 @@ export function buildReportsSnapshotMarkdown(
 		lines.push(`Team total: ${formatHours(totalSeconds)}`);
 		lines.push(`Open gap: ${formatHours(totalGapSeconds)}`);
 		lines.push(
-			`Validation: ${input.validationState.status} (${input.validationState.message})`,
+			`Validation: ${escapeMdCell(input.validationState.status)} (${escapeMdCell(input.validationState.message)})`,
 		);
 		if (input.validationState.checkedAt) {
-			lines.push(`Checked at: ${input.validationState.checkedAt}`);
+			lines.push(
+				`Checked at: ${escapeMdCell(input.validationState.checkedAt)}`,
+			);
 		}
 		lines.push('');
 		lines.push('| Member | Email | Total | Gap |');
 		lines.push('| --- | --- | ---: | ---: |');
 		for (const member of input.members) {
 			lines.push(
-				`| ${member.displayName} | ${member.email} | ${formatHours(member.totalSeconds)} | ${formatHours(member.gapSeconds)} |`,
+				`| ${escapeMdCell(member.displayName)} | ${escapeMdCell(member.email)} | ${formatHours(member.totalSeconds)} | ${formatHours(member.gapSeconds)} |`,
 			);
 		}
 
@@ -208,7 +221,7 @@ export function buildReportsSnapshotMarkdown(
 			lines.push(`## ${input.trendWeeks}-Week Trend`);
 			for (const week of input.trendModel.weeks) {
 				lines.push(
-					`- ${week.weekStart}: ${week.complianceRate}% compliant, ${formatHours(week.totalGapSeconds)} gap, ${week.attentionCount} people need attention`,
+					`- ${escapeMdCell(week.weekStart)}: ${week.complianceRate}% compliant, ${formatHours(week.totalGapSeconds)} gap, ${week.attentionCount} people need attention`,
 				);
 			}
 
@@ -217,7 +230,7 @@ export function buildReportsSnapshotMarkdown(
 				lines.push('## Recurring Gap Watchlist');
 				for (const member of input.trendModel.recurringGapMembers.slice(0, 5)) {
 					lines.push(
-						`- ${member.displayName}: ${member.gapWeeks} weeks with gap, current ${formatHours(member.currentGapSeconds)}, average ${formatHours(member.averageGapSeconds)}`,
+						`- ${escapeMdCell(member.displayName)}: ${member.gapWeeks} weeks with gap, current ${formatHours(member.currentGapSeconds)}, average ${formatHours(member.averageGapSeconds)}`,
 					);
 				}
 			}
@@ -242,7 +255,7 @@ export function buildReportsSnapshotMarkdown(
 	lines.push('| --- | ---: | ---: | ---: |');
 	for (const row of userRows) {
 		lines.push(
-			`| ${row.user} | ${formatHours(row.totalSeconds)} | ${row.entryCount} | ${row.activeDays} |`,
+			`| ${escapeMdCell(row.user)} | ${formatHours(row.totalSeconds)} | ${row.entryCount} | ${row.activeDays} |`,
 		);
 	}
 
@@ -258,10 +271,10 @@ export function buildReportsSnapshotMarkdown(
 	);
 	if (detailedEntry && breakdown.length > 0) {
 		lines.push('');
-		lines.push(`## Daily breakdown for ${detailedEntry[0]}`);
+		lines.push(`## Daily breakdown for ${escapeMdCell(detailedEntry[0])}`);
 		for (const day of breakdown) {
 			lines.push(
-				`- ${day.date}: ${formatHours(day.totalSeconds)} across ${day.entries} entr${day.entries === 1 ? 'y' : 'ies'}`,
+				`- ${escapeMdCell(day.date)}: ${formatHours(day.totalSeconds)} across ${day.entries} entr${day.entries === 1 ? 'y' : 'ies'}`,
 			);
 		}
 	}

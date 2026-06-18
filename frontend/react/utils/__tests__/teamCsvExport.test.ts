@@ -166,6 +166,17 @@ describe('buildTeamCsv', () => {
 		expect(lastLine).toContain('period=2026-03-09..2026-03-13');
 	});
 
+	it('routes the email field through csvEscape (ADA-460)', () => {
+		const csv = buildTeamCsv(
+			[makeMember({ email: '=cmd();a@b.com' })],
+			weekdays,
+			fixedProvenance,
+		);
+		const memberRow = csv.split('\n')[1];
+		// Leading `=` neutralised with `'`; the `;` forces CSV quoting.
+		expect(memberRow).toContain(`"'=cmd();a@b.com"`);
+	});
+
 	it('keeps daily hours at 1dp precision', () => {
 		const csv = buildTeamCsv([makeMember()], weekdays, fixedProvenance);
 		const memberRow = csv.split('\n')[1].split(';');

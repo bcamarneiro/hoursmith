@@ -125,6 +125,67 @@ describe('buildReportsSnapshotMarkdown', () => {
 	});
 });
 
+describe('markdown injection (ADA-460)', () => {
+	it('escapes pipes in the weekly team table cells', () => {
+		const output = buildReportsSnapshotMarkdown({
+			viewMode: 'weekly',
+			jiraHost: 'example.atlassian.net',
+			weekStart: '2026-03-23',
+			weekEnd: '2026-03-29',
+			searchQuery: '',
+			onlyAttentionNeeded: false,
+			managerMode: false,
+			trendWeeks: 4,
+			sortField: 'name',
+			sortDirection: 'asc',
+			members: [
+				createMember(
+					'evil@example.com | 999 | 999 |',
+					'Mallory | x',
+					40 * 3600,
+					0,
+				),
+			],
+			validationState: {
+				status: 'idle',
+				message: 'Ready.',
+				checkedAt: null,
+			},
+		});
+
+		// Pipes inside the cell values are escaped so they cannot forge columns.
+		expect(output).toContain(
+			'| Mallory \\| x | evil@example.com \\| 999 \\| 999 \\| | 40h | 0h |',
+		);
+	});
+
+	it('escapes pipes in the monthly user rows', () => {
+		const output = buildReportsSnapshotMarkdown({
+			viewMode: 'monthly',
+			jiraHost: 'example.atlassian.net',
+			monthLabel: 'March 2026',
+			year: 2026,
+			monthZeroIndexed: 2,
+			searchQuery: '',
+			selectedUser: '',
+			entries: [
+				[
+					'Mallory | 999 | 999 | 999',
+					{
+						'2026-03-03': [
+							createWorklog('Mallory | 999 | 999 | 999', '2026-03-03', 3600),
+						],
+					},
+				],
+			],
+		});
+
+		expect(output).toContain(
+			'| Mallory \\| 999 \\| 999 \\| 999 | 1h | 1 | 1 |',
+		);
+	});
+});
+
 describe('monthly snapshot — backdated exclusion', () => {
 	it('excludes backdated worklogs from the user total, entry count, and daily breakdown', () => {
 		const backdated: EnrichedJiraWorklog = {
