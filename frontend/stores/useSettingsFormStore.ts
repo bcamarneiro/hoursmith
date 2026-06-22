@@ -7,7 +7,11 @@ import {
 	describeGitlabConnectionError,
 	normalizeGitlabHost,
 } from '../services/gitlabService';
-import { rewriteForHostedProxy } from '../services/jiraGateway';
+import {
+	getJiraGatewayMode,
+	type JiraGatewayMode,
+	rewriteForHostedProxy,
+} from '../services/jiraGateway';
 import { type Config, normalizeConfig, useConfigStore } from './useConfigStore';
 import { buildJiraConnectionFingerprint, useUIStore } from './useUIStore';
 
@@ -59,6 +63,19 @@ class TestTimeoutError extends Error {
 	}
 }
 
+/**
+ * A connection-test failure whose message is already user-ready (composed from
+ * the HTTP status / proxy body). The catch handler surfaces it verbatim instead
+ * of running its CORS/network heuristics — otherwise an actionable message that
+ * happens to mention "CORS proxy" gets clobbered by the generic CORS copy.
+ */
+class JiraTestError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'JiraTestError';
+	}
+}
+
 async function fetchWithTimeout(
 	input: string,
 	init: RequestInit,
@@ -103,6 +120,55 @@ function describeJiraTestStatus(status: number, host: string): string {
 		return `Jira returned a server error on ${host} (${status}). This is usually temporary — please retry.`;
 	}
 	return `Jira API error on ${host}: ${status}.`;
+}
+
+/**
+ * Turn a non-OK `/myself` response into an actionable message (ADA-523).
+ *
+ * In `hosted` mode the request went to the Hoursmith proxy, not the user's
+ * `corsProxy`, so the message must name `jiraHost` (not the stale pre-rewrite
+ * label) and read the proxy's structured `{error, detail}` body:
+ *   - 502 `upstream_error` → the proxy reached our servers but couldn't reach the
+ *     Jira host. The #1 cause is an internal / VPN-only Jira (e.g. a corporate
+ *     Server/DC instance) our cloud servers can't see — point the user at the
+ *     "Override" escape hatch + a local CORS proxy.
+ *   - 504 `upstream_timeout` → same guidance, framed as a timeout.
+ *   - 400 `bad_request` → surface the proxy's own `detail` verbatim.
+ * Otherwise fall back to the status-specific copy, labelled with `jiraHost`.
+ */
+async function describeJiraTestFailure(
+	res: Response,
+	mode: JiraGatewayMode,
+	jiraHost: string,
+): Promise<string> {
+	const status = res.status;
+	if (mode === 'hosted') {
+		let proxyError: string | undefined;
+		let proxyDetail: string | undefined;
+		try {
+			const body = (await res.json()) as {
+				error?: unknown;
+				detail?: unknown;
+			} | null;
+			if (typeof body?.error === 'string') proxyError = body.error;
+			if (typeof body?.detail === 'string') proxyDetail = body.detail;
+		} catch {
+			// Non-JSON body (e.g. an upstream HTML error page) — fall through.
+		}
+		if (status === 502 || proxyError === 'upstream_error') {
+			return `The Hoursmith hosted proxy couldn't reach ${jiraHost}. If this is an internal or VPN-only Jira, our servers can't see it — click "Override" above and run a local CORS proxy (npm run cors-proxy) on a machine that can reach ${jiraHost}.`;
+		}
+		if (status === 504 || proxyError === 'upstream_timeout') {
+			return `The Hoursmith hosted proxy timed out reaching ${jiraHost}. If this is an internal or VPN-only Jira, our servers can't see it — click "Override" above and use a local CORS proxy on your network.`;
+		}
+		if (status === 400) {
+			return `The Hoursmith hosted proxy rejected the request for ${jiraHost}${proxyDetail ? `: ${proxyDetail}` : '.'}`;
+		}
+		if (status === 429) {
+			return 'Too many requests through the hosted proxy. Please wait a moment and retry.';
+		}
+	}
+	return describeJiraTestStatus(status, jiraHost);
 }
 
 /**
@@ -223,11 +289,20 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				? `${normalizedConfig.corsProxy.replace(/\/$/, '')}/https://${normalizedConfig.jiraHost}`
 				: `https://${normalizedConfig.jiraHost}`;
 
-			// Human-readable label for timeout messages — the proxy host if one is
-			// configured, otherwise the Jira host (ADA-444).
-			const timeoutHostLabel = normalizedConfig.corsProxy
-				? `${normalizedConfig.corsProxy.replace(/\/$/, '')} (proxy)`
-				: normalizedConfig.jiraHost;
+			// The active gateway. In `hosted` mode the request goes to the Hoursmith
+			// proxy regardless of `corsProxy`, so error/timeout copy must NOT use the
+			// `host` label above (it would show the stale pre-rewrite proxy URL) — it
+			// names the Jira host instead (ADA-523).
+			const mode = getJiraGatewayMode(normalizedConfig.corsProxy);
+
+			// Human-readable label for timeout messages — the hosted proxy in hosted
+			// mode, the self-configured proxy if one is set, else the Jira host (ADA-444).
+			const timeoutHostLabel =
+				mode === 'hosted'
+					? 'the Hoursmith hosted proxy'
+					: normalizedConfig.corsProxy
+						? `${normalizedConfig.corsProxy.replace(/\/$/, '')} (proxy)`
+						: normalizedConfig.jiraHost;
 
 			const baseHeaders: Record<string, string> = {
 				Authorization: `Bearer ${normalizedConfig.apiToken}`,
@@ -254,7 +329,13 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 			);
 			myselfStatus = myselfRes.status;
 			if (!myselfRes.ok) {
-				throw new Error(describeJiraTestStatus(myselfRes.status, host));
+				throw new JiraTestError(
+					await describeJiraTestFailure(
+						myselfRes,
+						mode,
+						normalizedConfig.jiraHost,
+					),
+				);
 			}
 			const myself = (await myselfRes.json()) as {
 				displayName?: string;
@@ -371,15 +452,22 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 			logger.error('[Test] Jira failed:', error);
 			const rawMessage =
 				error instanceof Error ? error.message : 'Connection failed';
+			// A JiraTestError already carries a user-ready message (status/proxy based),
+			// so skip the CORS/network heuristics — they'd misread copy that mentions
+			// "CORS proxy" as a browser CORS failure (ADA-523).
+			const isComposed = error instanceof JiraTestError;
 			const isCorsFailure =
-				error instanceof TypeError ||
-				/failed to fetch|networkerror|load failed|cors/i.test(rawMessage);
+				!isComposed &&
+				(error instanceof TypeError ||
+					/failed to fetch|networkerror|load failed|cors/i.test(rawMessage));
 			const message =
 				error instanceof TestTimeoutError
 					? `No response from ${error.host} within ${JIRA_TEST_TIMEOUT_MS / 1000}s — check the proxy is running / the host is reachable.`
-					: isCorsFailure
-						? 'Your browser blocked direct access to Jira (CORS). Configure a CORS proxy in Settings, or use the hosted proxy.'
-						: rawMessage;
+					: isComposed
+						? rawMessage
+						: isCorsFailure
+							? 'Your browser blocked direct access to Jira (CORS). Configure a CORS proxy in Settings, or use the hosted proxy.'
+							: rawMessage;
 			// Map the failure to the fixed enum from the error *type* / captured HTTP
 			// status — never the raw message — so no Jira-derived text reaches analytics.
 			const failureReason: JiraTestFailureReason =

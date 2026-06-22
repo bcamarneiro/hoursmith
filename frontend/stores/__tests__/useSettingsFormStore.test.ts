@@ -1,6 +1,11 @@
 import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '../../analytics';
+import {
+	__resetProxyBridgeForTests,
+	setHostedProxyUrl,
+	setSupabaseAccessToken,
+} from '../../services/proxyUrlBridge';
 import { useConfigStore } from '../useConfigStore';
 import { useSettingsFormStore } from '../useSettingsFormStore';
 import { useUIStore } from '../useUIStore';
@@ -136,6 +141,7 @@ describe('useSettingsFormStore', () => {
 		afterEach(() => {
 			vi.restoreAllMocks();
 			vi.useRealTimers();
+			__resetProxyBridgeForTests();
 		});
 
 		it('warns on email mismatch and does not report success (ADA-436)', async () => {
@@ -352,6 +358,49 @@ describe('useSettingsFormStore', () => {
 					failure_reason: 'timeout',
 				}),
 			);
+		});
+
+		it('explains an unreachable host via the hosted proxy and points to Override (ADA-523)', async () => {
+			// Premium/hosted user with a self-hosted Jira the hosted proxy can't reach
+			// (internal/VPN-only host). The proxy returns 502 upstream_error.
+			setHostedProxyUrl('https://hoursmith.io/api/proxy');
+			setSupabaseAccessToken('supabase-jwt');
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: {
+						...baseConfig,
+						jiraHost: 'ticket.rsint.net',
+						// A leftover local-proxy value that must NOT leak into the message.
+						corsProxy: 'http://localhost:8081',
+					},
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+				new Response(JSON.stringify({ error: 'upstream_error' }), {
+					status: 502,
+				}),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testJira();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.jira.result;
+			expect(result?.success).toBe(false);
+			// Names the real Jira host and the hosted proxy, points to Override...
+			expect(result?.message).toContain('ticket.rsint.net');
+			expect(result?.message).toMatch(/Override/i);
+			expect(result?.message).toMatch(/hosted proxy/i);
+			// ...and does NOT show the misleading pre-rewrite localhost label.
+			expect(result?.message).not.toContain('localhost:8081');
 		});
 	});
 
