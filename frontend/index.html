@@ -50,14 +50,10 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Forge × Ledger type system: Bricolage Grotesque (display),
-         Hanken Grotesk (body), JetBrains Mono (numerals). -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Forge × Ledger type system — Bricolage Grotesque (display), Hanken
+         Grotesk (body), JetBrains Mono (numerals) — is self-hosted via
+         @fontsource-variable/* (imported in main.tsx), so no Google CDN links
+         are needed here. See ADA-525. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",

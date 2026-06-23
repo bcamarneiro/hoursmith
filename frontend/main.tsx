@@ -6,6 +6,12 @@ import { queryClient } from './react/queryClient';
 import { logger } from './react/utils/logger';
 import { registerAppServiceWorker } from './react/utils/pwa';
 import { withBasePath } from './react/utils/runtimeConfig';
+// Self-hosted Forge × Ledger type system (no-CDN posture, ADA-525): served from
+// our own origin so the CSP needs no Google hosts and no visitor IP leaks to
+// Google. Variable families cover every weight the tokens reference.
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource-variable/hanken-grotesk';
+import '@fontsource-variable/jetbrains-mono';
 import './react/styles/global.css';
 import { createDefaultConfig, useConfigStore } from './stores/useConfigStore';
 

@@ -13,7 +13,9 @@
    - All hour/number figures use the mono numeral font, tabular.
    ============================================================ */
 
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+/* Fonts are self-hosted via @fontsource-variable/* (imported in main.tsx) to
+   keep the no-CDN posture — see ADA-525. The "* Variable" families below are
+   the @font-face names those packages declare. */
 
 :root {
 	/* Colors - Primary (ember; brand-only, off the status ramp) */
@@ -80,12 +82,14 @@
 	   sans    = Hanken Grotesk (body)
 	   mono    = JetBrains Mono (ALL hour/number figures, tabular) */
 	--font-display:
-		"Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI",
-		system-ui, sans-serif;
+		"Bricolage Grotesque Variable", "Bricolage Grotesque", -apple-system,
+		BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 	--font-sans:
-		"Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
-		sans-serif;
-	--font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+		"Hanken Grotesk Variable", "Hanken Grotesk", -apple-system,
+		BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+	--font-mono:
+		"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "SF Mono",
+		monospace;
 
 	--text-xs: 0.75rem;
 	--text-sm: 0.8125rem;
