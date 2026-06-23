@@ -12,6 +12,10 @@ import {
 	type JiraGatewayMode,
 	rewriteForHostedProxy,
 } from '../services/jiraGateway';
+import {
+	buildRescueTimeRequest,
+	getRescueTimeGatewayMode,
+} from '../services/rescueTimeGateway';
 import { type Config, normalizeConfig, useConfigStore } from './useConfigStore';
 import { buildJiraConnectionFingerprint, useUIStore } from './useUIStore';
 
@@ -667,8 +671,9 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 			}
 
 			const today = toLocalDateString(new Date());
+			// Key is added by the gateway (header in hosted mode, query param
+			// otherwise) — never include it here.
 			const params = new URLSearchParams({
-				key: normalizedConfig.rescueTimeApiKey,
 				perspective: 'interval',
 				restrict_kind: 'activity',
 				resolution_time: 'day',
@@ -677,12 +682,42 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				format: 'json',
 			});
 
-			const baseUrl = 'https://www.rescuetime.com/anapi/data';
-			const url = normalizedConfig.corsProxy
-				? `${normalizedConfig.corsProxy.replace(/\/$/, '')}/${baseUrl}?${params}`
-				: `${baseUrl}?${params}`;
+			// RescueTime sends no CORS headers, so the browser can only read it
+			// through *some* server: our hosted relay (Premium) or the user's own
+			// CORS proxy. With neither, the request would hit rescuetime.com directly
+			// and CORS-fail with an opaque `TypeError` — fail fast with actionable
+			// copy instead, and never issue the doomed request.
+			const mode = getRescueTimeGatewayMode(normalizedConfig.corsProxy);
+			if (mode === 'direct') {
+				throw new Error(
+					"RescueTime can't be reached directly from the browser. Add a CORS proxy URL in Connection settings, then test again.",
+				);
+			}
 
-			const res = await fetch(url);
+			// NOTE: `url`/`requestHeaders` may carry the API key (see
+			// rescueTimeService.ts SECURITY note). Never surface them in UI/log copy.
+			const { url, headers: requestHeaders } = buildRescueTimeRequest(
+				normalizedConfig.rescueTimeApiKey,
+				normalizedConfig.corsProxy,
+				params,
+			);
+			const target =
+				mode === 'hosted'
+					? 'the Hoursmith proxy'
+					: `the CORS proxy (${normalizedConfig.corsProxy.replace(/\/$/, '')})`;
+
+			let res: Response;
+			try {
+				res = await fetch(url, { headers: requestHeaders });
+			} catch (cause) {
+				// fetch rejects with a TypeError on network / CORS failure. The raw
+				// message can embed the request URL (and thus the API key), so we must
+				// not propagate it. Reference only the safe target description.
+				throw new Error(
+					`Could not reach RescueTime through ${target}. Check that it is running and reachable.`,
+					{ cause },
+				);
+			}
 			if (!res.ok) {
 				if (res.status === 403) throw new Error('Invalid RescueTime API key');
 				throw new Error(`RescueTime API error: ${res.status}`);

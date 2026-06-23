@@ -431,4 +431,167 @@ describe('useSettingsFormStore', () => {
 		expect(useUIStore.getState().jiraConnectionEvidenceFingerprint).toBeNull();
 		expect(useUIStore.getState().jiraConnectionEvidenceSource).toBeNull();
 	});
+
+	describe('testRescueTime', () => {
+		afterEach(() => {
+			vi.restoreAllMocks();
+			// Bridge state is module-scoped — reset so a hosted-mode test can't leak
+			// into the self-hosted / direct cases (which assert on no hosted proxy).
+			__resetProxyBridgeForTests();
+		});
+
+		// RescueTime's API sends no CORS headers, so a browser fetch can only reach
+		// it through a user-configured CORS proxy. With no proxy the request goes
+		// directly to rescuetime.com and the browser rejects it with an opaque
+		// `TypeError: NetworkError`. Fail fast with actionable copy instead, and
+		// never even attempt the doomed direct request.
+		it('fails fast with proxy guidance when no CORS proxy is configured', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: {
+						...baseConfig,
+						rescueTimeApiKey: 'rt-secret-key',
+						corsProxy: '',
+					},
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testRescueTime();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.rescuetime.result;
+			expect(result?.success).toBe(false);
+			expect(result?.message).toMatch(/CORS proxy/i);
+			expect(result?.message).toMatch(/Connection settings/i);
+			// Never issue the request that's guaranteed to CORS-fail.
+			expect(fetchSpy).not.toHaveBeenCalled();
+			expect(
+				useSettingsFormStore.getState().integrationTests.rescuetime.loading,
+			).toBe(false);
+		});
+
+		it('surfaces an actionable error when the CORS proxy is unreachable', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: {
+						...baseConfig,
+						rescueTimeApiKey: 'rt-secret-key',
+						corsProxy: 'http://localhost:8081',
+					},
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			// fetch rejects with a TypeError on network / CORS failure.
+			vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+				new TypeError('NetworkError when attempting to fetch resource'),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testRescueTime();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.rescuetime.result;
+			expect(result?.success).toBe(false);
+			expect(result?.message).toMatch(/proxy/i);
+			expect(result?.message).toContain('http://localhost:8081');
+			// The API key lives in the request URL — it must never leak into UI copy.
+			expect(result?.message).not.toContain('rt-secret-key');
+		});
+
+		it('reports the activity count on a successful test', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: {
+						...baseConfig,
+						rescueTimeApiKey: 'rt-secret-key',
+						corsProxy: 'http://localhost:8081',
+					},
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+				new Response(JSON.stringify({ rows: [[], []] }), { status: 200 }),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testRescueTime();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.rescuetime.result;
+			expect(result?.success).toBe(true);
+			expect(result?.message).toContain('2 activities');
+		});
+
+		it('routes through the hosted relay (key in header, not URL) for entitled users', async () => {
+			act(() => {
+				// No user-configured proxy — entitlement alone should suffice.
+				useSettingsFormStore.setState({
+					formData: {
+						...baseConfig,
+						rescueTimeApiKey: 'rt-secret-key',
+						corsProxy: '',
+					},
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+			// Premium auth normally pushes these into the bridge.
+			setHostedProxyUrl('https://hoursmith.io/api/proxy');
+			setSupabaseAccessToken('supabase-jwt');
+
+			const fetchSpy = vi
+				.spyOn(globalThis, 'fetch')
+				.mockResolvedValue(
+					new Response(JSON.stringify({ rows: [[]] }), { status: 200 }),
+				);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testRescueTime();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.rescuetime.result;
+			expect(result?.success).toBe(true);
+
+			const [calledUrl, calledInit] = fetchSpy.mock.calls[0];
+			// Hits our own relay, not rescuetime.com — and the key is NOT in the URL.
+			expect(String(calledUrl)).toContain(
+				'https://hoursmith.io/api/rescuetime',
+			);
+			expect(String(calledUrl)).not.toContain('rt-secret-key');
+			expect(String(calledUrl)).not.toContain('rescuetime.com');
+			// Key + Supabase JWT travel in headers.
+			const headers = (calledInit?.headers ?? {}) as Record<string, string>;
+			expect(headers['x-rescuetime-key']).toBe('rt-secret-key');
+			expect(headers.authorization).toBe('Bearer supabase-jwt');
+		});
+	});
 });

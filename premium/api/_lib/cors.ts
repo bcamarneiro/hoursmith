@@ -41,7 +41,7 @@ export function corsHeaders(
 	const headers: Record<string, string> = {
 		'access-control-allow-methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
 		'access-control-allow-headers':
-			'Authorization, Content-Type, Accept, X-Jira-Base, X-Jira-Auth, X-Atlassian-Token',
+			'Authorization, Content-Type, Accept, X-Jira-Base, X-Jira-Auth, X-Atlassian-Token, X-RescueTime-Key',
 		'access-control-expose-headers': 'Content-Type, Content-Length',
 		'access-control-max-age': '86400',
 		vary: 'Origin',

@@ -2,6 +2,7 @@ import type {
 	RescueTimeActivity,
 	RescueTimeDaySummary,
 } from '../../types/Suggestion';
+import { buildRescueTimeRequest } from './rescueTimeGateway';
 import { fromHttpResponse, ServiceError } from './serviceErrors';
 
 /**
@@ -14,13 +15,15 @@ import { fromHttpResponse, ServiceError } from './serviceErrors';
  *
  * SECURITY — API KEY EXPOSURE (ADA-466):
  * The RescueTime Analytic Data API only accepts the API key as the `key`
- * query-string parameter; it cannot be sent as an Authorization header.
- * This means the key is embedded in the request URL. When `corsProxy` is set,
- * the *full URL — including the key —* is sent to the user-configured CORS
- * proxy, so that proxy operator can read the key. This is an inherent
- * limitation of the RescueTime API and the user-supplied-proxy model; the
- * mitigation is to only use a trusted proxy. To avoid widening the exposure,
- * never log this URL, the params, or the apiKey anywhere in this file.
+ * query-string parameter; it cannot be sent as an Authorization header upstream.
+ * Routing is delegated to {@link buildRescueTimeRequest}:
+ *   - hosted (Premium): the key travels in the `X-RescueTime-Key` header to our
+ *     own relay, which appends it server-side — so it never appears in a URL the
+ *     browser builds, and our endpoint never logs it.
+ *   - self-hosted proxy: the key is embedded in the request URL sent to the
+ *     user-configured CORS proxy, so that operator can read it (inherent to the
+ *     user-supplied-proxy model — use a trusted proxy).
+ * To avoid widening exposure, never log the URL, params, or apiKey here.
  */
 export async function fetchRescueTimeData(
 	apiKey: string,
@@ -31,8 +34,8 @@ export async function fetchRescueTimeData(
 ): Promise<Map<string, RescueTimeDaySummary>> {
 	if (!apiKey) return new Map();
 
+	// Key is added by the gateway (header in hosted mode, query param otherwise).
 	const params = new URLSearchParams({
-		key: apiKey,
 		perspective: 'interval',
 		restrict_kind: 'activity',
 		resolution_time: 'day',
@@ -41,13 +44,14 @@ export async function fetchRescueTimeData(
 		format: 'json',
 	});
 
-	const baseUrl = 'https://www.rescuetime.com/anapi/data';
-	// NOTE: `url` contains the API key (see SECURITY note above). Do not log it.
-	const url = corsProxy
-		? `${corsProxy.replace(/\/$/, '')}/${baseUrl}?${params}`
-		: `${baseUrl}?${params}`;
+	// NOTE: `url`/`requestHeaders` may carry the API key (SECURITY note). No logs.
+	const { url, headers: requestHeaders } = buildRescueTimeRequest(
+		apiKey,
+		corsProxy,
+		params,
+	);
 
-	const res = await fetch(url, { signal });
+	const res = await fetch(url, { headers: requestHeaders, signal });
 	if (!res.ok) {
 		if (res.status === 403) {
 			throw new ServiceError({
