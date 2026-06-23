@@ -5,6 +5,7 @@ import type {
 } from '../../../../stores/useConfigStore';
 import type { CalendarMapping } from '../../../../stores/useUserDataStore';
 import { SETTINGS_SECTION_IDS } from '../../../constants/settingsSections';
+import { useProxyBadge } from '../../../hooks/useProxyBadge';
 import { Button } from '../../ui/Button';
 import { CalendarMappingsEditor } from '../CalendarMappingsEditor';
 import * as styles from '../SettingsForm.module.css';
@@ -127,6 +128,10 @@ export const IntegrationsSection: React.FC<Props> = ({
 	allowedUserSuggestions,
 	handleChange,
 }) => {
+	// On Premium the hosted relay handles RescueTime, so no user CORS proxy is
+	// needed. Otherwise the key only works through a self-hosted proxy. Mirrors
+	// the gateway's mode resolution (rescueTimeGateway.ts).
+	const rescueTimeHostedActive = useProxyBadge().mode === 'hosted';
 	return (
 		<fieldset id={SETTINGS_SECTION_IDS.integrations} className={styles.section}>
 			<legend className={styles.sectionTitle}>
@@ -240,7 +245,11 @@ export const IntegrationsSection: React.FC<Props> = ({
 							value={rescueTimeApiKey}
 							onChange={handleChange}
 						/>
-						<small>Requires the CORS proxy to be running</small>
+						<small>
+							{rescueTimeHostedActive
+								? 'Works automatically on your Premium plan — no CORS proxy needed.'
+								: 'Requires a CORS proxy (configure one in Connection settings).'}
+						</small>
 					</div>
 					<div className={styles.serviceActions}>
 						<Button
