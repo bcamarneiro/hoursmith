@@ -133,7 +133,7 @@ function estimateConfidence(
 function reasonLabel(type: ActivityType, count: number): string {
 	if (type === 'push') return `${count} commit${count > 1 ? 's' : ''}`;
 	if (type === 'pr-action') return `${count} PR action${count > 1 ? 's' : ''}`;
-	return `${count} review comment${count > 1 ? 's' : ''}`;
+	return `${count} PR review/comment${count > 1 ? 's' : ''}`;
 }
 
 const PR_ACTION_EVENTS = new Set(['PullRequestEvent']);

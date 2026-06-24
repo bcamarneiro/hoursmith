@@ -101,7 +101,31 @@ describe('fetchGithubSuggestions', () => {
 		);
 		expect(out).toHaveLength(1);
 		expect(out[0].issueKey).toBe('PUMA-99');
-		expect(out[0].reason).toMatch(/review comment/i);
+		expect(out[0].reason).toMatch(/review\/comment/i);
+	});
+
+	it('captures a submitted review (PullRequestReviewEvent) via the PR title key', async () => {
+		vi.spyOn(globalThis, 'fetch')
+			.mockResolvedValueOnce(jsonRes({ login: 'me', name: 'Me' }))
+			.mockResolvedValueOnce(
+				jsonRes([
+					{
+						type: 'PullRequestReviewEvent',
+						created_at: '2026-06-17T09:00:00Z',
+						payload: {
+							action: 'submitted',
+							pull_request: { title: 'PUMA-77 add cache' },
+							review: { body: 'looks good' },
+						},
+					},
+				]),
+			)
+			.mockResolvedValueOnce(jsonRes([]));
+
+		const out = await fetchGithubSuggestions('tok', '', '', '2026-06-15', '2026-06-21');
+		expect(out).toHaveLength(1);
+		expect(out[0].issueKey).toBe('PUMA-77');
+		expect(out[0].reason).toMatch(/review\/comment/i);
 	});
 
 	it('drops events with no Jira key and events outside the week', async () => {
