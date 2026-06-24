@@ -6,6 +6,7 @@ import { buildSettingsSetupModel } from '../settingsSetup';
 const emptyTests: SettingsIntegrationTests = {
 	jira: { loading: false, result: null },
 	gitlab: { loading: false, result: null },
+	github: { loading: false, result: null },
 	calendar: { loading: false, result: null },
 	rescuetime: { loading: false, result: null },
 };

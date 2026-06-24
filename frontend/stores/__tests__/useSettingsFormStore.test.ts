@@ -58,6 +58,7 @@ describe('useSettingsFormStore', () => {
 						result: { success: false, message: 'Invalid token' },
 					},
 					calendar: { loading: false, result: null },
+					github: { loading: false, result: null },
 					rescuetime: { loading: true, result: null },
 				},
 			});
@@ -87,6 +88,7 @@ describe('useSettingsFormStore', () => {
 			jira: { loading: false, result: null },
 			gitlab: { loading: false, result: null },
 			calendar: { loading: false, result: null },
+			github: { loading: false, result: null },
 			rescuetime: { loading: false, result: null },
 		});
 	});
@@ -155,6 +157,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -208,6 +211,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -252,6 +256,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -292,6 +297,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -323,6 +329,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -380,6 +387,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -421,6 +429,7 @@ describe('useSettingsFormStore', () => {
 					jira: { loading: false, result: null },
 					gitlab: { loading: false, result: null },
 					calendar: { loading: false, result: null },
+					github: { loading: false, result: null },
 					rescuetime: { loading: false, result: null },
 				},
 			});
@@ -460,6 +469,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -495,6 +505,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -530,6 +541,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -562,6 +574,7 @@ describe('useSettingsFormStore', () => {
 						jira: { loading: false, result: null },
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
+						github: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
 					},
 				});
@@ -595,6 +608,82 @@ describe('useSettingsFormStore', () => {
 			const headers = (calledInit?.headers ?? {}) as Record<string, string>;
 			expect(headers['x-rescuetime-key']).toBe('rt-secret-key');
 			expect(headers.authorization).toBe('Bearer supabase-jwt');
+		});
+	});
+
+	describe('testGithub', () => {
+		afterEach(() => {
+			vi.restoreAllMocks();
+		});
+
+		it('reports connected + coverage on success', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: { ...baseConfig, githubToken: 'tok' },
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						github: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+
+			vi.spyOn(globalThis, 'fetch')
+				.mockResolvedValueOnce(
+					new Response(JSON.stringify({ login: 'me', name: 'Me' }), { status: 200 }),
+				)
+				.mockResolvedValueOnce(
+					new Response(
+						JSON.stringify([
+							{
+								type: 'PushEvent',
+								created_at: new Date().toISOString(),
+								payload: { ref: 'refs/heads/PUMA-1', commits: [{ message: 'x' }] },
+							},
+						]),
+						{ status: 200 },
+					),
+				)
+				.mockResolvedValueOnce(new Response('[]', { status: 200 }));
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testGithub();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.github.result;
+			expect(result?.success).toBe(true);
+			expect(result?.message).toContain('@me');
+			expect(result?.message).not.toContain('tok'); // never echo the token
+		});
+
+		it('maps 401 to a token-rejected message', async () => {
+			act(() => {
+				useSettingsFormStore.setState({
+					formData: { ...baseConfig, githubToken: 'bad' },
+					integrationTests: {
+						jira: { loading: false, result: null },
+						gitlab: { loading: false, result: null },
+						github: { loading: false, result: null },
+						calendar: { loading: false, result: null },
+						rescuetime: { loading: false, result: null },
+					},
+				});
+			});
+			vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+				new Response('{}', { status: 401 }),
+			);
+
+			await act(async () => {
+				await useSettingsFormStore.getState().testGithub();
+			});
+
+			const result =
+				useSettingsFormStore.getState().integrationTests.github.result;
+			expect(result?.success).toBe(false);
+			expect(result?.message).toMatch(/401|token/i);
 		});
 	});
 });
