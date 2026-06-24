@@ -28,6 +28,8 @@ const baseConfig = {
 	canDeleteWorklogs: true,
 	gitlabToken: '',
 	gitlabHost: '',
+	githubToken: '',
+	githubHost: '',
 	rescueTimeApiKey: '',
 	calendarFeeds: [],
 	absenceAssignments: [],
@@ -36,6 +38,7 @@ const baseConfig = {
 	timeRounding: 'off' as const,
 	includeAbsenceInCsv: true,
 	includeCsvProvenance: false,
+	analyticsOptOut: false,
 };
 
 describe('useSettingsFormStore', () => {

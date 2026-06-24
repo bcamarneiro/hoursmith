@@ -31,6 +31,8 @@ describe('monthWorklogs query key consistency', () => {
 				canDeleteWorklogs: true,
 				gitlabToken: '',
 				gitlabHost: '',
+				githubToken: '',
+				githubHost: '',
 				rescueTimeApiKey: '',
 				calendarFeeds: [],
 				absenceAssignments: [],
@@ -39,6 +41,7 @@ describe('monthWorklogs query key consistency', () => {
 				timeRounding: 'off',
 				includeAbsenceInCsv: true,
 				includeCsvProvenance: false,
+				analyticsOptOut: false,
 			},
 		});
 	});
