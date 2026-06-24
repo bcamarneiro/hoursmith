@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { trackEvent } from '../analytics';
 import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
+import { fetchDevActivitySuggestions } from '../services/devActivityService';
+import {
+	fetchGithubSuggestions,
+	fetchGithubUser,
+} from '../services/githubService';
 import {
 	buildGitlabBaseUrl,
 	describeGitlabConnectionError,
@@ -27,6 +32,7 @@ export interface IntegrationTestResult {
 export interface SettingsIntegrationTests {
 	jira: IntegrationTestResult;
 	gitlab: IntegrationTestResult;
+	github: IntegrationTestResult;
 	calendar: IntegrationTestResult;
 	rescuetime: IntegrationTestResult;
 }
@@ -46,6 +52,7 @@ interface SettingsFormState {
 	resetForm: () => void;
 	testJira: () => Promise<void>;
 	testGitlab: () => Promise<void>;
+	testGithub: () => Promise<void>;
 	testCalendar: () => Promise<void>;
 	testRescueTime: () => Promise<void>;
 }
@@ -209,6 +216,7 @@ const emptyTest: IntegrationTestResult = { loading: false, result: null };
 const resetIntegrationTests = () => ({
 	jira: { ...emptyTest },
 	gitlab: { ...emptyTest },
+	github: { ...emptyTest },
 	calendar: { ...emptyTest },
 	rescuetime: { ...emptyTest },
 });
@@ -577,6 +585,95 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 						result: {
 							success: false,
 							message: describeGitlabConnectionError(error, cleanHost),
+						},
+					},
+				},
+			}));
+		}
+	},
+
+	testGithub: async () => {
+		set((s) => ({
+			integrationTests: {
+				...s.integrationTests,
+				github: { loading: true, result: null },
+			},
+		}));
+		try {
+			const { formData } = get();
+			const normalizedConfig = normalizeConfig(formData);
+			if (!normalizedConfig.githubToken) {
+				throw new Error('GitHub token is required');
+			}
+			const token = normalizedConfig.githubToken;
+			const host = normalizedConfig.githubHost;
+
+			// Validate token + identity (throws ServiceError with friendly copy).
+			const user = await fetchGithubUser(token, host, '');
+
+			// Coverage preview: how many of this week's events carry Jira keys.
+			const today = toLocalDateString(new Date());
+			const weekAgo = toLocalDateString(
+				new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+			);
+			const suggestions = await fetchGithubSuggestions(
+				token,
+				host,
+				'',
+				weekAgo,
+				today,
+			);
+			const keyed = suggestions.length;
+			const sample = suggestions
+				.slice(0, 3)
+				.map((s) => s.issueKey)
+				.join(', ');
+
+			let devIssueCount = 0;
+			try {
+				const devSuggestions = await fetchDevActivitySuggestions(
+					normalizedConfig,
+					weekAgo,
+					today,
+					{ githubLogin: user.login, displayName: user.name },
+				);
+				devIssueCount = new Set(devSuggestions.map((s) => s.issueKey)).size;
+			} catch {
+				// dev-status is best-effort; ignore probe failures
+			}
+
+			const devPanelSuffix =
+				devIssueCount > 0
+					? ` ${devIssueCount} issue(s) have linked GitHub commits via Jira's dev panel.`
+					: '';
+
+			set((s) => ({
+				integrationTests: {
+					...s.integrationTests,
+					github: {
+						loading: false,
+						result: {
+							success: true,
+							message:
+								keyed > 0
+									? `Connected as @${user.login} — ${keyed} issue${keyed > 1 ? 's' : ''} with Jira-keyed activity this week (e.g. ${sample}).${devPanelSuffix}`
+									: `Connected as @${user.login} — no Jira-keyed GitHub activity found this week. dev-panel links may still produce suggestions.${devPanelSuffix}`,
+						},
+					},
+				},
+			}));
+		} catch (error) {
+			set((s) => ({
+				integrationTests: {
+					...s.integrationTests,
+					github: {
+						loading: false,
+						result: {
+							success: false,
+							message:
+								error instanceof Error
+									? error.message
+									: 'GitHub connection failed',
 						},
 					},
 				},

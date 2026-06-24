@@ -5,6 +5,7 @@ export interface WorklogSuggestion {
 	source:
 		| 'jira-activity'
 		| 'gitlab'
+		| 'github'
 		| 'calendar'
 		| 'rescuetime'
 		| 'favorite'

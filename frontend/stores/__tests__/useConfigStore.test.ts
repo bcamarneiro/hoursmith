@@ -192,3 +192,20 @@ describe('migration scaffold — future schema bump rehearsal', () => {
 		expect(migratePersistedConfigState(null, 0).config?.theme).toBe('system');
 	});
 });
+
+describe('github config fields', () => {
+	it('defaults github fields to empty strings', () => {
+		const c = createDefaultConfig();
+		expect(c.githubToken).toBe('');
+		expect(c.githubHost).toBe('');
+	});
+
+	it('trims githubToken and normalizes githubHost', () => {
+		const c = normalizeConfig({
+			githubToken: '  tok  ',
+			githubHost: 'https://github.example.com/',
+		});
+		expect(c.githubToken).toBe('tok');
+		expect(c.githubHost).toBe('github.example.com');
+	});
+});

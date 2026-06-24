@@ -10,17 +10,22 @@ export const SourceStatusBar: React.FC = () => {
 	const isLoadingGitlab = useDashboardStore(
 		(s) => s.isLoadingGitlabSuggestions,
 	);
+	const isLoadingGithub = useDashboardStore(
+		(s) => s.isLoadingGithubSuggestions,
+	);
 	const isLoadingCalendar = useDashboardStore(
 		(s) => s.isLoadingCalendarSuggestions,
 	);
 	const isLoadingRescueTime = useDashboardStore((s) => s.isLoadingRescueTime);
 	const jiraError = useDashboardStore((s) => s.jiraSuggestionsError);
 	const gitlabError = useDashboardStore((s) => s.gitlabSuggestionsError);
+	const githubError = useDashboardStore((s) => s.githubSuggestionsError);
 	const calendarError = useDashboardStore((s) => s.calendarSuggestionsError);
 	const rescueTimeError = useDashboardStore((s) => s.rescueTimeError);
 	const lastFetchedAt = useDashboardStore((s) => s.lastFetchedAt);
 
 	const hasGitlab = !!(config.gitlabToken && config.gitlabHost);
+	const hasGithub = !!config.githubToken;
 	const hasCalendar = (config.calendarFeeds ?? []).some(
 		(feed) => feed.type === 'suggestion' && feed.url.trim(),
 	);
@@ -38,6 +43,12 @@ export const SourceStatusBar: React.FC = () => {
 			label: 'GitLab',
 			loading: isLoadingGitlab,
 			error: gitlabError,
+		});
+	if (hasGithub)
+		sources.push({
+			label: 'GitHub',
+			loading: isLoadingGithub,
+			error: githubError,
 		});
 	if (hasCalendar)
 		sources.push({

@@ -2,6 +2,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import type { RescueTimeDaySummary } from '../../../types/Suggestion';
 import { fetchCalendarSuggestions } from '../../services/calendarService';
+import { fetchDevActivitySuggestions } from '../../services/devActivityService';
+import {
+	fetchGithubSuggestions,
+	fetchGithubUser,
+} from '../../services/githubService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
 import { fetchJiraActivitySuggestions } from '../../services/jiraActivityService';
 import {
@@ -134,6 +139,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const jqlFilterValue = useConfigStore((s) => s.config.jqlFilter);
 	const gitlabToken = useConfigStore((s) => s.config.gitlabToken);
 	const gitlabHost = useConfigStore((s) => s.config.gitlabHost);
+	const githubToken = useConfigStore((s) => s.config.githubToken);
+	const githubHost = useConfigStore((s) => s.config.githubHost);
 	const rescueTimeApiKey = useConfigStore((s) => s.config.rescueTimeApiKey);
 	const calendarFeeds = useConfigStore((s) => s.config.calendarFeeds);
 	const timeRounding = useConfigStore((s) => s.config.timeRounding);
@@ -185,6 +192,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			jqlFilter: jqlFilterValue,
 			gitlabToken,
 			gitlabHost,
+			githubToken,
+			githubHost,
 			rescueTimeApiKey,
 			calendarFeeds,
 			timeRounding,
@@ -195,6 +204,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			setError('worklogs', null);
 			setError('jira', null);
 			setError('gitlab', null);
+			setError('github', null);
 			setError('calendar', null);
 			setError('rescuetime', null);
 
@@ -208,6 +218,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			});
 			setLoading('jira', true);
 			if (gitlabToken && gitlabHost) setLoading('gitlab', true);
+			if (githubToken) setLoading('github', true);
+			else setLoading('github', false);
 			const suggestionFeeds = (config.calendarFeeds ?? []).filter(
 				(f) => f.type === 'suggestion',
 			);
@@ -237,12 +249,27 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					jqlFilter,
 				);
 
+			let githubUser: {
+				githubLogin?: string | null;
+				displayName?: string | null;
+			} = {};
+			if (githubToken) {
+				try {
+					const u = await fetchGithubUser(githubToken, githubHost, '', signal);
+					githubUser = { githubLogin: u.login, displayName: u.name };
+				} catch {
+					// identity is best-effort; dev-status falls back to no GitHub login
+				}
+			}
+
 			const [
 				worklogsResult,
 				jiraSuggestions,
 				gitlabSuggestions,
 				calendarSuggestions,
 				rescueTimeData,
+				githubEvents,
+				devActivity,
 			] = await Promise.all([
 				// Worklogs: fetch from shared month query (cached/deduplicated)
 				(async () => {
@@ -379,6 +406,33 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 							})
 							.finally(() => setLoading('rescuetime', false))
 					: Promise.resolve(new Map<string, RescueTimeDaySummary>()),
+
+				githubToken
+					? fetchGithubSuggestions(
+							githubToken,
+							githubHost,
+							'',
+							weekStart,
+							weekEnd,
+							signal,
+						)
+							.catch((e) => {
+								if (!signal.aborted) setError('github', e.message);
+								return [];
+							})
+							.finally(() => setLoading('github', false))
+					: Promise.resolve([]),
+
+				fetchDevActivitySuggestions(
+					config,
+					weekStart,
+					weekEnd,
+					githubUser,
+					signal,
+				).catch((e) => {
+					if (!signal.aborted) setError('github', e.message);
+					return [];
+				}),
 			]);
 
 			if (signal.aborted) return;
@@ -391,10 +445,13 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 				(w): w is WorklogEntry & { issueKey: string } => !!w.issueKey,
 			);
 
+			const githubSuggestions = [...githubEvents, ...devActivity];
+
 			const summaries = mergeSuggestions({
 				weekStart,
 				jiraSuggestions,
 				gitlabSuggestions,
+				githubSuggestions,
 				calendarSuggestions,
 				rescueTimeData,
 				existingWorklogs: worklogs,
@@ -427,6 +484,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		jqlFilterValue,
 		gitlabToken,
 		gitlabHost,
+		githubToken,
+		githubHost,
 		rescueTimeApiKey,
 		calendarFeeds,
 		timeRounding,

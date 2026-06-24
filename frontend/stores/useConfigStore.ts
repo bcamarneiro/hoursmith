@@ -41,6 +41,8 @@ export interface Config {
 	canDeleteWorklogs: boolean;
 	gitlabToken: string;
 	gitlabHost: string;
+	githubToken: string;
+	githubHost: string;
 	rescueTimeApiKey: string;
 	calendarFeeds: CalendarFeed[];
 	absenceAssignments: AbsenceAssignment[];
@@ -75,7 +77,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 7;
+export const CONFIG_STORAGE_VERSION = 8;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -178,6 +180,8 @@ export function createDefaultConfig(): Config {
 		canDeleteWorklogs: true,
 		gitlabToken: '',
 		gitlabHost: '',
+		githubToken: '',
+		githubHost: '',
 		rescueTimeApiKey: '',
 		calendarFeeds: [],
 		absenceAssignments: [],
@@ -257,6 +261,11 @@ export function normalizeConfig(
 				? config.gitlabToken.trim()
 				: fallback.gitlabToken.trim(),
 		gitlabHost: normalizeHost(config?.gitlabHost ?? fallback.gitlabHost),
+		githubToken:
+			typeof config?.githubToken === 'string'
+				? config.githubToken.trim()
+				: fallback.githubToken.trim(),
+		githubHost: normalizeHost(config?.githubHost ?? fallback.githubHost),
 		rescueTimeApiKey:
 			typeof config?.rescueTimeApiKey === 'string'
 				? config.rescueTimeApiKey.trim()
@@ -307,6 +316,8 @@ export function normalizeConfig(
  *        migrate step is a no-op pass-through normaliser.
  *   v7 → added analyticsOptOut (boolean, default false). No shape change;
  *        `normalizeConfig` fills the field for pre-v7 blobs.
+ *   v8 → added githubToken/githubHost (strings, default ''). No shape change;
+ *        `normalizeConfig` fills the fields for pre-v8 blobs.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -314,7 +325,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v7(
+function migrateLegacy_v0_to_v8(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -328,7 +339,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v7(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v8(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and

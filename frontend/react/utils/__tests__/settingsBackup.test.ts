@@ -17,6 +17,8 @@ const defaultConfig = {
 	canDeleteWorklogs: true,
 	gitlabToken: '',
 	gitlabHost: '',
+	githubToken: '',
+	githubHost: '',
 	rescueTimeApiKey: '',
 	calendarFeeds: [],
 	absenceAssignments: [],

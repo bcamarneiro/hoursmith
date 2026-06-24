@@ -15,6 +15,8 @@ const baseConfig: Config = {
 	canDeleteWorklogs: true,
 	gitlabToken: '',
 	gitlabHost: '',
+	githubToken: '',
+	githubHost: '',
 	rescueTimeApiKey: '',
 	calendarFeeds: [],
 	absenceAssignments: [],
@@ -23,6 +25,7 @@ const baseConfig: Config = {
 	timeRounding: 'off',
 	includeAbsenceInCsv: true,
 	includeCsvProvenance: false,
+	analyticsOptOut: false,
 };
 
 describe('fetchMonthWorklogs', () => {

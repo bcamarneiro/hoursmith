@@ -6,6 +6,7 @@ import { buildSettingsSetupModel } from '../settingsSetup';
 const emptyTests: SettingsIntegrationTests = {
 	jira: { loading: false, result: null },
 	gitlab: { loading: false, result: null },
+	github: { loading: false, result: null },
 	calendar: { loading: false, result: null },
 	rescuetime: { loading: false, result: null },
 };
@@ -22,6 +23,8 @@ const baseConfig: Config = {
 	canDeleteWorklogs: true,
 	gitlabToken: '',
 	gitlabHost: '',
+	githubToken: '',
+	githubHost: '',
 	rescueTimeApiKey: '',
 	calendarFeeds: [],
 	absenceAssignments: [],
@@ -30,6 +33,7 @@ const baseConfig: Config = {
 	timeRounding: 'off',
 	includeAbsenceInCsv: true,
 	includeCsvProvenance: false,
+	analyticsOptOut: false,
 };
 
 describe('buildSettingsSetupModel', () => {
