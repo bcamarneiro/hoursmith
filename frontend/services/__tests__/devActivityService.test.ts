@@ -1,8 +1,8 @@
 // frontend/services/__tests__/devActivityService.test.ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as jiraSearch from '../jiraSearch';
-import { fetchDevActivitySuggestions } from '../devActivityService';
 import { createDefaultConfig } from '../../stores/useConfigStore';
+import { fetchDevActivitySuggestions } from '../devActivityService';
+import * as jiraSearch from '../jiraSearch';
 
 const config = {
 	...createDefaultConfig(),
@@ -31,7 +31,9 @@ describe('fetchDevActivitySuggestions', () => {
 			.mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ summary: { repository: { overall: { count: 2 } } } }),
+				json: async () => ({
+					summary: { repository: { overall: { count: 2 } } },
+				}),
 			} as Response)
 			// detail (repository)
 			.mockResolvedValueOnce({
@@ -100,9 +102,19 @@ describe('fetchDevActivitySuggestions', () => {
 			total: 2,
 		} as never);
 		vi.spyOn(globalThis, 'fetch')
-			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ summary: { repository: { overall: { count: 1 } } } }) } as Response)
+			.mockResolvedValueOnce({
+				ok: true,
+				status: 200,
+				json: async () => ({
+					summary: { repository: { overall: { count: 1 } } },
+				}),
+			} as Response)
 			.mockRejectedValueOnce(new Error('boom')) // detail for PUMA-1 fails
-			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ summary: {} }) } as Response); // PUMA-2 summary empty
+			.mockResolvedValueOnce({
+				ok: true,
+				status: 200,
+				json: async () => ({ summary: {} }),
+			} as Response); // PUMA-2 summary empty
 
 		const out = await fetchDevActivitySuggestions(
 			config,
