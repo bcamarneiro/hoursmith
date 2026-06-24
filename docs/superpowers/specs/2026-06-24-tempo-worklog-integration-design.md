@@ -45,7 +45,11 @@ is explicitly out of scope.
 4. **Architecture:** gateway + service + mapper + a thin source resolver
    (approach A). Existing Jira paths remain the untouched default.
 
-## API assumptions (verify against Tempo Cloud v4 docs during planning)
+## API assumptions
+
+Deployment is **confirmed Tempo Cloud** (the Jira instance is Cloud, verified
+with the user 2026-06-24). The endpoint request/response *shapes* below should
+still be verified against the live Tempo Cloud v4 docs during planning.
 
 - Base URL `https://api.tempo.io/4/`, auth `Authorization: Bearer <Tempo API token>`
   (token generated in Tempo → Settings → API integration).
