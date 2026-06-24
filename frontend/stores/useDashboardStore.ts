@@ -78,12 +78,14 @@ interface DashboardState {
 	isLoadingWorklogs: boolean;
 	isLoadingJiraSuggestions: boolean;
 	isLoadingGitlabSuggestions: boolean;
+	isLoadingGithubSuggestions: boolean;
 	isLoadingCalendarSuggestions: boolean;
 	isLoadingRescueTime: boolean;
 
 	worklogsError: string | null;
 	jiraSuggestionsError: string | null;
 	gitlabSuggestionsError: string | null;
+	githubSuggestionsError: string | null;
 	calendarSuggestionsError: string | null;
 	rescueTimeError: string | null;
 
@@ -109,11 +111,23 @@ interface DashboardState {
 	fillDayGap: (date: string) => void;
 
 	setLoading: (
-		source: 'worklogs' | 'jira' | 'gitlab' | 'calendar' | 'rescuetime',
+		source:
+			| 'worklogs'
+			| 'jira'
+			| 'gitlab'
+			| 'github'
+			| 'calendar'
+			| 'rescuetime',
 		value: boolean,
 	) => void;
 	setError: (
-		source: 'worklogs' | 'jira' | 'gitlab' | 'calendar' | 'rescuetime',
+		source:
+			| 'worklogs'
+			| 'jira'
+			| 'gitlab'
+			| 'github'
+			| 'calendar'
+			| 'rescuetime',
 		value: string | null,
 	) => void;
 }
@@ -122,6 +136,7 @@ const loadingKeys = {
 	worklogs: 'isLoadingWorklogs',
 	jira: 'isLoadingJiraSuggestions',
 	gitlab: 'isLoadingGitlabSuggestions',
+	github: 'isLoadingGithubSuggestions',
 	calendar: 'isLoadingCalendarSuggestions',
 	rescuetime: 'isLoadingRescueTime',
 } as const;
@@ -130,6 +145,7 @@ const errorKeys = {
 	worklogs: 'worklogsError',
 	jira: 'jiraSuggestionsError',
 	gitlab: 'gitlabSuggestionsError',
+	github: 'githubSuggestionsError',
 	calendar: 'calendarSuggestionsError',
 	rescuetime: 'rescueTimeError',
 } as const;
@@ -145,12 +161,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 	isLoadingWorklogs: false,
 	isLoadingJiraSuggestions: false,
 	isLoadingGitlabSuggestions: false,
+	isLoadingGithubSuggestions: false,
 	isLoadingCalendarSuggestions: false,
 	isLoadingRescueTime: false,
 
 	worklogsError: null,
 	jiraSuggestionsError: null,
 	gitlabSuggestionsError: null,
+	githubSuggestionsError: null,
 	calendarSuggestionsError: null,
 	rescueTimeError: null,
 

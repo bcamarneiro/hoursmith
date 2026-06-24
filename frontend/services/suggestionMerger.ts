@@ -31,6 +31,7 @@ export interface MergeSuggestionsInput {
 	weekStart: string;
 	jiraSuggestions: WorklogSuggestion[];
 	gitlabSuggestions: WorklogSuggestion[];
+	githubSuggestions?: WorklogSuggestion[];
 	calendarSuggestions: WorklogSuggestion[];
 	rescueTimeData: Map<string, RescueTimeDaySummary>;
 	existingWorklogs: WorklogEntry[];
@@ -242,6 +243,7 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 		weekStart,
 		jiraSuggestions,
 		gitlabSuggestions,
+		githubSuggestions = [],
 		calendarSuggestions,
 		rescueTimeData,
 		existingWorklogs,
@@ -298,6 +300,7 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 	const allSuggestions = [
 		...jiraSuggestions,
 		...gitlabSuggestions,
+		...githubSuggestions,
 		...mappedCalendar,
 	];
 

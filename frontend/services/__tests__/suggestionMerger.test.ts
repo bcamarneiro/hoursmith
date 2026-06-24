@@ -425,3 +425,48 @@ describe('roundingStepSeconds', () => {
 		expect(roundingStepSeconds('30m')).toBe(1800);
 	});
 });
+
+describe('github suggestions merge', () => {
+	it('includes github suggestions and dedups against gitlab by confidence', () => {
+		const base = {
+			weekStart: '2026-06-15',
+			jiraSuggestions: [],
+			gitlabSuggestions: [
+				{
+					id: 'gitlab-PUMA-1-2026-06-16',
+					source: 'gitlab' as const,
+					issueKey: 'PUMA-1',
+					date: '2026-06-16',
+					suggestedTimeSpent: '30m',
+					suggestedSeconds: 1800,
+					confidence: 'low' as const,
+					reason: 'gl',
+					logged: false,
+				},
+			],
+			githubSuggestions: [
+				{
+					id: 'github-PUMA-1-2026-06-16',
+					source: 'github' as const,
+					issueKey: 'PUMA-1',
+					date: '2026-06-16',
+					suggestedTimeSpent: '1h',
+					suggestedSeconds: 3600,
+					confidence: 'high' as const,
+					reason: 'gh',
+					logged: false,
+				},
+			],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			existingWorklogs: [],
+			timeRounding: 'off' as const,
+		};
+		const days = mergeSuggestions(base as never);
+		const all = days.flatMap((d) => d.suggestions);
+		const puma1 = all.filter((s) => s.issueKey === 'PUMA-1');
+		// Deduped to one, the higher-confidence GitHub one wins.
+		expect(puma1).toHaveLength(1);
+		expect(puma1[0].source).toBe('github');
+	});
+});
