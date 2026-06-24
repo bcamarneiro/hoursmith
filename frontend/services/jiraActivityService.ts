@@ -13,6 +13,7 @@ interface JiraChangelog {
 }
 
 interface JiraIssueWithChangelog {
+	id: string;
 	key: string;
 	fields: { summary?: string };
 	changelog?: JiraChangelog;

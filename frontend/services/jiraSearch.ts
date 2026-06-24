@@ -65,6 +65,26 @@ const SEARCH_HEADERS = (apiToken: string): Record<string, string> => ({
 	'X-Atlassian-Token': 'no-check',
 });
 
+/**
+ * Build an authenticated, proxy-aware URL+headers pair for an arbitrary Jira
+ * REST path. Reuses the same base-URL construction, auth headers, and
+ * hosted-proxy rewrite that `fetchSearchPage` uses — so dev-status and other
+ * non-search endpoints travel the identical authed/proxied path.
+ */
+export function buildJiraRequest(
+	config: JiraSearchConfig,
+	path: string,
+): { url: string; headers: Record<string, string> } {
+	const base = buildSearchBaseUrl(config);
+	const headers = SEARCH_HEADERS(config.apiToken);
+	const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+	return rewriteForHostedProxy(url, headers, {
+		jiraHost: config.jiraHost,
+		email: config.email,
+		apiToken: config.apiToken,
+	});
+}
+
 export interface SearchPageParams {
 	jql: string;
 	fields: string;
