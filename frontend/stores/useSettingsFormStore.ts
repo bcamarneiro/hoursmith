@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { trackEvent } from '../analytics';
 import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
+import { fetchDevActivitySuggestions } from '../services/devActivityService';
 import {
 	fetchGithubSuggestions,
 	fetchGithubUser,
@@ -628,6 +629,24 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				.map((s) => s.issueKey)
 				.join(', ');
 
+			let devIssueCount = 0;
+			try {
+				const devSuggestions = await fetchDevActivitySuggestions(
+					normalizedConfig,
+					weekAgo,
+					today,
+					{ githubLogin: user.login, displayName: user.name },
+				);
+				devIssueCount = new Set(devSuggestions.map((s) => s.issueKey)).size;
+			} catch {
+				// dev-status is best-effort; ignore probe failures
+			}
+
+			const devPanelSuffix =
+				devIssueCount > 0
+					? ` ${devIssueCount} issue(s) have linked GitHub commits via Jira's dev panel.`
+					: '';
+
 			set((s) => ({
 				integrationTests: {
 					...s.integrationTests,
@@ -637,8 +656,8 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 							success: true,
 							message:
 								keyed > 0
-									? `Connected as @${user.login} — ${keyed} issue${keyed > 1 ? 's' : ''} with Jira-keyed activity this week (e.g. ${sample}).`
-									: `Connected as @${user.login} — no Jira-keyed GitHub activity found this week. dev-panel links may still produce suggestions.`,
+									? `Connected as @${user.login} — ${keyed} issue${keyed > 1 ? 's' : ''} with Jira-keyed activity this week (e.g. ${sample}).${devPanelSuffix}`
+									: `Connected as @${user.login} — no Jira-keyed GitHub activity found this week. dev-panel links may still produce suggestions.${devPanelSuffix}`,
 						},
 					},
 				},
@@ -652,7 +671,9 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 						result: {
 							success: false,
 							message:
-								error instanceof Error ? error.message : 'GitHub connection failed',
+								error instanceof Error
+									? error.message
+									: 'GitHub connection failed',
 						},
 					},
 				},

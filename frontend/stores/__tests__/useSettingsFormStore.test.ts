@@ -632,7 +632,9 @@ describe('useSettingsFormStore', () => {
 
 			vi.spyOn(globalThis, 'fetch')
 				.mockResolvedValueOnce(
-					new Response(JSON.stringify({ login: 'me', name: 'Me' }), { status: 200 }),
+					new Response(JSON.stringify({ login: 'me', name: 'Me' }), {
+						status: 200,
+					}),
 				)
 				.mockResolvedValueOnce(
 					new Response(
@@ -640,13 +642,19 @@ describe('useSettingsFormStore', () => {
 							{
 								type: 'PushEvent',
 								created_at: new Date().toISOString(),
-								payload: { ref: 'refs/heads/PUMA-1', commits: [{ message: 'x' }] },
+								payload: {
+									ref: 'refs/heads/PUMA-1',
+									commits: [{ message: 'x' }],
+								},
 							},
 						]),
 						{ status: 200 },
 					),
 				)
-				.mockResolvedValueOnce(new Response('[]', { status: 200 }));
+				.mockResolvedValueOnce(new Response('[]', { status: 200 }))
+				.mockResolvedValueOnce(
+					new Response(JSON.stringify({ issues: [], total: 0 }), { status: 200 }),
+				);
 
 			await act(async () => {
 				await useSettingsFormStore.getState().testGithub();

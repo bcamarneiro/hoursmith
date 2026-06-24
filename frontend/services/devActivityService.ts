@@ -1,6 +1,7 @@
 // frontend/services/devActivityService.ts
 import type { WorklogSuggestion } from '../../types/Suggestion';
 import type { Config } from '../stores/useConfigStore';
+import { jiraRequest } from './jiraRequest';
 import { fetchSearchPage } from './jiraSearch';
 
 export interface DevActivityUser {
@@ -36,7 +37,10 @@ function dateOnly(iso: string): string {
 }
 
 /** Case-insensitive match of a dev author name against the user's identities. */
-function isCurrentUser(authorName: string | undefined, user: DevActivityUser): boolean {
+function isCurrentUser(
+	authorName: string | undefined,
+	user: DevActivityUser,
+): boolean {
 	if (!authorName) return false;
 	const candidates = [user.githubLogin, user.displayName]
 		.filter((v): v is string => !!v)
@@ -68,12 +72,6 @@ export async function fetchDevActivitySuggestions(
 		{ jql, fields: 'summary', maxResults: 50 },
 		signal,
 	);
-
-	// fetchSearchPage builds the proxied/authed Jira base; mirror its URL shape
-	// for the dev-status calls. We reuse the same base by deriving it from a
-	// lightweight helper exported there (see jiraSearch.buildBaseUrl) — but to
-	// keep this service self-contained we call through a thin wrapper below.
-	const { jiraRequest } = await import('./jiraRequest');
 
 	const out: WorklogSuggestion[] = [];
 
