@@ -38,24 +38,34 @@ type Props = {
 	gitlabTokenId: string;
 	rescueTimeKeyId: string;
 
+	// formData slices — GitHub
+	githubToken: string;
+
+	// Static IDs — GitHub
+	githubTokenId: string;
+
 	// Status / test state per service
 	gitlabStatus: ServiceStatus;
 	rescueTimeStatus: ServiceStatus;
 	calendarStatus: ServiceStatus;
+	githubStatus: ServiceStatus;
 	gitlabTroubleshooting: string | null;
 	integrationTests: {
 		gitlab: IntegrationTestResult;
 		rescuetime: IntegrationTestResult;
 		calendar: IntegrationTestResult;
+		github: IntegrationTestResult;
 	};
 
 	// Test action callbacks
 	testGitlab: () => void;
 	testRescueTime: () => void;
 	testCalendar: () => void;
+	testGithub: () => void;
 	canTestGitlab: boolean;
 	canTestRescueTime: boolean;
 	hasCalendarFeeds: boolean;
+	canTestGithub: boolean;
 
 	// Calendar feeds
 	suggestionFeedEntries: FeedEntry[];
@@ -99,17 +109,22 @@ export const IntegrationsSection: React.FC<Props> = ({
 	gitlabHostId,
 	gitlabTokenId,
 	rescueTimeKeyId,
+	githubToken,
+	githubTokenId,
 	gitlabStatus,
 	rescueTimeStatus,
 	calendarStatus,
+	githubStatus,
 	gitlabTroubleshooting,
 	integrationTests,
 	testGitlab,
 	testRescueTime,
 	testCalendar,
+	testGithub,
 	canTestGitlab,
 	canTestRescueTime,
 	hasCalendarFeeds,
+	canTestGithub,
 	suggestionFeedEntries,
 	absenceFeedEntries,
 	holidayFeedEntries,
@@ -216,6 +231,59 @@ export const IntegrationsSection: React.FC<Props> = ({
 						<p className={styles.serviceHint}>
 							Run the test once to confirm the host, token, and proxy path are
 							all valid together.
+						</p>
+					)}
+				</section>
+
+				<section className={styles.serviceCard}>
+					<div className={styles.serviceHeader}>
+						<div className={styles.serviceHeading}>
+							<p className={styles.serviceKicker}>GitHub</p>
+							<h3>Development activity</h3>
+							<p>
+								Suggest worklogs from your GitHub commits, PRs, and reviews —
+								including review comments on others' PRs.
+							</p>
+						</div>
+						<span
+							className={`${styles.serviceStatusBadge} ${githubStatus.tone === 'ready' ? styles.serviceStatusReady : githubStatus.tone === 'warning' ? styles.serviceStatusWarning : styles.serviceStatusPending}`}
+						>
+							{githubStatus.label}
+						</span>
+					</div>
+					<div className={styles.formGroup}>
+						<label htmlFor={githubTokenId}>GitHub token</label>
+						<input
+							type="password"
+							id={githubTokenId}
+							name="githubToken"
+							value={githubToken}
+							onChange={handleChange}
+						/>
+						<small>
+							Classic PAT with <code>repo</code> + <code>read:user</code> scope,
+							or a fine-grained PAT with read access to your repos.
+						</small>
+					</div>
+					<div className={styles.serviceActions}>
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={testGithub}
+							disabled={integrationTests.github.loading || !canTestGithub}
+						>
+							{integrationTests.github.loading ? 'Testing...' : 'Test GitHub'}
+						</Button>
+					</div>
+					{integrationTests.github.result ? (
+						<p
+							className={`${styles.testResult} ${integrationTests.github.result.success ? styles.testSuccess : styles.testError}`}
+						>
+							{integrationTests.github.result.message}
+						</p>
+					) : (
+						<p className={styles.serviceHint}>
+							Works directly with github.com — no CORS proxy needed.
 						</p>
 					)}
 				</section>

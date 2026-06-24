@@ -138,6 +138,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const testGitlab = useSettingsFormStore((state) => state.testGitlab);
 	const testCalendar = useSettingsFormStore((state) => state.testCalendar);
 	const testRescueTime = useSettingsFormStore((state) => state.testRescueTime);
+	const testGithub = useSettingsFormStore((state) => state.testGithub);
 	const loadFromConfig = useSettingsFormStore((state) => state.loadFromConfig);
 	const resetForm = useSettingsFormStore((state) => state.resetForm);
 	const replaceFormData = useSettingsFormStore(
@@ -171,6 +172,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const gitlabTokenId = useId();
 	const gitlabHostId = useId();
 	const rescueTimeKeyId = useId();
+	const githubTokenId = useId();
 	const timeRoundingId = useId();
 	const themeId = useId();
 	const includeAbsenceInCsvId = useId();
@@ -184,6 +186,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const canTestGitlab =
 		!!formData.gitlabHost.trim() && !!formData.gitlabToken.trim();
 	const canTestRescueTime = !!formData.rescueTimeApiKey.trim();
+	const canTestGithub = !!formData.githubToken.trim();
 	const hasCalendarFeeds = (formData.calendarFeeds ?? []).some((f) =>
 		f.url.trim(),
 	);
@@ -220,6 +223,11 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		hasCalendarFeeds,
 		integrationTests.calendar.loading,
 		integrationTests.calendar.result,
+	);
+	const githubStatus = getServiceStatus(
+		!!formData.githubToken.trim(),
+		integrationTests.github.loading,
+		integrationTests.github.result,
 	);
 	const hasSharedAbsenceFeeds = sharedAbsenceFeedEntries.length > 0;
 	const hasHolidayFeeds = holidayFeedEntries.length > 0;
@@ -523,17 +531,22 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							gitlabHostId={gitlabHostId}
 							gitlabTokenId={gitlabTokenId}
 							rescueTimeKeyId={rescueTimeKeyId}
+							githubToken={formData.githubToken}
+							githubTokenId={githubTokenId}
 							gitlabStatus={gitlabStatus}
 							rescueTimeStatus={rescueTimeStatus}
 							calendarStatus={calendarStatus}
+							githubStatus={githubStatus}
 							gitlabTroubleshooting={gitlabTroubleshooting}
 							integrationTests={integrationTests}
 							testGitlab={testGitlab}
 							testRescueTime={testRescueTime}
 							testCalendar={testCalendar}
+							testGithub={testGithub}
 							canTestGitlab={canTestGitlab}
 							canTestRescueTime={canTestRescueTime}
 							hasCalendarFeeds={hasCalendarFeeds}
+							canTestGithub={canTestGithub}
 							suggestionFeedEntries={suggestionFeedEntries}
 							absenceFeedEntries={absenceFeedEntries}
 							holidayFeedEntries={holidayFeedEntries}
