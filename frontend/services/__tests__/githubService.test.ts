@@ -122,7 +122,13 @@ describe('fetchGithubSuggestions', () => {
 			)
 			.mockResolvedValueOnce(jsonRes([]));
 
-		const out = await fetchGithubSuggestions('tok', '', '', '2026-06-15', '2026-06-21');
+		const out = await fetchGithubSuggestions(
+			'tok',
+			'',
+			'',
+			'2026-06-15',
+			'2026-06-21',
+		);
 		expect(out).toHaveLength(1);
 		expect(out[0].issueKey).toBe('PUMA-77');
 		expect(out[0].reason).toMatch(/review\/comment/i);

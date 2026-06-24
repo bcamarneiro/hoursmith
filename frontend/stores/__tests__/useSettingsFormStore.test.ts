@@ -653,7 +653,9 @@ describe('useSettingsFormStore', () => {
 				)
 				.mockResolvedValueOnce(new Response('[]', { status: 200 }))
 				.mockResolvedValueOnce(
-					new Response(JSON.stringify({ issues: [], total: 0 }), { status: 200 }),
+					new Response(JSON.stringify({ issues: [], total: 0 }), {
+						status: 200,
+					}),
 				);
 
 			await act(async () => {
