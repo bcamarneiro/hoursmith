@@ -529,10 +529,10 @@ git commit -m "feat(tempo): worklog source resolver + Tempo detection predicate"
 **Interfaces:**
 - Consumes: `EnrichedJiraWorklog`, `JiraIssue` (`types/jira.ts`); `searchAllIssues` (`jiraSearch.ts`).
 - Produces:
-  - `interface TempoWorklog { tempoWorklogId: number; jiraWorklogId?: number; issue: { id: number }; timeSpentSeconds: number; startDate: string; startTime?: string; description?: string; author?: { accountId?: string } }`
+  - `interface TempoWorklog { tempoWorklogId: number; jiraWorklogId?: number; issue: { id: number; key?: string }; timeSpentSeconds: number; startDate: string; startTime?: string; description?: string; author?: { accountId?: string } }`
   - `mapTempoWorklog(wl: TempoWorklog, issueMap: Map<string, JiraIssue>, email: string): EnrichedJiraWorklog`
   - `fetchIssueMetadata(ids: string[], config, signal?): Promise<Map<string, JiraIssue>>` (chunked, ~100 ids/query)
-  - `placeholderIssue(id: string): JiraIssue`
+  - `placeholderIssue(id: string, key?: string): JiraIssue` — keeps Tempo's real `key` when present (verified 2026-06-26: Tempo `issue` carries `key`).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -567,14 +567,23 @@ describe('mapTempoWorklog', () => {
 		expect(out.started).toBe('2026-06-30T00:00:00');
 	});
 
-	it('uses a placeholder issue when the id is not in the map (never drops)', () => {
+	it('keeps Tempo real key in the placeholder when the id is not in the map (never drops)', () => {
+		const out = mapTempoWorklog(
+			{ tempoWorklogId: 9, issue: { id: 2002, key: 'PAY-2' }, timeSpentSeconds: 60, startDate: '2026-06-05' },
+			new Map(),
+			'me@x.com',
+		);
+		expect(out.issue.key).toBe('PAY-2');
+		expect(out.issue.fields.summary).toContain('Unknown issue');
+	});
+
+	it('falls back to UNKNOWN-<id> when Tempo gives no key and the map misses', () => {
 		const out = mapTempoWorklog(
 			{ tempoWorklogId: 9, issue: { id: 2002 }, timeSpentSeconds: 60, startDate: '2026-06-05' },
 			new Map(),
 			'me@x.com',
 		);
 		expect(out.issue.key).toBe('UNKNOWN-2002');
-		expect(out.issue.fields.summary).toContain('Unknown issue');
 	});
 });
 
@@ -588,7 +597,10 @@ describe('chunkIds', () => {
 });
 
 describe('placeholderIssue', () => {
-	it('builds a stable placeholder', () => {
+	it('uses the real key when given', () => {
+		expect(placeholderIssue('42', 'PAY-9')).toMatchObject({ id: '42', key: 'PAY-9' });
+	});
+	it('falls back to UNKNOWN-<id> with no key', () => {
 		expect(placeholderIssue('42')).toMatchObject({ id: '42', key: 'UNKNOWN-42' });
 	});
 });
@@ -608,7 +620,8 @@ import { searchAllIssues } from './jiraSearch';
 export interface TempoWorklog {
 	tempoWorklogId: number;
 	jiraWorklogId?: number;
-	issue: { id: number };
+	// Verified 2026-06-26: Tempo v4 `issue` carries both `id` and `key`.
+	issue: { id: number; key?: string };
 	timeSpentSeconds: number;
 	startDate: string;
 	startTime?: string;
@@ -616,8 +629,12 @@ export interface TempoWorklog {
 	author?: { accountId?: string };
 }
 
-export function placeholderIssue(id: string): JiraIssue {
-	return { id, key: `UNKNOWN-${id}`, fields: { summary: `Unknown issue · ${id}` } };
+export function placeholderIssue(id: string, key?: string): JiraIssue {
+	return {
+		id,
+		key: key ?? `UNKNOWN-${id}`,
+		fields: { summary: `Unknown issue · ${key ?? id}` },
+	};
 }
 
 /**
@@ -632,7 +649,7 @@ export function mapTempoWorklog(
 	email: string,
 ): EnrichedJiraWorklog {
 	const issueId = String(wl.issue.id);
-	const issue = issueMap.get(issueId) ?? placeholderIssue(issueId);
+	const issue = issueMap.get(issueId) ?? placeholderIssue(issueId, wl.issue.key);
 	const started = `${wl.startDate}T${wl.startTime ?? '00:00:00'}`;
 	return {
 		id: String(wl.tempoWorklogId),
@@ -892,7 +909,7 @@ export async function fetchWeekWorklogsTempo(
 }
 ```
 
-> Confirm Tempo's list response field name (`results`) and the pagination cursor (`metadata.next`) against the live v4 docs; adjust the `TempoPage` interface + `next` handling if they differ.
+> Verified 2026-06-26: the list response uses `results` (array) and `metadata.next` (next-page URL, present only when more results). The `TempoPage` interface + `next` handling above match the live v4 docs.
 
 - [ ] **Step 4: Run test to verify it passes**
 

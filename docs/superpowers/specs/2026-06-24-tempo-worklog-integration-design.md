@@ -45,24 +45,31 @@ is explicitly out of scope.
 4. **Architecture:** gateway + service + mapper + a thin source resolver
    (approach A). Existing Jira paths remain the untouched default.
 
-## API assumptions
+## API (verified against Tempo Cloud v4 docs 2026-06-26)
 
 Deployment is **confirmed Tempo Cloud** (the Jira instance is Cloud, verified
-with the user 2026-06-24). The endpoint request/response *shapes* below should
-still be verified against the live Tempo Cloud v4 docs during planning.
+with the user 2026-06-24). Endpoint shapes verified against
+`help.tempo.io` / `apidocs.tempo.io` on 2026-06-26.
 
 - Base URL `https://api.tempo.io/4/`, auth `Authorization: Bearer <Tempo API token>`
   (token generated in Tempo → Settings → API integration).
+- **List response shape:** `{ self, metadata: { count, offset, limit, next? },
+  results: [...] }`. The worklog array is under **`results`**. Pagination is
+  `offset`/`limit` (`limit` max 1000); **`metadata.next`** holds the next-page URL
+  and is present only when more results exist.
 - `GET /4/worklogs/user/{accountId}?from=YYYY-MM-DD&to=YYYY-MM-DD` — current-user
-  reads, paginated via `metadata.next`.
+  reads.
 - `GET /4/worklogs?from&to` — non-user-scoped reads (team path).
-- `POST /4/worklogs` — body `{ authorAccountId, issueId (numeric), timeSpentSeconds,
-  startDate, startTime, description }`.
+- **Worklog object fields:** `self`, `tempoWorklogId`, `jiraWorklogId`,
+  `issue: { self, id, key }` (**`key` IS present** — only summary/status/type/
+  parent/project still need Jira enrichment), `timeSpentSeconds`, `billableSeconds`,
+  `startDate`, `startTime`, `description`, `createdAt`, `updatedAt`,
+  `author: { self, accountId, displayName }`, `attributes`.
+- `POST /4/worklogs` — body `{ issueId (integer, required), authorAccountId,
+  timeSpentSeconds, startDate, startTime }` + optional `billableSeconds`,
+  `description`, `remainingEstimateSeconds`.
 - `PUT /4/worklogs/{tempoWorklogId}`, `DELETE /4/worklogs/{tempoWorklogId}`,
   `GET /4/worklogs/{tempoWorklogId}`.
-- Worklog payload exposes `tempoWorklogId`, `jiraWorklogId`, `issue.id` (+ `self`,
-  **no key/summary**), `timeSpentSeconds`, `startDate`, `startTime`, `description`,
-  `author.accountId`, `createdAt`, `updatedAt`.
 
 ## Architecture (approach A)
 
@@ -153,8 +160,9 @@ swaps the source.
 2. **Fetch from Tempo.** `GET /4/worklogs/user/{accountId}?from&to` through
    `tempoGateway`, paginating on `metadata.next`. No app-author filtering needed
    — Tempo carries the real worker.
-3. **Enrich issue metadata from Jira.** Tempo returns issue `id` only. Collect the
-   unique issue IDs and batch-fetch their fields from Jira via JQL
+3. **Enrich issue metadata from Jira.** Tempo returns `issue.id` **and
+   `issue.key`**, but not summary/status/type/parent/project. Collect the unique
+   issue IDs and batch-fetch the remaining fields from Jira via JQL
    `issue in (id1,id2,…)` with `fields=key,summary,issuetype,parent,project,status`.
    **Chunk** the id list (~100/query) to stay under JQL/URL limits. Build an
    `id → issueFields` map.
@@ -167,8 +175,9 @@ swaps the source.
    - `timeSpentSeconds`, `comment` ← `description`.
    - `author` ← synthesize `{ accountId, emailAddress: config.email }` so
      downstream email grouping (e.g. `teamReports`) still works.
-   - `issue` ← from the Step-3 map; **missing issues render with a placeholder**
-     (`"Unknown issue · <id>"`), never dropped (avoids undercount; cf. ADA-456a).
+   - `issue` ← from the Step-3 map; **missing issues render with a placeholder
+     that keeps Tempo's real `key`** (only summary/status unknown), never dropped
+     (avoids undercount; cf. ADA-456a).
    - **Backdate flagging is off for Tempo v1.** `classifyWorklog`'s backdate
      detection is Jira-worklog-specific (comment markers, created>started cross-
      month). Tempo's day comes straight from `startDate`, so backdate detection
