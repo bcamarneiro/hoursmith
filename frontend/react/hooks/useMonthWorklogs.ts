@@ -1,15 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import type { WorklogFetchProgress } from '../../../types/worklogLoading';
-import {
-	fetchMonthWorklogs,
-	type WorklogItem,
-} from '../../services/monthWorklogService';
+import { type WorklogItem } from '../../services/monthWorklogService';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import {
 	buildJiraConnectionFingerprint,
 	useUIStore,
 } from '../../stores/useUIStore';
+import { readMonth } from './worklogReadRouter';
 
 interface UseMonthWorklogsOptions {
 	currentUserOnly?: boolean;
@@ -28,6 +27,7 @@ export function monthWorklogsQueryKey(
 	corsProxy: string,
 	currentUserOnly: boolean,
 	jqlFilter: string,
+	source: 'jira' | 'tempo',
 ) {
 	return [
 		'monthWorklogs',
@@ -37,6 +37,7 @@ export function monthWorklogsQueryKey(
 		corsProxy,
 		currentUserOnly,
 		jqlFilter,
+		source,
 	];
 }
 
@@ -46,6 +47,12 @@ export function useMonthWorklogs(
 	options?: UseMonthWorklogsOptions,
 ) {
 	const config = useConfigStore((s) => s.config);
+	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const source = getWorklogSource({
+		tempoMode: config.tempoMode,
+		tempoApiToken: config.tempoApiToken,
+		tempoSuspected,
+	});
 	const queryClient = useQueryClient();
 	const jiraHost = config.jiraHost;
 	const apiToken = config.apiToken;
@@ -62,9 +69,11 @@ export function useMonthWorklogs(
 			corsProxy,
 			currentUserOnly,
 			jqlFilter,
+			source,
 		),
 		queryFn: ({ signal }) =>
-			fetchMonthWorklogs(
+			readMonth(
+				source,
 				config,
 				year,
 				month,
@@ -127,9 +136,11 @@ export function useMonthWorklogs(
 					corsProxy,
 					currentUserOnly,
 					jqlFilter,
+					source,
 				),
 				queryFn: ({ signal }) =>
-					fetchMonthWorklogs(
+					readMonth(
+						source,
 						queryConfig,
 						y,
 						m,

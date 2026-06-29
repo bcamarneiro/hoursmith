@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchMonthWorklogs } from '../../services/monthWorklogService';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { useTeamStore } from '../../stores/useTeamStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import {
@@ -18,6 +19,7 @@ import { toast } from '../components/ui/Toast';
 import { useAbsenceDaysByUser } from '../hooks/useAbsenceDays';
 import { useDownload } from '../hooks/useDownload';
 import { monthWorklogsQueryKey } from '../hooks/useMonthWorklogs';
+import { readMonth } from '../hooks/worklogReadRouter';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useReportsTrendData } from '../hooks/useReportsTrendData';
 import {
@@ -152,6 +154,12 @@ export const ReportsPage: React.FC = () => {
 	const goPrevMonth = useTimesheetStore((state) => state.goPrevMonth);
 	const goNextMonth = useTimesheetStore((state) => state.goNextMonth);
 	const config = useConfigStore((state) => state.config);
+	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const source = getWorklogSource({
+		tempoMode: config.tempoMode,
+		tempoApiToken: config.tempoApiToken,
+		tempoSuspected,
+	});
 	const jiraDomain = config.jiraHost;
 	const allowedUsers = config.allowedUsers;
 
@@ -544,9 +552,10 @@ export const ReportsPage: React.FC = () => {
 							config.corsProxy,
 							false,
 							'',
+							source,
 						),
 						queryFn: ({ signal }) =>
-							fetchMonthWorklogs(config, year, month, {}, signal),
+							readMonth(source, config, year, month, {}, signal),
 						staleTime: 15 * 60 * 1000,
 					}),
 				),

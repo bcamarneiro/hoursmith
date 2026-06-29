@@ -59,6 +59,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			jqlFilter,
+			'jira',
 		);
 
 		// Dashboard (via queryClient.fetchQuery)
@@ -69,6 +70,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			jqlFilter,
+			'jira',
 		);
 
 		// Heatmap (via useMonthWorklogs)
@@ -79,6 +81,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			jqlFilter,
+			'jira',
 		);
 
 		expect(teamKey).toEqual(dashboardKey);
@@ -95,6 +98,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			jqlFilter,
+			'jira',
 		);
 
 		const dashboardKey = monthWorklogsQueryKey(
@@ -104,6 +108,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			jqlFilter,
+			'jira',
 		);
 
 		expect(teamKey).toEqual(dashboardKey);
@@ -118,6 +123,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			'project = X',
+			'jira',
 		);
 
 		expect(key).toEqual([
@@ -128,6 +134,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			'project = X',
+			'jira',
 		]);
 	});
 
@@ -139,6 +146,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			'',
+			'jira',
 		);
 
 		const keyWithFilter = monthWorklogsQueryKey(
@@ -148,6 +156,7 @@ describe('monthWorklogs query key consistency', () => {
 			corsProxy,
 			false,
 			'project = X',
+			'jira',
 		);
 
 		expect(keyNoFilter).not.toEqual(keyWithFilter);

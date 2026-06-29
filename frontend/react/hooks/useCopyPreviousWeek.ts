@@ -1,15 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { WorklogSuggestion } from '../../../types/Suggestion';
-import {
-	fetchMonthWorklogs,
-	type WorklogItem,
-} from '../../services/monthWorklogService';
+import { type WorklogItem } from '../../services/monthWorklogService';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { addDaysToIsoDate } from '../utils/date';
 import { classifyWorklog } from '../utils/worklogClassifier';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
+import { readMonth } from './worklogReadRouter';
 
 /**
  * Given a date string, shift it forward by 7 days and return the new date string.
@@ -76,6 +76,12 @@ export function deriveWeekWorklogs(
 
 export function useCopyPreviousWeek() {
 	const config = useConfigStore((s) => s.config);
+	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const source = getWorklogSource({
+		tempoMode: config.tempoMode,
+		tempoApiToken: config.tempoApiToken,
+		tempoSuspected,
+	});
 	const weekStart = useDashboardStore((s) => s.weekStart);
 	const mergePreviousWeekSuggestions = useDashboardStore(
 		(s) => s.mergePreviousWeekSuggestions,
@@ -108,12 +114,13 @@ export function useCopyPreviousWeek() {
 					config.corsProxy,
 					false,
 					jqlFilter,
+					source,
 				);
 
 			const month1Data = await queryClient.fetchQuery({
 				queryKey: buildKey(startYear, startMonth),
 				queryFn: ({ signal }) =>
-					fetchMonthWorklogs(config, startYear, startMonth, fetchOpts, signal),
+					readMonth(source, config, startYear, startMonth, fetchOpts, signal),
 				staleTime: 15 * 60 * 1000,
 			});
 
@@ -122,7 +129,7 @@ export function useCopyPreviousWeek() {
 				const month2Data = await queryClient.fetchQuery({
 					queryKey: buildKey(endYear, endMonth),
 					queryFn: ({ signal }) =>
-						fetchMonthWorklogs(config, endYear, endMonth, fetchOpts, signal),
+						readMonth(source, config, endYear, endMonth, fetchOpts, signal),
 					staleTime: 15 * 60 * 1000,
 				});
 				allData = [...month1Data, ...month2Data];

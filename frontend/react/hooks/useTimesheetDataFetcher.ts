@@ -2,8 +2,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import type { EnrichedJiraWorklog } from '../../../types/jira';
 import type { WorklogFetchProgress } from '../../../types/worklogLoading';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { monthWorklogsQueryKey, useMonthWorklogs } from './useMonthWorklogs';
 
 function adjacentMonths(year: number, month: number) {
@@ -32,6 +34,10 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 	const jqlFilter = useConfigStore((state) => state.config.jqlFilter);
 	const jiraHost = useConfigStore((state) => state.config.jiraHost);
 	const corsProxy = useConfigStore((state) => state.config.corsProxy);
+	const tempoMode = useConfigStore((state) => state.config.tempoMode);
+	const tempoApiToken = useConfigStore((state) => state.config.tempoApiToken);
+	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const source = getWorklogSource({ tempoMode, tempoApiToken, tempoSuspected });
 	const queryClient = useQueryClient();
 	const [worklogProgress, setWorklogProgress] =
 		useState<WorklogFetchProgress | null>(null);
@@ -59,6 +65,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 			corsProxy,
 			false,
 			jqlFilter || '',
+			source,
 		);
 		const nextKey = monthWorklogsQueryKey(
 			next.year,
@@ -67,6 +74,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 			corsProxy,
 			false,
 			jqlFilter || '',
+			source,
 		);
 		const prevData =
 			(queryClient.getQueryData(prevKey) as
@@ -99,6 +107,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 		jiraHost,
 		corsProxy,
 		jqlFilter,
+		source,
 		setData,
 	]);
 
@@ -124,6 +133,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 				corsProxy,
 				false,
 				jqlFilter || '',
+				source,
 			);
 			const nextKey = monthWorklogsQueryKey(
 				next.year,
@@ -132,6 +142,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 				corsProxy,
 				false,
 				jqlFilter || '',
+				source,
 			);
 			const prevData = queryClient.getQueryData(prevKey) as
 				| EnrichedJiraWorklog[]
@@ -164,6 +175,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 		jiraHost,
 		corsProxy,
 		jqlFilter,
+		source,
 		setData,
 	]);
 
