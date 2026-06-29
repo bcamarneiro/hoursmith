@@ -22,9 +22,39 @@ export interface ForwardOptions {
 	body?: string;
 }
 
-/** Reject paths that try to escape the /4/ namespace. */
+/**
+ * Reject paths that try to escape the /4/ namespace.
+ *
+ * We decode iteratively until the string stabilises so that double- (or
+ * deeper-)encoded dot-segments are visible before the check.  A single decode
+ * of `%252e%252e/admin` yields `%2e%2e/admin`, which still hides the `..`;
+ * only after a second pass does it become `../admin`.  Without this loop,
+ * fetch's WHATWG URL parser would perform that normalization transparently,
+ * resolving the traversal OUTSIDE `/4/`.
+ *
+ * Malformed percent-sequences (e.g. a bare `%`) are treated as unsafe.
+ *
+ * The leading-slash check now guards decoded slashes too (e.g. `%2f` → `/`),
+ * which were previously unreachable because the caller strips literal leading
+ * slashes before calling us.
+ */
 function isSafePath(path: string): boolean {
-	return !path.includes('..') && !path.startsWith('/') && !path.includes('://');
+	let decoded = path;
+	try {
+		let prev: string;
+		do {
+			prev = decoded;
+			decoded = decodeURIComponent(decoded);
+		} while (decoded !== prev);
+	} catch {
+		// Malformed percent-encoding → reject rather than throw.
+		return false;
+	}
+	return (
+		!decoded.includes('..') &&
+		!decoded.startsWith('/') &&
+		!decoded.includes('://')
+	);
 }
 
 export async function forwardToTempo(opts: ForwardOptions): Promise<Response> {

@@ -52,4 +52,39 @@ describe('forwardToTempo', () => {
 		});
 		expect(res.status).toBe(400);
 	});
+
+	it('rejects a double-encoded path traversal (%252e%252e bypasses naive check)', async () => {
+		// %252e%252e → first decode → %2e%2e → second decode (by URL parser) → ../
+		// isSafePath must decode before checking so this is caught as status 400.
+		const res = await forwardToTempo({
+			path: '%252e%252e/admin',
+			search: '',
+			tempoToken: 'tok',
+			method: 'GET',
+		});
+		expect(res.status).toBe(400);
+	});
+
+	it('rejects a single-encoded path traversal (%2e%2e)', async () => {
+		// %2e%2e → decoded → .. — must be caught before fetch normalises the URL.
+		const res = await forwardToTempo({
+			path: '%2e%2e/admin',
+			search: '',
+			tempoToken: 'tok',
+			method: 'GET',
+		});
+		expect(res.status).toBe(400);
+	});
+
+	it('rejects a path with malformed percent-encoding without throwing', async () => {
+		// A bare % is invalid percent-encoding; decodeURIComponent throws URIError.
+		// isSafePath must return false rather than propagating the exception.
+		const res = await forwardToTempo({
+			path: '%',
+			search: '',
+			tempoToken: 'tok',
+			method: 'GET',
+		});
+		expect(res.status).toBe(400);
+	});
 });
