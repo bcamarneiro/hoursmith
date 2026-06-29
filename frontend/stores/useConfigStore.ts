@@ -44,6 +44,15 @@ export interface Config {
 	githubToken: string;
 	githubHost: string;
 	rescueTimeApiKey: string;
+	/** Tempo Cloud API token. Empty unless the user connects Tempo. */
+	tempoApiToken: string;
+	/**
+	 * Worklog source selection.
+	 * - `auto`  : Tempo when a token is present AND Tempo is detected; else Jira.
+	 * - `jira`  : force native Jira worklogs.
+	 * - `tempo` : force Tempo (covers the empty-worklog case detection can't see).
+	 */
+	tempoMode: 'auto' | 'jira' | 'tempo';
 	calendarFeeds: CalendarFeed[];
 	absenceAssignments: AbsenceAssignment[];
 	complianceReminderEnabled: boolean;
@@ -77,7 +86,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 8;
+export const CONFIG_STORAGE_VERSION = 9;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -183,6 +192,8 @@ export function createDefaultConfig(): Config {
 		githubToken: '',
 		githubHost: '',
 		rescueTimeApiKey: '',
+		tempoApiToken: '',
+		tempoMode: 'auto',
 		calendarFeeds: [],
 		absenceAssignments: [],
 		complianceReminderEnabled: false,
@@ -270,6 +281,16 @@ export function normalizeConfig(
 			typeof config?.rescueTimeApiKey === 'string'
 				? config.rescueTimeApiKey.trim()
 				: fallback.rescueTimeApiKey.trim(),
+		tempoApiToken:
+			typeof config?.tempoApiToken === 'string'
+				? config.tempoApiToken.trim()
+				: fallback.tempoApiToken.trim(),
+		tempoMode:
+			config?.tempoMode === 'jira' ||
+			config?.tempoMode === 'tempo' ||
+			config?.tempoMode === 'auto'
+				? config.tempoMode
+				: fallback.tempoMode,
 		calendarFeeds: normalizedCalendarFeeds,
 		absenceAssignments: normalizedAbsenceAssignments,
 		complianceReminderEnabled:

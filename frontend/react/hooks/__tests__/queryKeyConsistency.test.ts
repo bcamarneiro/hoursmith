@@ -34,6 +34,8 @@ describe('monthWorklogs query key consistency', () => {
 				githubToken: '',
 				githubHost: '',
 				rescueTimeApiKey: '',
+				tempoApiToken: '',
+				tempoMode: 'auto',
 				calendarFeeds: [],
 				absenceAssignments: [],
 				complianceReminderEnabled: false,
