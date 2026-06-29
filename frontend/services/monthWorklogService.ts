@@ -3,9 +3,11 @@ import type { WorklogFetchProgress } from '../../types/worklogLoading';
 import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
+import { useUIStore } from '../stores/useUIStore';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { searchAllIssues } from './jiraSearch';
 import { fromHttpResponse } from './serviceErrors';
+import { looksLikeTempoManaged } from './worklogSource';
 
 export type WorklogAuthor = JiraUser;
 export type WorklogItem = EnrichedJiraWorklog;
@@ -156,6 +158,17 @@ export async function fetchMonthWorklogs(
 			},
 		},
 	);
+
+	const embeddedAuthors = issues.flatMap(
+		(i) =>
+			i.fields.worklog?.worklogs?.map((w) => ({
+				accountType: (w.author as { accountType?: string } | undefined)
+					?.accountType,
+				displayName: w.author?.displayName,
+			})) ?? [],
+	);
+	if (looksLikeTempoManaged(embeddedAuthors))
+		useUIStore.getState().setTempoSuspected(true);
 
 	throwIfAborted(signal);
 

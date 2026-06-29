@@ -25,6 +25,9 @@ interface UIState {
 	// Product adoption preferences
 	installPromptDismissed: boolean;
 
+	// Transient flag: at least one worklog author looks like the Tempo app account
+	tempoSuspected: boolean;
+
 	// Persisted evidence that the saved Jira connection has already worked
 	jiraConnectionEvidenceAt: string | null;
 	jiraConnectionEvidenceFingerprint: string | null;
@@ -38,6 +41,7 @@ interface UIState {
 	resetPreferences: () => void;
 	dismissInstallPrompt: () => void;
 	resetInstallPrompt: () => void;
+	setTempoSuspected: (v: boolean) => void;
 	markJiraConnectionEvidence: (
 		fingerprint: string,
 		source: 'test' | 'fetch',
@@ -141,6 +145,7 @@ export const useUIStore = create<UIState>()(
 			selectedProject: '',
 			expandedUsers: {},
 			installPromptDismissed: false,
+			tempoSuspected: false,
 			jiraConnectionEvidenceAt: null,
 			jiraConnectionEvidenceFingerprint: null,
 			jiraConnectionEvidenceSource: null,
@@ -190,6 +195,8 @@ export const useUIStore = create<UIState>()(
 			resetInstallPrompt: () => {
 				set({ installPromptDismissed: false });
 			},
+
+			setTempoSuspected: (v: boolean) => set({ tempoSuspected: v }),
 
 			markJiraConnectionEvidence: (fingerprint, source, at) => {
 				set({
