@@ -29,7 +29,10 @@ export interface ProxyOverrideState {
 	/**
 	 * When `true`, the user explicitly asked to keep their self-configured
 	 * proxy URL even though they're entitled to the hosted one (escape hatch).
-	 * Respected only when `hostedProxyUrl` is set.
+	 * Respected only when `hostedProxyUrl` is set. Persisted to localStorage
+	 * (`hoursmith-proxy-override`) and restored at module init so it survives a
+	 * reload — otherwise a subscriber gets snapped back onto the hosted proxy on
+	 * every refresh (ADA-447 regression).
 	 */
 	userOverride: boolean;
 	/**
@@ -126,6 +129,42 @@ function bootstrapFromPersistedSession(): void {
 	STATE.hostedProxyUrl = computeHostedProxyUrl();
 }
 
+/**
+ * localStorage key for the "use my own proxy instead of the hosted one" escape
+ * hatch. Persisted separately from `useConfigStore` so the bridge can read it
+ * synchronously at module init without importing React or the store — same
+ * discipline as `readPersistedSupabaseToken` above.
+ */
+const OVERRIDE_STORAGE_KEY = 'hoursmith-proxy-override';
+
+/** Read the persisted override flag. Defaults to `false` (use hosted). */
+function readPersistedOverride(): boolean {
+	if (typeof window === 'undefined') return false;
+	try {
+		return window.localStorage?.getItem(OVERRIDE_STORAGE_KEY) === '1';
+	} catch {
+		// Access can throw (privacy mode, blocked storage) — treat as no override.
+		return false;
+	}
+}
+
+/** Persist (or clear) the override flag. Best-effort; never throws. */
+function persistOverride(enabled: boolean): void {
+	if (typeof window === 'undefined') return;
+	try {
+		const storage = window.localStorage;
+		if (!storage) return;
+		if (enabled) storage.setItem(OVERRIDE_STORAGE_KEY, '1');
+		else storage.removeItem(OVERRIDE_STORAGE_KEY);
+	} catch {
+		// A blocked store just means the toggle stays in-memory for this session.
+	}
+}
+
+// Restore the escape hatch BEFORE bootstrapping the hosted URL, so a subscriber
+// who opted out of the hosted proxy isn't snapped back onto it on every reload
+// (ADA-447 left `userOverride` in memory only — this is the missing half).
+STATE.userOverride = readPersistedOverride();
 bootstrapFromPersistedSession();
 
 // Cached frozen snapshot — returned by `getProxyOverrideState()` until a
@@ -173,6 +212,7 @@ export function setHostedProxyUrl(url: string | null): void {
 export function setUserOverride(enabled: boolean): void {
 	if (STATE.userOverride === enabled) return;
 	STATE.userOverride = enabled;
+	persistOverride(enabled);
 	emit();
 }
 
@@ -212,6 +252,13 @@ export function __resetProxyBridgeForTests(): void {
 	STATE.hostedProxyUrl = null;
 	STATE.userOverride = false;
 	STATE.supabaseAccessToken = null;
+	if (typeof window !== 'undefined') {
+		try {
+			window.localStorage?.removeItem(OVERRIDE_STORAGE_KEY);
+		} catch {
+			// Ignore — storage may be blocked in the test environment.
+		}
+	}
 	snapshot = { ...STATE };
 	listeners.clear();
 }
