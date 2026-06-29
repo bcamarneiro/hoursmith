@@ -1,15 +1,19 @@
 import type React from 'react';
+import { useRef, useState } from 'react';
 import type {
 	AbsenceAssignment,
 	CalendarFeed,
 } from '../../../../stores/useConfigStore';
 import type { CalendarMapping } from '../../../../stores/useUserDataStore';
+import { buildTempoRequest } from '../../../../services/tempoGateway';
+import { describeServiceError } from '../../../../services/serviceErrors';
 import { SETTINGS_SECTION_IDS } from '../../../constants/settingsSections';
 import { useProxyBadge } from '../../../hooks/useProxyBadge';
 import { Button } from '../../ui/Button';
 import { CalendarMappingsEditor } from '../CalendarMappingsEditor';
 import * as styles from '../SettingsForm.module.css';
 import { TeamAbsenceAssignmentsEditor } from '../TeamAbsenceAssignmentsEditor';
+import { TempoConnectBanner } from '../TempoConnectBanner';
 
 type ServiceStatus = {
 	tone: 'ready' | 'warning' | 'pending';
@@ -43,6 +47,20 @@ type Props = {
 
 	// Static IDs — GitHub
 	githubTokenId: string;
+
+	// formData slices — Tempo
+	tempoApiToken: string;
+	tempoMode: 'auto' | 'jira' | 'tempo';
+	corsProxy: string;
+
+	// Static IDs — Tempo
+	tempoApiTokenId: string;
+
+	// Tempo detection
+	tempoSuspected: boolean;
+
+	// Select change handler (for tempoMode)
+	handleSelectChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 
 	// Status / test state per service
 	gitlabStatus: ServiceStatus;
@@ -111,6 +129,12 @@ export const IntegrationsSection: React.FC<Props> = ({
 	rescueTimeKeyId,
 	githubToken,
 	githubTokenId,
+	tempoApiToken,
+	tempoMode,
+	corsProxy,
+	tempoApiTokenId,
+	tempoSuspected,
+	handleSelectChange,
 	gitlabStatus,
 	rescueTimeStatus,
 	calendarStatus,
@@ -147,11 +171,68 @@ export const IntegrationsSection: React.FC<Props> = ({
 	// needed. Otherwise the key only works through a self-hosted proxy. Mirrors
 	// the gateway's mode resolution (rescueTimeGateway.ts).
 	const rescueTimeHostedActive = useProxyBadge().mode === 'hosted';
+
+	const [tempoTest, setTempoTest] = useState<{
+		loading: boolean;
+		result: { success: boolean; message: string } | null;
+	}>({ loading: false, result: null });
+
+	const tempoTokenFieldRef = useRef<HTMLInputElement>(null);
+
+	const handleTestTempo = async () => {
+		setTempoTest({ loading: true, result: null });
+		try {
+			const req = buildTempoRequest(
+				tempoApiToken,
+				corsProxy,
+				'worklogs',
+				new URLSearchParams({ limit: '1' }),
+			);
+			const res = await fetch(req.url, { headers: req.headers });
+			if (!res.ok) {
+				const err = await import('../../../../services/serviceErrors').then(
+					(m) => m.fromHttpResponseAsync('Tempo', res),
+				);
+				setTempoTest({
+					loading: false,
+					result: {
+						success: false,
+						message: describeServiceError(err).message,
+					},
+				});
+			} else {
+				setTempoTest({
+					loading: false,
+					result: { success: true, message: 'Connected' },
+				});
+			}
+		} catch (error) {
+			setTempoTest({
+				loading: false,
+				result: {
+					success: false,
+					message: describeServiceError(error).message,
+				},
+			});
+		}
+	};
+
+	const scrollToTempoToken = () => {
+		tempoTokenFieldRef.current?.scrollIntoView({
+			behavior: 'smooth',
+			block: 'center',
+		});
+		tempoTokenFieldRef.current?.focus();
+	};
 	return (
 		<fieldset id={SETTINGS_SECTION_IDS.integrations} className={styles.section}>
 			<legend className={styles.sectionTitle}>
 				Services <span className={styles.optional}>optional</span>
 			</legend>
+			<TempoConnectBanner
+				show={tempoSuspected && !tempoApiToken.trim()}
+				onConnect={scrollToTempoToken}
+			/>
 			<p className={styles.servicesIntro}>
 				Each service helps in a different way. Keep them separate so it is
 				obvious what powers suggestions, what reduces target hours, and what
@@ -343,6 +424,79 @@ export const IntegrationsSection: React.FC<Props> = ({
 						<p className={styles.serviceHint}>
 							Leave this blank if you only want Jira- and calendar-based
 							suggestions.
+						</p>
+					)}
+				</section>
+
+				<section className={styles.serviceCard}>
+					<div className={styles.serviceHeader}>
+						<div className={styles.serviceHeading}>
+							<p className={styles.serviceKicker}>Tempo</p>
+							<h3>Tempo time tracking</h3>
+							<p>
+								Connect Tempo to read and log worklogs via the Tempo API instead
+								of the Jira built-in worklog API.
+							</p>
+						</div>
+						<span
+							className={`${styles.serviceStatusBadge} ${tempoApiToken.trim() ? styles.serviceStatusReady : styles.serviceStatusPending}`}
+						>
+							{tempoApiToken.trim() ? 'Ready' : 'Not configured'}
+						</span>
+					</div>
+					<div className={styles.formGroup}>
+						<label htmlFor={tempoApiTokenId}>Tempo API Token</label>
+						<input
+							ref={tempoTokenFieldRef}
+							type="password"
+							id={tempoApiTokenId}
+							name="tempoApiToken"
+							value={tempoApiToken}
+							onChange={handleChange}
+						/>
+						<small>
+							Generate a Tempo API token at{' '}
+							<code>Tempo → Settings → API integration</code>.
+						</small>
+					</div>
+					<div className={styles.formGroup}>
+						<label htmlFor={`${tempoApiTokenId}-mode`}>Mode</label>
+						<select
+							id={`${tempoApiTokenId}-mode`}
+							name="tempoMode"
+							value={tempoMode}
+							onChange={handleSelectChange}
+						>
+							<option value="auto">Auto-detect</option>
+							<option value="tempo">Always use Tempo</option>
+							<option value="jira">Always use Jira</option>
+						</select>
+						<small>
+							Auto-detect switches to Tempo when a token is present and Tempo is
+							detected on your Jira instance.
+						</small>
+					</div>
+					<div className={styles.serviceActions}>
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={() => {
+								void handleTestTempo();
+							}}
+							disabled={tempoTest.loading || !tempoApiToken.trim()}
+						>
+							{tempoTest.loading ? 'Testing...' : 'Test connection'}
+						</Button>
+					</div>
+					{tempoTest.result ? (
+						<p
+							className={`${styles.testResult} ${tempoTest.result.success ? styles.testSuccess : styles.testError}`}
+						>
+							{tempoTest.result.message}
+						</p>
+					) : (
+						<p className={styles.serviceHint}>
+							Test the token and proxy connection before saving.
 						</p>
 					)}
 				</section>
