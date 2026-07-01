@@ -2,6 +2,20 @@
 
 Thanks for your interest in contributing to Hoursmith! This guide will get you up and running.
 
+## Contributor License Agreement
+
+Hoursmith is open-core: an MIT-licensed core plus a separately-licensed `premium/`
+component. So that accepted contributions can move freely across that boundary, all
+contributors sign a one-time [Contributor License Agreement](CLA.md).
+
+You don't do anything up front. The first time you open a pull request, a bot will
+ask you to sign by posting a single comment on the PR:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+Your signature is remembered, so you only sign once. The PR can be merged after it's
+signed.
+
 ## Quick Start
 
 ```bash
