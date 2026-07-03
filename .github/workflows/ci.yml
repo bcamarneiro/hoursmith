@@ -102,3 +102,62 @@ jobs:
           name: offline-server-log
           path: /tmp/hoursmith-offline.log
           retention-days: 7
+
+  # Premium /account subscription lifecycle (active → canceled → revoked,
+  # ADA-274). Runs against a PREMIUM offline build with the billing backend
+  # mocked at the network layer — no secrets required (the dev script inlines a
+  # mock Supabase env). Complements the deployed-staging `e2e-sandbox` workflow.
+  e2e-premium-lifecycle:
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Start premium offline server
+        run: npm run dev:premium:offline:e2e > /tmp/hoursmith-premium.log 2>&1 &
+
+      - name: Wait for premium server
+        run: |
+          for attempt in {1..60}; do
+            if curl -sI --max-time 5 http://127.0.0.1:5174/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/hoursmith-premium.log
+          exit 1
+
+      - name: Run premium lifecycle e2e
+        run: npm run test:e2e:lifecycle
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-premium
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Upload premium server log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: premium-server-log
+          path: /tmp/hoursmith-premium.log
+          retention-days: 7
