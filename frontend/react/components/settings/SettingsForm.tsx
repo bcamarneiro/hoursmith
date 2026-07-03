@@ -169,6 +169,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const corsProxyId = useId();
 	const jqlFilterId = useId();
 	const allowedUsersId = useId();
+	const expectedDailyHoursId = useId();
 	const gitlabTokenId = useId();
 	const gitlabHostId = useId();
 	const rescueTimeKeyId = useId();
@@ -324,6 +325,20 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 		const { name, value } = e.target;
 		updateFormField(name as keyof typeof formData, value as never);
+	};
+
+	const handleExpectedDailyHoursChange = (hours: number) => {
+		updateFormField('expectedDailyHours', hours as never);
+	};
+
+	const handleExpectedHoursOverrideChange = (
+		email: string,
+		hours: number | null,
+	) => {
+		const next = { ...(formData.expectedHoursByUser ?? {}) };
+		if (hours === null) delete next[email];
+		else next[email] = hours;
+		updateFormField('expectedHoursByUser', next as never);
 	};
 
 	const handleSave = () => {
@@ -509,6 +524,11 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							}
 							jqlFilterId={jqlFilterId}
 							allowedUsersId={allowedUsersId}
+							expectedDailyHours={formData.expectedDailyHours ?? 8}
+							expectedHoursByUser={formData.expectedHoursByUser ?? {}}
+							onExpectedDailyHoursChange={handleExpectedDailyHoursChange}
+							onExpectedHoursOverrideChange={handleExpectedHoursOverrideChange}
+							expectedDailyHoursId={expectedDailyHoursId}
 						/>
 					</div>
 

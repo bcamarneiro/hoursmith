@@ -79,6 +79,12 @@ export function useTeamData(
 			weekEnd,
 			config.allowedUsers,
 			absenceDaysByUser,
+			// asOf defaults to today inside buildTeamSummaries.
+			undefined,
+			{
+				defaultDailyHours: config.expectedDailyHours ?? 8,
+				byUser: config.expectedHoursByUser ?? {},
+			},
 		);
 	}, [
 		month1.data,
@@ -87,6 +93,8 @@ export function useTeamData(
 		weekStart,
 		weekEnd,
 		config.allowedUsers,
+		config.expectedDailyHours,
+		config.expectedHoursByUser,
 		absenceDaysByUser,
 		isLoading,
 	]);
