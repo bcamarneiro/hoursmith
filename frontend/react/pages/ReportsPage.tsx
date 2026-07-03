@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchMonthWorklogs } from '../../services/monthWorklogService';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useTeamStore } from '../../stores/useTeamStore';
@@ -649,6 +650,27 @@ export const ReportsPage: React.FC = () => {
 		teamFetching,
 		monthlyFetching,
 	]);
+
+	// First-run intercept (ADA-314): before Jira is connected, don't render the
+	// full toolbar + control panel (view toggle, filters, share, snapshot,
+	// exports, consistency check) above a "connect Jira" message — a first-run
+	// user shouldn't face a wall of unfamiliar controls before being told the one
+	// thing they need to do. Show only the setup intercept, linked to Settings.
+	if (!config.jiraHost || !config.apiToken) {
+		return (
+			<div className={styles.container}>
+				<div className={styles.error}>
+					<h2>Connect Jira to see reports</h2>
+					<p>
+						Add your Jira host and API token in Settings to load your team's
+						weekly worklogs. Filters, exports, and the manager view appear here
+						once there's data to show.
+					</p>
+					<Link to="/settings">Go to Settings</Link>
+				</div>
+			</div>
+		);
+	}
 
 	if (errorMessage && viewMode === 'monthly') {
 		return (
