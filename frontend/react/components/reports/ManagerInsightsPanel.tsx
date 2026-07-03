@@ -39,8 +39,12 @@ export const ManagerInsightsPanel: React.FC<Props> = ({
 	isLoading,
 	errorMessage,
 }) => {
+	// "Attention Now" counts who is behind *relative to elapsed days* (prorated),
+	// not who still has any full-week gap — otherwise everyone reads red on
+	// Monday morning for hours not yet owed (ADA-477). Falls back to the
+	// full-week gap when a producer didn't prorate.
 	const attentionNow = currentMembers.filter(
-		(member) => member.gapSeconds > 0,
+		(member) => (member.proratedGapSeconds ?? member.gapSeconds) > 0,
 	).length;
 	const currentGapSeconds = currentMembers.reduce(
 		(sum, member) => sum + member.gapSeconds,

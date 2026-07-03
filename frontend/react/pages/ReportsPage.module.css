@@ -281,6 +281,15 @@
 	font-weight: var(--font-semibold);
 }
 
+/* On-track mid-week: hours remain for the full week, but the member is NOT
+ * behind relative to elapsed days — show the figure without the red alarm. */
+.gapPending {
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+	font-family: var(--font-mono);
+	color: var(--color-text-secondary);
+}
+
 .summaryRow td {
 	border-top: 2px solid var(--color-border);
 	background: var(--color-surface-sunken);
