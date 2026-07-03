@@ -95,15 +95,16 @@ merges:
   panel's existing "only attention" filter to the grid is a small follow-up.
 - **ADA-484 items 1/2/4** — Settings progressive disclosure + inline token
   walkthrough + CORS error copy (couples to the Settings redesign).
-- **ADA-274 (M3)** — the paid-lifecycle e2e. A **complementary offline spec**
-  shipped (PR #126, `e2e/paid-lifecycle.spec.ts`, verified green): the /account
-  subscription-state UI lifecycle (active → canceled → revoked) with the billing
-  backend mocked via `page.route`. The ticket's **actual** acceptance is a
-  *staging integration* test (`e2e/paywall-sandbox.spec.ts`) against
-  `staging.hoursmith.io` with real Polar-sandbox checkout, real webhook→Supabase
-  sync, and a real `/api/proxy` 403 — wired into `e2e-sandbox.yml`. That remains
-  open: blocked by ADA-341 + ADA-291 and needs CI secrets (Polar sandbox token,
-  AgentMail, Supabase staging service-role key) not available from here.
+- **ADA-274 (M3)** — the paid-lifecycle e2e. **Both specs authored (PR #126):**
+  (a) `e2e/paid-lifecycle.spec.ts` — offline /account lifecycle, fully mocked,
+  **verified green**; and (b) `e2e/paywall-sandbox.spec.ts` + the wired
+  `e2e-sandbox.yml` — the real staging integration (signup → Polar-sandbox
+  checkout → webhook→Supabase sync → proxy 403 cutoff). The two blockers
+  (ADA-341, ADA-291) are **Done**. The staging spec is **code-complete but not
+  yet run against staging** — owner step: add the CI secrets (Polar sandbox
+  token, Supabase staging service-role key, target URL), run `e2e-sandbox` via
+  workflow_dispatch, fix the two `FIRST-RUN`-marked spots (Polar checkout card
+  form, Polar cancel endpoint) if they differ, then uncomment `push:[staging]`.
 - **`fetchTeamWorklogs`** in `frontend/services/teamService.ts` still uses the
   fixed 8h/day target and doesn't read the expected-hours config — the Reports
   path uses `buildTeamSummaries` (which does). Align the two producers if that
