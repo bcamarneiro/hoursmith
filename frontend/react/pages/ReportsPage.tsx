@@ -32,6 +32,7 @@ import { describeFreshness } from '../utils/dataFreshness';
 import { addDaysToIsoDate, monthLabel } from '../utils/date';
 import { downloadAsFile } from '../utils/downloadFile';
 import { deriveMonthlyReportState } from '../utils/monthlyReport';
+import { computeMonthlyDeadline } from '../utils/onTimeStatus';
 import { validateReportsConsistency } from '../utils/reportConsistency';
 import {
 	buildReportsSnapshotHtml,
@@ -614,6 +615,23 @@ export const ReportsPage: React.FC = () => {
 			),
 		};
 	}, [data, viewMode, filteredVisibleEntries, currentYear, currentMonth]);
+	// Monthly timesheet deadline (ADA-549): Nth working day of the following
+	// month. Drives the "due by" line + the overview table's on-time badges.
+	const monthlyDeadline = useMemo(
+		() =>
+			computeMonthlyDeadline(
+				currentYear,
+				currentMonth,
+				config.monthlyDeadlineDay ?? 3,
+				config.monthlyDeadlineTime ?? '18:00',
+			),
+		[
+			currentYear,
+			currentMonth,
+			config.monthlyDeadlineDay,
+			config.monthlyDeadlineTime,
+		],
+	);
 	const weeklySummary = useMemo(() => {
 		if (viewMode !== 'weekly' || sortedMembers.length === 0) return null;
 		return {
@@ -691,6 +709,7 @@ export const ReportsPage: React.FC = () => {
 					hasNoFilteredMonthlyResults={hasNoFilteredMonthlyResults}
 					monthlyWorklogProgress={monthlyWorklogProgress}
 					monthlySummary={monthlySummary}
+					monthlyDeadline={monthlyDeadline}
 					errorMessage={errorMessage}
 					onRetry={handleRetryMonthly}
 					onUserChange={handleUserChange}
@@ -865,6 +884,7 @@ export const ReportsPage: React.FC = () => {
 					hasNoFilteredMonthlyResults={hasNoFilteredMonthlyResults}
 					monthlyWorklogProgress={monthlyWorklogProgress}
 					monthlySummary={monthlySummary}
+					monthlyDeadline={monthlyDeadline}
 					errorMessage={errorMessage}
 					onRetry={handleRetryMonthly}
 					onUserChange={handleUserChange}

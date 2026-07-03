@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	computeMonthlyDeadline,
 	computeWeeklyDeadline,
 	deriveOnTimeStatus,
 	describeOnTimeStatus,
@@ -23,6 +24,41 @@ describe('computeWeeklyDeadline', () => {
 		expect(sunday.getDate()).toBe(8); // clamped to Sunday
 		const badTime = computeWeeklyDeadline('2026-03-02', 5, 'nonsense');
 		expect(badTime.getHours()).toBe(18); // default 18:00
+	});
+});
+
+describe('computeMonthlyDeadline', () => {
+	it('resolves the Nth working day of the following month', () => {
+		// March 2026 timesheets, 3rd working day of April 2026.
+		// Apr 1 2026 = Wed → 1st, Apr 2 = Thu → 2nd, Apr 3 = Fri → 3rd.
+		const deadline = computeMonthlyDeadline(2026, 2, 3, '18:00');
+		expect(deadline.getFullYear()).toBe(2026);
+		expect(deadline.getMonth()).toBe(3); // April (0-indexed)
+		expect(deadline.getDate()).toBe(3);
+		expect(deadline.getHours()).toBe(18);
+		expect(deadline.getMinutes()).toBe(0);
+	});
+
+	it('skips weekends when counting working days', () => {
+		// Feb 2026 timesheets → March 2026. Mar 1 2026 = Sun (skipped),
+		// Mar 2 = Mon → 1st, Mar 3 = Tue → 2nd, Mar 4 = Wed → 3rd.
+		const deadline = computeMonthlyDeadline(2026, 1, 3, '18:00');
+		expect(deadline.getMonth()).toBe(2); // March
+		expect(deadline.getDate()).toBe(4);
+	});
+
+	it('rolls over the year for December', () => {
+		// Dec 2026 timesheets → Jan 2027. Jan 1 2027 = Fri → 1st working day.
+		const deadline = computeMonthlyDeadline(2026, 11, 1, '18:00');
+		expect(deadline.getFullYear()).toBe(2027);
+		expect(deadline.getMonth()).toBe(0); // January
+		expect(deadline.getDate()).toBe(1);
+	});
+
+	it('clamps a sub-1 ordinal to the first working day and defaults a bad time', () => {
+		const deadline = computeMonthlyDeadline(2026, 2, 0, 'nonsense');
+		expect(deadline.getDate()).toBe(1); // Apr 1 2026 (Wed), 1st working day
+		expect(deadline.getHours()).toBe(18); // default 18:00
 	});
 });
 

@@ -16,6 +16,16 @@ import { WorklogLoadingStatus } from '../ui/WorklogLoadingStatus';
 
 type MonthlyEntry = [string, Record<string, EnrichedJiraWorklog[]>];
 
+function formatMonthlyDeadline(deadline: Date): string {
+	return new Intl.DateTimeFormat(undefined, {
+		weekday: 'short',
+		month: 'short',
+		day: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
+	}).format(deadline);
+}
+
 type Props = {
 	filteredVisibleEntries: MonthlyEntry[];
 	selectedUser: string;
@@ -32,6 +42,11 @@ type Props = {
 	hasNoFilteredMonthlyResults: boolean;
 	monthlyWorklogProgress: WorklogFetchProgress | null;
 	monthlySummary: { userCount: number; totalSeconds: number } | null;
+	/**
+	 * Monthly timesheet deadline (ADA-549). When set, the snapshot shows the due
+	 * date and the overview table derives a per-member on-time badge against it.
+	 */
+	monthlyDeadline?: Date | null;
 	errorMessage: string | null | undefined;
 	/** Re-runs the monthly worklog fetch from the data-error surface (ADA-476). */
 	onRetry?: () => void;
@@ -55,6 +70,7 @@ export const ReportsMonthlyView: React.FC<Props> = ({
 	hasNoFilteredMonthlyResults,
 	monthlyWorklogProgress,
 	monthlySummary,
+	monthlyDeadline,
 	errorMessage,
 	onRetry,
 	onUserChange,
@@ -105,6 +121,11 @@ export const ReportsMonthlyView: React.FC<Props> = ({
 							? `Filtered to ${selectedUser}`
 							: `${monthlySummary.userCount} user${monthlySummary.userCount === 1 ? '' : 's'} in view`}
 					</span>
+					{monthlyDeadline && (
+						<span>
+							Timesheets due by {formatMonthlyDeadline(monthlyDeadline)}
+						</span>
+					)}
 				</div>
 			)}
 			{isLoading && !hasData && (
@@ -197,6 +218,7 @@ export const ReportsMonthlyView: React.FC<Props> = ({
 								userEmails={userEmails}
 								absenceDaysByUser={monthlyAbsenceDaysByUser}
 								onUserClick={onUserChange}
+								monthlyDeadline={monthlyDeadline}
 							/>
 						)}
 						{filteredVisibleEntries.map(([user, days]) => (

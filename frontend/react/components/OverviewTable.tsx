@@ -5,10 +5,22 @@ import type { UserAbsenceDays } from '../../services/absenceService';
 import { getWorkdayDatesInMonth, isDateInMonth } from '../utils/date';
 import { sumWeekdayTargetSeconds } from '../utils/dayTarget';
 import { computeCompliancePct } from '../utils/format';
+import {
+	deriveOnTimeStatus,
+	describeOnTimeStatus,
+} from '../utils/onTimeStatus';
 import { getInitials } from '../utils/text';
 import { classifyWorklog } from '../utils/worklogClassifier';
 import * as styles from './OverviewTable.module.css';
 import { ProgressBar } from './ui/ProgressBar';
+
+// On-time tone → badge class, riding the green/amber/red completeness ramp.
+const STATUS_TONE_CLASS: Record<string, string> = {
+	success: styles.statusSuccess,
+	warning: styles.statusWarning,
+	error: styles.statusError,
+	neutral: styles.statusNeutral,
+};
 
 type Props = {
 	entries: [string, Record<string, EnrichedJiraWorklog[]>][];
@@ -28,6 +40,15 @@ type Props = {
 	 * `includeZeroHourUsers` is true (e.g. the configured `allowedUsers`).
 	 */
 	allUsers?: string[];
+	/**
+	 * When set, each row shows an on-time badge derived against this monthly
+	 * deadline (ADA-549). Omit to keep the plain table. Because the monthly
+	 * aggregate carries no per-worklog timing, "met by the deadline" reads as
+	 * on-time (there's no false "late") — the weekly RAG is the finer signal.
+	 */
+	monthlyDeadline?: Date | null;
+	/** Injectable clock for the deadline-passed check (defaults to now). */
+	now?: Date;
 };
 
 type SortField = 'user' | 'days' | 'entries' | 'hours';
@@ -42,9 +63,15 @@ export const OverviewTable: React.FC<Props> = ({
 	onUserClick,
 	includeZeroHourUsers = false,
 	allUsers,
+	monthlyDeadline,
+	now,
 }) => {
 	const [sortField, setSortField] = useState<SortField>('user');
 	const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+	// Computed once per render (not per row) so the memoised rows stay stable.
+	const deadlinePassed = monthlyDeadline
+		? (now ?? new Date()) > monthlyDeadline
+		: false;
 
 	const workdayDates = useMemo(
 		() => getWorkdayDatesInMonth(year, monthZeroIndexed),
@@ -88,6 +115,8 @@ export const OverviewTable: React.FC<Props> = ({
 				worklogCount,
 				daysWorked: totalHours / 8,
 				targetHours,
+				totalSeconds,
+				targetSeconds,
 				// Use the same compliance-pct formula as TimesheetGrid so the two
 				// surfaces don't drift by 1% near integer boundaries (audit #19).
 				pct: computeCompliancePct(totalSeconds, targetSeconds),
@@ -104,6 +133,8 @@ export const OverviewTable: React.FC<Props> = ({
 						worklogCount: 0,
 						daysWorked: 0,
 						targetHours: baseTargetHours,
+						totalSeconds: 0,
+						targetSeconds: baseTargetHours * 3600,
 						pct: 0,
 					});
 				}
@@ -210,48 +241,74 @@ export const OverviewTable: React.FC<Props> = ({
 					</tr>
 				</thead>
 				<tbody>
-					{rows.map((row) => (
-						<tr
-							key={row.user}
-							className={
-								[
-									onUserClick ? styles.clickableRow : '',
-									row.totalHours === 0 ? styles.zeroHourRow : '',
-								]
-									.filter(Boolean)
-									.join(' ') || undefined
-							}
-							onClick={() => onUserClick?.(row.user)}
-							onKeyDown={(event) => {
-								if (
-									onUserClick &&
-									(event.key === 'Enter' || event.key === ' ')
-								) {
-									event.preventDefault();
-									onUserClick(row.user);
+					{rows.map((row) => {
+						const status = monthlyDeadline
+							? deriveOnTimeStatus({
+									targetSeconds: row.targetSeconds,
+									totalSeconds: row.totalSeconds,
+									// No per-worklog timing in the monthly aggregate, so
+									// everything logged counts toward "on time" — met by the
+									// deadline is on-time, not late.
+									onTimeSeconds: row.totalSeconds,
+									deadlinePassed,
+								})
+							: null;
+						return (
+							<tr
+								key={row.user}
+								className={
+									[
+										onUserClick ? styles.clickableRow : '',
+										row.totalHours === 0 ? styles.zeroHourRow : '',
+									]
+										.filter(Boolean)
+										.join(' ') || undefined
 								}
-							}}
-							tabIndex={onUserClick ? 0 : undefined}
-						>
-							<td>
-								<div className={styles.userInfo}>
-									<span className={styles.avatar}>{getInitials(row.user)}</span>
-									<span className={styles.userName}>{row.user}</span>
-								</div>
-							</td>
-							<td className={styles.progressCell}>
-								<div className={styles.progressWrapper}>
-									<ProgressBar value={row.pct} height={6} />
-									<span className={styles.progressPct}>
-										{Math.round(row.pct)}%
-									</span>
-								</div>
-							</td>
-							<td className={styles.hoursCell}>{row.daysWorked.toFixed(1)}</td>
-							<td className={styles.hoursCell}>{row.worklogCount}</td>
-							<td className={styles.hoursCell}>{row.totalHours.toFixed(1)}h</td>
-						</tr>
-					))}
+								onClick={() => onUserClick?.(row.user)}
+								onKeyDown={(event) => {
+									if (
+										onUserClick &&
+										(event.key === 'Enter' || event.key === ' ')
+									) {
+										event.preventDefault();
+										onUserClick(row.user);
+									}
+								}}
+								tabIndex={onUserClick ? 0 : undefined}
+							>
+								<td>
+									<div className={styles.userInfo}>
+										<span className={styles.avatar}>
+											{getInitials(row.user)}
+										</span>
+										<span className={styles.userName}>{row.user}</span>
+									</div>
+								</td>
+								<td className={styles.progressCell}>
+									<div className={styles.progressWrapper}>
+										<ProgressBar value={row.pct} height={6} />
+										<span className={styles.progressPct}>
+											{Math.round(row.pct)}%
+										</span>
+										{status && (
+											<span
+												className={`${styles.statusBadge} ${STATUS_TONE_CLASS[describeOnTimeStatus(status).tone]}`}
+											>
+												{describeOnTimeStatus(status).label}
+											</span>
+										)}
+									</div>
+								</td>
+								<td className={styles.hoursCell}>
+									{row.daysWorked.toFixed(1)}
+								</td>
+								<td className={styles.hoursCell}>{row.worklogCount}</td>
+								<td className={styles.hoursCell}>
+									{row.totalHours.toFixed(1)}h
+								</td>
+							</tr>
+						);
+					})}
 					{rows.length > 1 && (
 						<tr className={styles.totalRow}>
 							<td>Total ({rows.length})</td>

@@ -91,6 +91,15 @@ export interface Config {
 	 */
 	weeklyDeadlineWeekday?: number;
 	weeklyDeadlineTime?: string;
+	/**
+	 * Monthly timesheet deadline (ADA-549): the Nth working day (Mon–Fri) of the
+	 * month *after* the reported month, plus a local `HH:MM`, by which the month
+	 * should be logged. Timesheets for month M are due early in M+1. Defaults to
+	 * the 3rd working day at 18:00. Optional so existing fixtures compile;
+	 * `createDefaultConfig` / `normalizeConfig` populate them.
+	 */
+	monthlyDeadlineDay?: number;
+	monthlyDeadlineTime?: string;
 }
 
 interface ConfigState {
@@ -98,7 +107,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 10;
+export const CONFIG_STORAGE_VERSION = 11;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -216,6 +225,8 @@ export function createDefaultConfig(): Config {
 		expectedHoursByUser: {},
 		weeklyDeadlineWeekday: 5,
 		weeklyDeadlineTime: '18:00',
+		monthlyDeadlineDay: 3,
+		monthlyDeadlineTime: '18:00',
 	};
 }
 
@@ -226,6 +237,20 @@ function normalizeDeadlineWeekday(value: unknown, fallback: number): number {
 		!Number.isInteger(value) ||
 		value < 1 ||
 		value > 7
+	) {
+		return fallback;
+	}
+	return value;
+}
+
+/** Clamp the monthly-deadline ordinal to the 1st … 20th working day of the next
+ *  month (a month has at most ~23 weekdays; 20 is a safe upper bound). */
+function normalizeMonthlyDeadlineDay(value: unknown, fallback: number): number {
+	if (
+		typeof value !== 'number' ||
+		!Number.isInteger(value) ||
+		value < 1 ||
+		value > 20
 	) {
 		return fallback;
 	}
@@ -398,6 +423,14 @@ export function normalizeConfig(
 			config?.weeklyDeadlineTime,
 			fallback.weeklyDeadlineTime ?? '18:00',
 		),
+		monthlyDeadlineDay: normalizeMonthlyDeadlineDay(
+			config?.monthlyDeadlineDay,
+			fallback.monthlyDeadlineDay ?? 3,
+		),
+		monthlyDeadlineTime: normalizeDeadlineTime(
+			config?.monthlyDeadlineTime,
+			fallback.monthlyDeadlineTime ?? '18:00',
+		),
 	};
 }
 
@@ -422,6 +455,9 @@ export function normalizeConfig(
  *   v10 → added weeklyDeadlineWeekday (1–7, default 5=Fri) + weeklyDeadlineTime
  *        ("HH:MM", default "18:00"). No shape change; `normalizeConfig` fills
  *        them for pre-v10 blobs.
+ *   v11 → added monthlyDeadlineDay (Nth working day of next month, default 3) +
+ *        monthlyDeadlineTime ("HH:MM", default "18:00"). No shape change;
+ *        `normalizeConfig` fills them for pre-v11 blobs.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -429,7 +465,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v10(
+function migrateLegacy_v0_to_v11(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -443,7 +479,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v10(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v11(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and

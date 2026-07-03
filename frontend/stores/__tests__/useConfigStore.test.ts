@@ -298,3 +298,37 @@ describe('weekly-deadline config (ADA-387)', () => {
 		).toBe('18:00');
 	});
 });
+
+describe('monthly-deadline config (ADA-549)', () => {
+	it('defaults to the 3rd working day at 18:00', () => {
+		const c = createDefaultConfig();
+		expect(c.monthlyDeadlineDay).toBe(3);
+		expect(c.monthlyDeadlineTime).toBe('18:00');
+		// Pre-v11 blobs missing the fields get the same defaults.
+		expect(normalizeConfig({}).monthlyDeadlineDay).toBe(3);
+		expect(normalizeConfig({}).monthlyDeadlineTime).toBe('18:00');
+	});
+
+	it('accepts a valid working-day ordinal + time and rejects out-of-range values', () => {
+		const c = normalizeConfig({
+			monthlyDeadlineDay: 5,
+			monthlyDeadlineTime: '9:05',
+		});
+		expect(c.monthlyDeadlineDay).toBe(5);
+		expect(c.monthlyDeadlineTime).toBe('09:05');
+
+		// Out-of-range / non-integer ordinals fall back to the default (3).
+		expect(normalizeConfig({ monthlyDeadlineDay: 0 }).monthlyDeadlineDay).toBe(
+			3,
+		);
+		expect(normalizeConfig({ monthlyDeadlineDay: 21 }).monthlyDeadlineDay).toBe(
+			3,
+		);
+		expect(
+			normalizeConfig({ monthlyDeadlineDay: 2.5 }).monthlyDeadlineDay,
+		).toBe(3);
+		expect(
+			normalizeConfig({ monthlyDeadlineTime: '25:00' }).monthlyDeadlineTime,
+		).toBe('18:00');
+	});
+});

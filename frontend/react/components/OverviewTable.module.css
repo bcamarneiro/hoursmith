@@ -108,6 +108,42 @@
 	text-align: right;
 }
 
+/* Monthly on-time badge (ADA-549). Rides the green/amber/red completeness ramp
+   + a neutral "in progress" — never the ember brand accent (brand rule). */
+.statusBadge {
+	flex-shrink: 0;
+	padding: 1px var(--space-2);
+	border-radius: var(--radius-full);
+	border: 1px solid transparent;
+	font-size: var(--text-xs);
+	font-weight: var(--font-medium);
+	white-space: nowrap;
+}
+
+.statusSuccess {
+	background: var(--color-success-bg);
+	border-color: var(--color-success-border);
+	color: var(--color-success-strong);
+}
+
+.statusWarning {
+	background: var(--color-warning-bg);
+	border-color: var(--color-warning-border);
+	color: var(--color-warning);
+}
+
+.statusError {
+	background: var(--color-error-bg);
+	border-color: var(--color-error-border);
+	color: var(--color-error);
+}
+
+.statusNeutral {
+	background: var(--color-surface-sunken);
+	border-color: var(--color-border);
+	color: var(--color-text-secondary);
+}
+
 .hoursCell {
 	text-align: center;
 	font-variant-numeric: tabular-nums;
