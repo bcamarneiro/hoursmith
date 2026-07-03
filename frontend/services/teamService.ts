@@ -29,6 +29,13 @@ export interface TeamMemberSummary {
 	/** `max(0, expectedByTodaySeconds - totalSeconds)`. The colored "behind
 	 *  schedule" signal. Equals `gapSeconds` once the week has fully elapsed. */
 	proratedGapSeconds?: number;
+	/** Seconds among `totalSeconds` whose worklog was *created* on or before the
+	 *  weekly deadline (ADA-387). Drives the on-time classification. Undefined
+	 *  when no deadline was supplied to the builder. */
+	onTimeSeconds?: number;
+	/** on-time / late / incomplete / pending vs. the weekly deadline (ADA-387).
+	 *  Undefined when no deadline was supplied. */
+	onTimeStatus?: import('../react/utils/onTimeStatus').OnTimeStatus;
 }
 
 const SECONDS_PER_DAY = 28800; // 8h

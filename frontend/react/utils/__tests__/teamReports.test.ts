@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { UserAbsenceDays } from '../../../services/absenceService';
 import type { WorklogItem } from '../../../services/monthWorklogService';
+import { computeWeeklyDeadline } from '../onTimeStatus';
 import { buildManagerTrendModel, buildTeamSummaries } from '../teamReports';
 
 function createWorklog(
@@ -226,6 +227,92 @@ describe('buildTeamSummaries', () => {
 
 		expect(summaries[0]?.targetSeconds).toBe(30 * 3600);
 		expect(summaries[0]?.gapSeconds).toBe(0);
+	});
+
+	it('classifies members on-time / late / incomplete vs. the weekly deadline (ADA-387)', () => {
+		const deadline = computeWeeklyDeadline('2026-03-02', 5, '18:00');
+		const now = new Date('2026-03-10T09:00:00'); // after the Friday deadline
+		const summaries = buildTeamSummaries(
+			[
+				// Alice: full week, no `created` → can't be proven late → on-time.
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+				// Bob: full week, but created after the deadline → late.
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-03T09:00:00.000+0000',
+					40 * 3600,
+					'2026-03-07T09:00:00.000+0000',
+				),
+				// Carol: only 20h and the deadline has passed → incomplete.
+				createWorklog(
+					'carol@example.com',
+					'Carol',
+					'2026-03-02T09:00:00.000+0000',
+					20 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com,bob@example.com,carol@example.com',
+			undefined,
+			'2026-03-20',
+			undefined,
+			deadline,
+			now,
+		);
+
+		const byEmail = (email: string) => summaries.find((s) => s.email === email);
+		expect(byEmail('alice@example.com')?.onTimeStatus).toBe('on-time');
+		expect(byEmail('bob@example.com')?.onTimeStatus).toBe('late');
+		expect(byEmail('carol@example.com')?.onTimeStatus).toBe('incomplete');
+	});
+
+	it('reads pending when incomplete but the deadline is still ahead (ADA-387)', () => {
+		const deadline = computeWeeklyDeadline('2026-03-02', 5, '18:00');
+		const now = new Date('2026-03-04T09:00:00'); // before the deadline
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'dave@example.com',
+					'Dave',
+					'2026-03-02T09:00:00.000+0000',
+					16 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'dave@example.com',
+			undefined,
+			'2026-03-04',
+			undefined,
+			deadline,
+			now,
+		);
+		expect(summaries[0]?.onTimeStatus).toBe('pending');
+	});
+
+	it('omits on-time fields when no deadline is supplied (ADA-387)', () => {
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+		);
+		expect(summaries[0]?.onTimeStatus).toBeUndefined();
+		expect(summaries[0]?.onTimeSeconds).toBeUndefined();
 	});
 
 	it('excludes backdated worklogs from a member weekly total and gap', () => {

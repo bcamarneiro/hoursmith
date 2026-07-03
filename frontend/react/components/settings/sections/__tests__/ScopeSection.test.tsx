@@ -21,6 +21,12 @@ function renderScope(
 		onExpectedDailyHoursChange: vi.fn(),
 		onExpectedHoursOverrideChange: vi.fn(),
 		expectedDailyHoursId: 'edh',
+		weeklyDeadlineWeekday: 5,
+		weeklyDeadlineTime: '18:00',
+		onWeeklyDeadlineWeekdayChange: vi.fn(),
+		onWeeklyDeadlineTimeChange: vi.fn(),
+		weeklyDeadlineWeekdayId: 'dwd',
+		weeklyDeadlineTimeId: 'dwt',
 		...overrides,
 	};
 	render(<ScopeSection {...props} />);
@@ -87,5 +93,26 @@ describe('ScopeSection', () => {
 	it('hides per-person overrides when no members are configured', () => {
 		renderScope({ allowedUsers: '' });
 		expect(screen.queryByText(/Per-person overrides/)).not.toBeInTheDocument();
+	});
+
+	it('binds the weekly-deadline weekday + time controls (ADA-387)', () => {
+		const onWeeklyDeadlineWeekdayChange = vi.fn();
+		const onWeeklyDeadlineTimeChange = vi.fn();
+		renderScope({
+			weeklyDeadlineWeekday: 5,
+			weeklyDeadlineTime: '18:00',
+			onWeeklyDeadlineWeekdayChange,
+			onWeeklyDeadlineTimeChange,
+		});
+
+		const day = screen.getByLabelText(/Weekly deadline day/);
+		expect(day).toHaveValue('5');
+		fireEvent.change(day, { target: { value: '3' } });
+		expect(onWeeklyDeadlineWeekdayChange).toHaveBeenCalledWith(3);
+
+		const time = screen.getByLabelText(/Weekly deadline time/);
+		expect(time).toHaveValue('18:00');
+		fireEvent.change(time, { target: { value: '17:30' } });
+		expect(onWeeklyDeadlineTimeChange).toHaveBeenCalledWith('17:30');
 	});
 });

@@ -116,6 +116,14 @@
 	flex: 0 0 auto;
 }
 
+/* Weekly-deadline row: weekday select + time input side by side (ADA-387). */
+.deadlineRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-3);
+	align-items: center;
+}
+
 /* ADA-273 — Proxy URL "Hosted by Premium" / "Self-hosted" pills */
 .badgePremium,
 .badgeNeutral {

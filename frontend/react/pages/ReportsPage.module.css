@@ -290,6 +290,46 @@
 	color: var(--color-text-secondary);
 }
 
+/* On-time status badge (ADA-387). Rides the green/amber/red worklog ramp plus a
+ * neutral "in progress" — never the ember brand accent. */
+.onTimeBadge {
+	display: inline-block;
+	margin-left: var(--space-2);
+	padding: 1px 8px;
+	border-radius: var(--radius-pill, 999px);
+	font-size: var(--text-xs);
+	font-weight: var(--font-semibold);
+	vertical-align: middle;
+	white-space: nowrap;
+}
+
+.onTimeSuccess {
+	background: var(--color-success-bg);
+	color: var(--color-success);
+	border: 1px solid color-mix(in srgb, var(--color-success) 24%, transparent);
+}
+
+.onTimeWarning {
+	background: var(--color-warning-bg);
+	color: var(--color-warning);
+	border: 1px solid var(--color-warning-border);
+}
+
+.onTimeError {
+	background: var(
+		--color-error-bg,
+		color-mix(in srgb, var(--color-error) 12%, transparent)
+	);
+	color: var(--color-error);
+	border: 1px solid color-mix(in srgb, var(--color-error) 24%, transparent);
+}
+
+.onTimeNeutral {
+	background: var(--color-surface-sunken);
+	color: var(--color-text-secondary);
+	border: 1px solid var(--color-border);
+}
+
 .summaryRow td {
 	border-top: 2px solid var(--color-border);
 	background: var(--color-surface-sunken);
