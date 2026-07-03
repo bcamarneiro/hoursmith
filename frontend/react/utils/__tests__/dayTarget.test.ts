@@ -48,6 +48,22 @@ describe('computeDayTargetSeconds', () => {
 	it('treats negative logged seconds as 0', () => {
 		expect(computeDayTargetSeconds(false, true, -100)).toBe(0);
 	});
+
+	it('honours a custom daily target (ADA-392)', () => {
+		const sixHours = 6 * 3600;
+		// Not absent → the custom target, not the 8h baseline.
+		expect(computeDayTargetSeconds(false, false, 0, sixHours)).toBe(sixHours);
+		// Absent, partial work below the custom target → tracks logged.
+		expect(computeDayTargetSeconds(false, true, 2 * 3600, sixHours)).toBe(
+			2 * 3600,
+		);
+		// Absent, work above the custom target → capped at the custom target.
+		expect(computeDayTargetSeconds(false, true, 10 * 3600, sixHours)).toBe(
+			sixHours,
+		);
+		// Weekend is still 0 regardless of the custom target.
+		expect(computeDayTargetSeconds(true, false, 0, sixHours)).toBe(0);
+	});
 });
 
 describe('sumWeekdayTargetSeconds', () => {
@@ -100,5 +116,16 @@ describe('sumWeekdayTargetSeconds', () => {
 		);
 		// Capped at 8h on the absence day → identical to a normal week.
 		expect(total).toBe(5 * BASELINE_DAY_SECONDS);
+	});
+
+	it('sums against a custom daily target across the week (ADA-392)', () => {
+		const sixHours = 6 * 3600;
+		const total = sumWeekdayTargetSeconds(
+			weekdays,
+			() => false,
+			() => 0,
+			sixHours,
+		);
+		expect(total).toBe(5 * sixHours);
 	});
 });

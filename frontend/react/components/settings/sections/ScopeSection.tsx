@@ -11,12 +11,40 @@ type Props = {
 	onAllowedUsersChange: (next: string) => void;
 	jqlFilterId: string;
 	allowedUsersId: string;
+	expectedDailyHours: number;
+	expectedHoursByUser: Record<string, number>;
+	onExpectedDailyHoursChange: (hours: number) => void;
+	onExpectedHoursOverrideChange: (email: string, hours: number | null) => void;
+	expectedDailyHoursId: string;
 };
 
+/** Parse a number input into a per-day hours value, or null when the field is
+ *  cleared / invalid (so a per-user override reverts to the team default). */
+function parseHoursInput(raw: string): number | null {
+	const trimmed = raw.trim();
+	if (!trimmed) return null;
+	const value = Number.parseFloat(trimmed);
+	if (!Number.isFinite(value) || value <= 0) return null;
+	return Math.min(value, 24);
+}
+
+function splitAllowedUsers(allowedUsers: string): string[] {
+	return Array.from(
+		new Set(
+			allowedUsers
+				.split(',')
+				.map((email) => email.trim().toLowerCase())
+				.filter(Boolean),
+		),
+	);
+}
+
 /**
- * Reports Scope section: JQL filter + allowed-users chip editor.
- * `onAllowedUsersChange` is split out from `handleChange` because the
- * chip editor doesn't emit native input events.
+ * Reports Scope section: JQL filter + allowed-users chip editor + working-hours
+ * expectations (ADA-392). `onAllowedUsersChange` is split out from
+ * `handleChange` because the chip editor doesn't emit native input events; the
+ * expected-hours handlers are likewise split because those values are numeric /
+ * keyed and don't map cleanly onto the string-based `handleChange`.
  */
 export const ScopeSection: React.FC<Props> = ({
 	jqlFilter,
@@ -26,7 +54,13 @@ export const ScopeSection: React.FC<Props> = ({
 	onAllowedUsersChange,
 	jqlFilterId,
 	allowedUsersId,
+	expectedDailyHours,
+	expectedHoursByUser,
+	onExpectedDailyHoursChange,
+	onExpectedHoursOverrideChange,
+	expectedDailyHoursId,
 }) => {
+	const members = splitAllowedUsers(allowedUsers);
 	return (
 		<fieldset id={SETTINGS_SECTION_IDS.scope} className={styles.section}>
 			<legend className={styles.sectionTitle}>Reports Scope</legend>
@@ -61,6 +95,68 @@ export const ScopeSection: React.FC<Props> = ({
 					paste a list to create chips.
 				</small>
 			</div>
+			<div className={styles.formGroup}>
+				<label htmlFor={expectedDailyHoursId}>Expected hours per day</label>
+				<input
+					className={styles.expectedHoursInput}
+					type="number"
+					inputMode="decimal"
+					min="1"
+					max="24"
+					step="0.5"
+					id={expectedDailyHoursId}
+					value={expectedDailyHours}
+					onChange={(e) => {
+						const parsed = parseHoursInput(e.target.value);
+						// Empty / invalid falls back to the 8h baseline rather than 0, which
+						// would flag no one and is almost always a mis-edit.
+						onExpectedDailyHoursChange(parsed ?? 8);
+					}}
+				/>
+				<small>
+					The team-wide daily target used to compute completeness and gaps.
+					Absences already reduce it per day.
+				</small>
+			</div>
+			{members.length > 0 && (
+				<div className={styles.formGroup}>
+					<span className={styles.fieldLabel}>
+						Per-person overrides{' '}
+						<span className={styles.optional}>optional</span>
+					</span>
+					<div className={styles.expectedHoursRows}>
+						{members.map((email) => {
+							const override = expectedHoursByUser[email];
+							return (
+								<label key={email} className={styles.expectedHoursRow}>
+									<span title={email}>{email}</span>
+									<input
+										className={styles.expectedHoursInput}
+										type="number"
+										inputMode="decimal"
+										min="1"
+										max="24"
+										step="0.5"
+										value={override ?? ''}
+										placeholder={`${expectedDailyHours}`}
+										aria-label={`Expected hours per day for ${email}`}
+										onChange={(e) =>
+											onExpectedHoursOverrideChange(
+												email,
+												parseHoursInput(e.target.value),
+											)
+										}
+									/>
+								</label>
+							);
+						})}
+					</div>
+					<small>
+						Set a different daily target for contractors or part-timers (e.g. 6h
+						for a 30h week). Leave blank to use the team default above.
+					</small>
+				</div>
+			)}
 		</fieldset>
 	);
 };

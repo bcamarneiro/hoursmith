@@ -70,6 +70,18 @@ export interface Config {
 	 * compiling — `createDefaultConfig`/`normalizeConfig` always populate it.
 	 */
 	analyticsOptOut?: boolean;
+	/**
+	 * Team completeness: expected working hours **per weekday**, used as each
+	 * member's daily target (ADA-392 / ADA-386). `expectedDailyHours` is the
+	 * team-wide default (8 when unset); `expectedHoursByUser` maps a lowercased
+	 * email to a per-person daily override so contractors / part-timers aren't
+	 * perpetually flagged red. Per-day *schedules* (which weekdays are working
+	 * days) are deliberately deferred — see ADA-386. Optional so existing full-
+	 * `Config` fixtures keep compiling; `createDefaultConfig` / `normalizeConfig`
+	 * always populate them.
+	 */
+	expectedDailyHours?: number;
+	expectedHoursByUser?: Record<string, number>;
 }
 
 interface ConfigState {
@@ -77,7 +89,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 8;
+export const CONFIG_STORAGE_VERSION = 9;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -191,7 +203,42 @@ export function createDefaultConfig(): Config {
 		includeAbsenceInCsv: true,
 		includeCsvProvenance: false,
 		analyticsOptOut: false,
+		expectedDailyHours: 8,
+		expectedHoursByUser: {},
 	};
+}
+
+/** Clamp a per-day expected-hours value to a sane range (0 < h ≤ 24). A
+ *  non-number, or 0/negative (which would flag no one, almost always a
+ *  mistake), falls back to the provided default. */
+function normalizeDailyHours(value: unknown, fallback: number): number {
+	if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+		return fallback;
+	}
+	return Math.min(value, 24);
+}
+
+/** Normalise the per-user override map: lowercase/trim the email keys and drop
+ *  any entry whose value isn't a sane per-day figure (0 < h ≤ 24). */
+function normalizeExpectedHoursByUser(value: unknown): Record<string, number> {
+	if (!value || typeof value !== 'object') return {};
+	const result: Record<string, number> = {};
+	for (const [rawEmail, rawHours] of Object.entries(
+		value as Record<string, unknown>,
+	)) {
+		const email = rawEmail.trim().toLowerCase();
+		if (!email) continue;
+		if (
+			typeof rawHours !== 'number' ||
+			!Number.isFinite(rawHours) ||
+			rawHours <= 0 ||
+			rawHours > 24
+		) {
+			continue;
+		}
+		result[email] = rawHours;
+	}
+	return result;
 }
 
 export function normalizeConfig(
@@ -300,6 +347,14 @@ export function normalizeConfig(
 			typeof config?.analyticsOptOut === 'boolean'
 				? config.analyticsOptOut
 				: fallback.analyticsOptOut,
+		expectedDailyHours: normalizeDailyHours(
+			config?.expectedDailyHours,
+			fallback.expectedDailyHours ?? 8,
+		),
+		expectedHoursByUser:
+			config?.expectedHoursByUser !== undefined
+				? normalizeExpectedHoursByUser(config.expectedHoursByUser)
+				: { ...(fallback.expectedHoursByUser ?? {}) },
 	};
 }
 
@@ -318,6 +373,9 @@ export function normalizeConfig(
  *        `normalizeConfig` fills the field for pre-v7 blobs.
  *   v8 → added githubToken/githubHost (strings, default ''). No shape change;
  *        `normalizeConfig` fills the fields for pre-v8 blobs.
+ *   v9 → added expectedDailyHours (number, default 8) + expectedHoursByUser
+ *        (Record<email, hours>, default {}). No shape change; `normalizeConfig`
+ *        fills them for pre-v9 blobs (existing installs keep the 8h behaviour).
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -325,7 +383,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v8(
+function migrateLegacy_v0_to_v9(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -339,7 +397,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v8(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v9(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and
