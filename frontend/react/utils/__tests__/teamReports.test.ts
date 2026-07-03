@@ -103,6 +103,72 @@ describe('buildTeamSummaries', () => {
 		expect(summaries[0]?.gapSeconds).toBe((40 - 21.5) * 3600);
 	});
 
+	it('prorates the colored gap to elapsed weekdays for the current week (ADA-477)', () => {
+		// Week Mon 2026-03-02 .. Sun 2026-03-08. As of Tue 2026-03-03 only Mon+Tue
+		// are owed (16h). Alice logged 8h: the full-week gap is 32h (context), but
+		// the colored/prorated gap is only 8h (16h owed − 8h logged). This is what
+		// stops the mid-week "everyone is behind" false alarm.
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					8 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+			undefined,
+			'2026-03-03',
+		);
+
+		expect(summaries[0]?.targetSeconds).toBe(40 * 3600);
+		expect(summaries[0]?.gapSeconds).toBe(32 * 3600);
+		expect(summaries[0]?.expectedByTodaySeconds).toBe(16 * 3600);
+		expect(summaries[0]?.proratedGapSeconds).toBe(8 * 3600);
+	});
+
+	it('does not flag a member behind before any weekday has elapsed (ADA-477)', () => {
+		// asOf is the Sunday BEFORE the week — nothing is owed yet, so the colored
+		// gap is 0 even though the full-week gap is the whole 40h.
+		const summaries = buildTeamSummaries(
+			[],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+			undefined,
+			'2026-03-01',
+		);
+
+		expect(summaries[0]?.gapSeconds).toBe(40 * 3600);
+		expect(summaries[0]?.expectedByTodaySeconds).toBe(0);
+		expect(summaries[0]?.proratedGapSeconds).toBe(0);
+	});
+
+	it('prorated gap equals the full gap once the week has fully elapsed (ADA-477)', () => {
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-02T09:00:00.000+0000',
+					32 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'bob@example.com',
+			undefined,
+			'2026-03-20',
+		);
+
+		expect(summaries[0]?.expectedByTodaySeconds).toBe(40 * 3600);
+		expect(summaries[0]?.proratedGapSeconds).toBe(8 * 3600);
+		expect(summaries[0]?.proratedGapSeconds).toBe(summaries[0]?.gapSeconds);
+	});
+
 	it('excludes backdated worklogs from a member weekly total and gap', () => {
 		const summaries = buildTeamSummaries(
 			[

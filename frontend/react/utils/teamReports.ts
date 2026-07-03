@@ -47,6 +47,10 @@ export function buildTeamSummaries(
 	weekEnd: string,
 	allowedUsers: string,
 	absenceDaysByUser?: UserAbsenceDays,
+	// The "as of" date used to prorate the colored gap to elapsed weekdays.
+	// Defaults to today; injected in tests. Pure enough — only used for a
+	// `<=` weekday comparison, never for grouping/bucketing.
+	asOf: string = toLocalDateString(new Date()),
 ): TeamMemberSummary[] {
 	const allowedSet = parseAllowedUsers(allowedUsers);
 	// Group on a STABLE key so we never (a) drop authors that have no
@@ -141,6 +145,10 @@ export function buildTeamSummaries(
 	// "OK / no gap" here while My Week showed a large gap (ADA-443). The target
 	// now spans the same weekdays the per-day totals are reported over.
 	const weekdays = getWeekdaysBetween(weekStart, weekEnd);
+	// Weekdays that have already elapsed by `asOf`. For a past week this is every
+	// weekday (so prorated == full); for the current week it's Mon..today, which
+	// is what stops the "everyone red on Monday" false alarm (ADA-477).
+	const elapsedWeekdays = weekdays.filter((day) => day <= asOf);
 
 	const summaries: TeamMemberSummary[] = [];
 	for (const member of memberMap.values()) {
@@ -157,6 +165,17 @@ export function buildTeamSummaries(
 			weekdays,
 			isAbsentOnDay,
 			loggedOnDay,
+		);
+		// Prorated "expected by today" target + gap — the colored signal. Keeps
+		// the full-week target/gap above as the week-completion context.
+		const expectedByTodaySeconds = sumWeekdayTargetSeconds(
+			elapsedWeekdays,
+			isAbsentOnDay,
+			loggedOnDay,
+		);
+		const proratedGapSeconds = Math.max(
+			0,
+			expectedByTodaySeconds - totalSeconds,
 		);
 		const workedOnPtoDates: string[] = [];
 		for (const day of weekdays) {
@@ -177,6 +196,8 @@ export function buildTeamSummaries(
 			totalSeconds,
 			targetSeconds,
 			gapSeconds: Math.max(0, targetSeconds - totalSeconds),
+			expectedByTodaySeconds,
+			proratedGapSeconds,
 			workedOnPtoDates:
 				workedOnPtoDates.length > 0 ? workedOnPtoDates : undefined,
 		});
@@ -218,6 +239,7 @@ export function buildManagerTrendModel(
 	trendWeeks: number,
 	allowedUsers: string,
 	absenceDaysByUser?: UserAbsenceDays,
+	asOf: string = toLocalDateString(new Date()),
 ): ManagerTrendModel {
 	const weekStarts = Array.from({ length: trendWeeks }, (_, index) =>
 		addDaysToIsoDate(endWeekStart, -7 * (trendWeeks - 1 - index)),
@@ -230,6 +252,7 @@ export function buildManagerTrendModel(
 			weekEnd,
 			allowedUsers,
 			absenceDaysByUser,
+			asOf,
 		);
 		const totalSeconds = members.reduce(
 			(sum, member) => sum + member.totalSeconds,

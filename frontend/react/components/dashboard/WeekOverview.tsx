@@ -18,12 +18,15 @@ type Props = {
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function getDayStatus(day: DaySummary): string {
+function getDayStatus(day: DaySummary, todayStr: string): string {
 	if (day.isWeekend) return styles.weekend;
 	if (day.targetSeconds === 0) return styles.timeOff;
 	if (day.loggedSeconds >= day.targetSeconds) return styles.complete;
 	if (day.loggedSeconds > 0) return styles.partial;
-	return styles.empty;
+	// Empty weekday: only "overdue" (red) once the day is in the past. Today and
+	// future days render neutral — logging isn't owed until the day is over, so
+	// painting them red is manufactured urgency (ADA-477).
+	return day.date < todayStr ? styles.empty : styles.upcoming;
 }
 
 export const WeekOverview = memo<Props>(function WeekOverview({ days }) {
@@ -83,7 +86,7 @@ export const WeekOverview = memo<Props>(function WeekOverview({ days }) {
 					return (
 						<li
 							key={day.date}
-							className={`${styles.day} ${getDayStatus(day)} ${isToday ? styles.today : ''}`}
+							className={`${styles.day} ${getDayStatus(day, todayStr)} ${isToday ? styles.today : ''}`}
 							title={`${baseTitle}${ghostTitle}`}
 							aria-label={ariaLabel}
 						>

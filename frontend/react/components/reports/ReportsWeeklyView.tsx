@@ -21,13 +21,16 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 // Per-day cells stay neutral mono — the Gap column is the single red signal on
 // this table (screens.html: "only the gap cell goes red"). Per-day fullness is
 // read from the figure itself, not a colour wash.
-const gapCellStyleMap = {
-	positive: styles.gapPositive,
-	zero: styles.gapZero,
-} as const;
-
-function getGapCellStyle(gapSeconds: number): string {
-	return gapSeconds > 0 ? gapCellStyleMap.positive : gapCellStyleMap.zero;
+//
+// The cell always shows the full-week remaining figure, but it only turns RED
+// when the member is behind *relative to elapsed days* (prorated gap > 0). A
+// member on track mid-week still shows a remaining figure, in a neutral tone —
+// no manufactured "you're behind" on Monday for Thursday's hours (ADA-477).
+function getGapCellStyle(member: TeamMemberSummary): string {
+	const behindSchedule = (member.proratedGapSeconds ?? member.gapSeconds) > 0;
+	if (behindSchedule) return styles.gapPositive; // genuinely behind → red
+	if (member.gapSeconds > 0) return styles.gapPending; // on track, week open → neutral
+	return styles.gapZero; // fully complete → OK
 }
 
 function getWeekdays(weekStart: string): string[] {
@@ -117,7 +120,7 @@ function TeamMemberRow({
 				);
 			})}
 			<td className={styles.totalCell}>{formatHours(member.totalSeconds)}</td>
-			<td className={getGapCellStyle(member.gapSeconds)}>
+			<td className={getGapCellStyle(member)}>
 				{member.gapSeconds > 0 ? formatHours(member.gapSeconds) : 'OK'}
 			</td>
 		</tr>
