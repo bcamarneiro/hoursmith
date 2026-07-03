@@ -25,6 +25,9 @@ export function SiteFooter(): JSX.Element {
 				<Link to="/terms" className={styles.link}>
 					Terms
 				</Link>
+				<Link to="/security" className={styles.link}>
+					Security
+				</Link>
 				<Link to="/sub-processors" className={styles.link}>
 					Sub-processors
 				</Link>

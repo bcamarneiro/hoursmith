@@ -333,6 +333,10 @@ export const PricingPage: React.FC = () => {
 							in-transit to reach Jira, but it's never stored, logged, or
 							inspected. Self-host the proxy and nothing leaves your machine.
 							See the full{' '}
+							<Link to="/security" className={styles.inlineLink}>
+								security &amp; trust overview
+							</Link>{' '}
+							or the{' '}
 							<Link to="/sub-processors" className={styles.inlineLink}>
 								sub-processors list
 							</Link>
@@ -372,6 +376,9 @@ export const PricingPage: React.FC = () => {
 			</section>
 
 			<footer className={styles.footer}>
+				<Link to="/security" className={styles.footerLink}>
+					Security &amp; trust
+				</Link>
 				<Link to="/sub-processors" className={styles.footerLink}>
 					Sub-processors and data handling
 				</Link>
