@@ -16,7 +16,23 @@ type Props = {
 	onExpectedDailyHoursChange: (hours: number) => void;
 	onExpectedHoursOverrideChange: (email: string, hours: number | null) => void;
 	expectedDailyHoursId: string;
+	weeklyDeadlineWeekday: number;
+	weeklyDeadlineTime: string;
+	onWeeklyDeadlineWeekdayChange: (weekday: number) => void;
+	onWeeklyDeadlineTimeChange: (time: string) => void;
+	weeklyDeadlineWeekdayId: string;
+	weeklyDeadlineTimeId: string;
 };
+
+const WEEKDAY_OPTIONS: { value: number; label: string }[] = [
+	{ value: 1, label: 'Monday' },
+	{ value: 2, label: 'Tuesday' },
+	{ value: 3, label: 'Wednesday' },
+	{ value: 4, label: 'Thursday' },
+	{ value: 5, label: 'Friday' },
+	{ value: 6, label: 'Saturday' },
+	{ value: 7, label: 'Sunday' },
+];
 
 /** Parse a number input into a per-day hours value, or null when the field is
  *  cleared / invalid (so a per-user override reverts to the team default). */
@@ -59,6 +75,12 @@ export const ScopeSection: React.FC<Props> = ({
 	onExpectedDailyHoursChange,
 	onExpectedHoursOverrideChange,
 	expectedDailyHoursId,
+	weeklyDeadlineWeekday,
+	weeklyDeadlineTime,
+	onWeeklyDeadlineWeekdayChange,
+	onWeeklyDeadlineTimeChange,
+	weeklyDeadlineWeekdayId,
+	weeklyDeadlineTimeId,
 }) => {
 	const members = splitAllowedUsers(allowedUsers);
 	return (
@@ -157,6 +179,36 @@ export const ScopeSection: React.FC<Props> = ({
 					</small>
 				</div>
 			)}
+			<div className={styles.formGroup}>
+				<span className={styles.fieldLabel}>Weekly deadline</span>
+				<div className={styles.deadlineRow}>
+					<select
+						id={weeklyDeadlineWeekdayId}
+						value={weeklyDeadlineWeekday}
+						aria-label="Weekly deadline day"
+						onChange={(e) =>
+							onWeeklyDeadlineWeekdayChange(Number.parseInt(e.target.value, 10))
+						}
+					>
+						{WEEKDAY_OPTIONS.map((option) => (
+							<option key={option.value} value={option.value}>
+								{option.label}
+							</option>
+						))}
+					</select>
+					<input
+						id={weeklyDeadlineTimeId}
+						type="time"
+						value={weeklyDeadlineTime}
+						aria-label="Weekly deadline time"
+						onChange={(e) => onWeeklyDeadlineTimeChange(e.target.value)}
+					/>
+				</div>
+				<small>
+					When each week's timesheets are due. Members are marked on-time, late,
+					or incomplete against this cutoff in Reports.
+				</small>
+			</div>
 		</fieldset>
 	);
 };

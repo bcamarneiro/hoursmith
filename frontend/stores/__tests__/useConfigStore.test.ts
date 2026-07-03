@@ -260,3 +260,41 @@ describe('expected-hours config (ADA-392)', () => {
 		});
 	});
 });
+
+describe('weekly-deadline config (ADA-387)', () => {
+	it('defaults to Friday 18:00', () => {
+		const c = createDefaultConfig();
+		expect(c.weeklyDeadlineWeekday).toBe(5);
+		expect(c.weeklyDeadlineTime).toBe('18:00');
+		// Pre-v10 blobs missing the fields get the same defaults.
+		expect(normalizeConfig({}).weeklyDeadlineWeekday).toBe(5);
+		expect(normalizeConfig({}).weeklyDeadlineTime).toBe('18:00');
+	});
+
+	it('accepts a valid weekday + time and rejects out-of-range values', () => {
+		const c = normalizeConfig({
+			weeklyDeadlineWeekday: 3,
+			weeklyDeadlineTime: '9:05',
+		});
+		expect(c.weeklyDeadlineWeekday).toBe(3);
+		// Zero-pads the hour.
+		expect(c.weeklyDeadlineTime).toBe('09:05');
+
+		// Out-of-range weekday / non-integer / bad time fall back to defaults.
+		expect(
+			normalizeConfig({ weeklyDeadlineWeekday: 0 }).weeklyDeadlineWeekday,
+		).toBe(5);
+		expect(
+			normalizeConfig({ weeklyDeadlineWeekday: 8 }).weeklyDeadlineWeekday,
+		).toBe(5);
+		expect(
+			normalizeConfig({ weeklyDeadlineWeekday: 2.5 }).weeklyDeadlineWeekday,
+		).toBe(5);
+		expect(
+			normalizeConfig({ weeklyDeadlineTime: '25:00' }).weeklyDeadlineTime,
+		).toBe('18:00');
+		expect(
+			normalizeConfig({ weeklyDeadlineTime: 'notatime' }).weeklyDeadlineTime,
+		).toBe('18:00');
+	});
+});

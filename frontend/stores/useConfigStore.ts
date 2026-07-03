@@ -82,6 +82,15 @@ export interface Config {
 	 */
 	expectedDailyHours?: number;
 	expectedHoursByUser?: Record<string, number>;
+	/**
+	 * Weekly timesheet deadline (ADA-387): the weekday (1=Mon … 7=Sun) and local
+	 * `HH:MM` time by which the week should be logged. Used to classify each
+	 * member as on-time / late / incomplete. Defaults to Friday 18:00. Optional so
+	 * existing fixtures compile; `createDefaultConfig` / `normalizeConfig` populate
+	 * them.
+	 */
+	weeklyDeadlineWeekday?: number;
+	weeklyDeadlineTime?: string;
 }
 
 interface ConfigState {
@@ -89,7 +98,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 9;
+export const CONFIG_STORAGE_VERSION = 10;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -205,7 +214,33 @@ export function createDefaultConfig(): Config {
 		analyticsOptOut: false,
 		expectedDailyHours: 8,
 		expectedHoursByUser: {},
+		weeklyDeadlineWeekday: 5,
+		weeklyDeadlineTime: '18:00',
 	};
+}
+
+/** Clamp the weekly-deadline weekday to 1 (Mon) … 7 (Sun); fall back otherwise. */
+function normalizeDeadlineWeekday(value: unknown, fallback: number): number {
+	if (
+		typeof value !== 'number' ||
+		!Number.isInteger(value) ||
+		value < 1 ||
+		value > 7
+	) {
+		return fallback;
+	}
+	return value;
+}
+
+/** Validate an `HH:MM` 24h time string; fall back on anything malformed. */
+function normalizeDeadlineTime(value: unknown, fallback: string): string {
+	if (typeof value !== 'string') return fallback;
+	const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+	if (!match) return fallback;
+	const hours = Number(match[1]);
+	const minutes = Number(match[2]);
+	if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return fallback;
+	return `${String(hours).padStart(2, '0')}:${match[2]}`;
 }
 
 /** Clamp a per-day expected-hours value to a sane range (0 < h ≤ 24). A
@@ -355,6 +390,14 @@ export function normalizeConfig(
 			config?.expectedHoursByUser !== undefined
 				? normalizeExpectedHoursByUser(config.expectedHoursByUser)
 				: { ...(fallback.expectedHoursByUser ?? {}) },
+		weeklyDeadlineWeekday: normalizeDeadlineWeekday(
+			config?.weeklyDeadlineWeekday,
+			fallback.weeklyDeadlineWeekday ?? 5,
+		),
+		weeklyDeadlineTime: normalizeDeadlineTime(
+			config?.weeklyDeadlineTime,
+			fallback.weeklyDeadlineTime ?? '18:00',
+		),
 	};
 }
 
@@ -376,6 +419,9 @@ export function normalizeConfig(
  *   v9 → added expectedDailyHours (number, default 8) + expectedHoursByUser
  *        (Record<email, hours>, default {}). No shape change; `normalizeConfig`
  *        fills them for pre-v9 blobs (existing installs keep the 8h behaviour).
+ *   v10 → added weeklyDeadlineWeekday (1–7, default 5=Fri) + weeklyDeadlineTime
+ *        ("HH:MM", default "18:00"). No shape change; `normalizeConfig` fills
+ *        them for pre-v10 blobs.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -383,7 +429,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v9(
+function migrateLegacy_v0_to_v10(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -397,7 +443,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v9(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v10(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and

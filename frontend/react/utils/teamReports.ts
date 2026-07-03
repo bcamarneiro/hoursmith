@@ -8,6 +8,7 @@ import {
 	toLocalDateString,
 } from './date';
 import { sumWeekdayTargetSeconds } from './dayTarget';
+import { deriveOnTimeStatus } from './onTimeStatus';
 import { classifyWorklog } from './worklogClassifier';
 
 function isWeekday(dateStr: string): boolean {
@@ -77,8 +78,16 @@ export function buildTeamSummaries(
 	// Per-user working-hours config (ADA-392). When omitted, every member gets
 	// the 8h/weekday baseline (behaviour unchanged from before this feature).
 	expectedHours?: ExpectedHoursConfig,
+	// Weekly deadline (ADA-387). When provided, each member gets an on-time
+	// classification from whether their worklogs were *created* by this instant.
+	// `now` decides whether a still-incomplete member reads "pending" (deadline
+	// ahead) or "incomplete" (deadline passed). Both omitted → no on-time fields.
+	deadline?: Date,
+	now: Date = new Date(),
 ): TeamMemberSummary[] {
 	const allowedSet = parseAllowedUsers(allowedUsers);
+	const deadlineMs = deadline ? deadline.getTime() : null;
+	const deadlinePassed = deadline ? now.getTime() > deadline.getTime() : false;
 	// Group on a STABLE key so we never (a) drop authors that have no
 	// emailAddress, nor (b) merge two distinct people who share a displayName
 	// (ADA-458). Preference: accountId → email → a clearly-marked synthetic
@@ -90,6 +99,7 @@ export function buildTeamSummaries(
 			displayName: string;
 			email: string;
 			dailySeconds: Map<string, number>;
+			onTimeSeconds: number;
 		}
 	>();
 
@@ -137,12 +147,27 @@ export function buildTeamSummaries(
 				displayName: worklog.author?.displayName || email || 'Unknown user',
 				email: email ?? '',
 				dailySeconds: new Map(),
+				onTimeSeconds: 0,
 			};
 			memberMap.set(groupKey, member);
 		}
 
+		const seconds = worklog.timeSpentSeconds ?? 0;
 		const existing = member.dailySeconds.get(day) || 0;
-		member.dailySeconds.set(day, existing + (worklog.timeSpentSeconds ?? 0));
+		member.dailySeconds.set(day, existing + seconds);
+
+		// On-time accounting (ADA-387): a worklog counts as "on time" when it was
+		// created on or before the deadline. A missing `created` can't be proven
+		// late, so it's treated as on-time. Backdated worklogs already `continue`d
+		// above, so they never reach here.
+		if (deadlineMs !== null) {
+			const createdMs = worklog.created
+				? new Date(worklog.created).getTime()
+				: null;
+			if (createdMs === null || createdMs <= deadlineMs) {
+				member.onTimeSeconds += seconds;
+			}
+		}
 	}
 
 	if (allowedSet) {
@@ -158,6 +183,7 @@ export function buildTeamSummaries(
 					displayName: email,
 					email,
 					dailySeconds: new Map(),
+					onTimeSeconds: 0,
 				});
 			}
 		}
@@ -222,6 +248,17 @@ export function buildTeamSummaries(
 			dailyHours.set(day, seconds / 3600);
 		}
 
+		// On-time classification (ADA-387) — only when a deadline was supplied.
+		const onTimeSeconds = deadline ? member.onTimeSeconds : undefined;
+		const onTimeStatus = deadline
+			? deriveOnTimeStatus({
+					targetSeconds,
+					totalSeconds,
+					onTimeSeconds: member.onTimeSeconds,
+					deadlinePassed,
+				})
+			: undefined;
+
 		summaries.push({
 			email,
 			displayName: member.displayName,
@@ -231,6 +268,8 @@ export function buildTeamSummaries(
 			gapSeconds: Math.max(0, targetSeconds - totalSeconds),
 			expectedByTodaySeconds,
 			proratedGapSeconds,
+			onTimeSeconds,
+			onTimeStatus,
 			workedOnPtoDates:
 				workedOnPtoDates.length > 0 ? workedOnPtoDates : undefined,
 		});

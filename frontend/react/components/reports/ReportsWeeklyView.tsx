@@ -9,6 +9,7 @@ import type {
 import * as styles from '../../pages/ReportsPage.module.css';
 import { addDaysToIsoDate, parseIsoDateLocal } from '../../utils/date';
 import { formatHours } from '../../utils/format';
+import { describeOnTimeStatus } from '../../utils/onTimeStatus';
 import type { ManagerTrendModel } from '../../utils/teamReports';
 import { TeamStatsCards } from '../team/TeamStatsCards';
 import { Button } from '../ui/Button';
@@ -17,6 +18,15 @@ import { WorklogLoadingStatus } from '../ui/WorklogLoadingStatus';
 import { ManagerInsightsPanel } from './ManagerInsightsPanel';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+// On-time status badge tone → CSS class (ADA-387). The ember brand accent is
+// never used here — this rides the green/amber/red worklog ramp plus a neutral.
+const ON_TIME_TONE_CLASS: Record<string, string> = {
+	success: styles.onTimeSuccess,
+	warning: styles.onTimeWarning,
+	error: styles.onTimeError,
+	neutral: styles.onTimeNeutral,
+};
 
 // Per-day cells stay neutral mono — the Gap column is the single red signal on
 // this table (screens.html: "only the gap cell goes red"). Per-day fullness is
@@ -95,6 +105,17 @@ function TeamMemberRow({
 				>
 					{member.displayName}
 				</button>
+				{member.onTimeStatus &&
+					(() => {
+						const { label, tone } = describeOnTimeStatus(member.onTimeStatus);
+						return (
+							<span
+								className={`${styles.onTimeBadge} ${ON_TIME_TONE_CLASS[tone]}`}
+							>
+								{label}
+							</span>
+						);
+					})()}
 				{workedOnPto.length > 0 && (
 					<span
 						className={styles.workedOnPtoBadge}

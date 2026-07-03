@@ -170,6 +170,8 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const jqlFilterId = useId();
 	const allowedUsersId = useId();
 	const expectedDailyHoursId = useId();
+	const weeklyDeadlineWeekdayId = useId();
+	const weeklyDeadlineTimeId = useId();
 	const gitlabTokenId = useId();
 	const gitlabHostId = useId();
 	const rescueTimeKeyId = useId();
@@ -339,6 +341,15 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		if (hours === null) delete next[email];
 		else next[email] = hours;
 		updateFormField('expectedHoursByUser', next as never);
+	};
+
+	const handleWeeklyDeadlineWeekdayChange = (weekday: number) => {
+		if (!Number.isFinite(weekday)) return;
+		updateFormField('weeklyDeadlineWeekday', weekday as never);
+	};
+
+	const handleWeeklyDeadlineTimeChange = (time: string) => {
+		updateFormField('weeklyDeadlineTime', time as never);
 	};
 
 	const handleSave = () => {
@@ -529,6 +540,12 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							onExpectedDailyHoursChange={handleExpectedDailyHoursChange}
 							onExpectedHoursOverrideChange={handleExpectedHoursOverrideChange}
 							expectedDailyHoursId={expectedDailyHoursId}
+							weeklyDeadlineWeekday={formData.weeklyDeadlineWeekday ?? 5}
+							weeklyDeadlineTime={formData.weeklyDeadlineTime ?? '18:00'}
+							onWeeklyDeadlineWeekdayChange={handleWeeklyDeadlineWeekdayChange}
+							onWeeklyDeadlineTimeChange={handleWeeklyDeadlineTimeChange}
+							weeklyDeadlineWeekdayId={weeklyDeadlineWeekdayId}
+							weeklyDeadlineTimeId={weeklyDeadlineTimeId}
 						/>
 					</div>
 
