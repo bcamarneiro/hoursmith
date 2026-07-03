@@ -52,6 +52,11 @@ const SettingsPage = lazy(() =>
 		default: module.SettingsPage,
 	})),
 );
+const SecurityPage = lazy(() =>
+	import('./pages/SecurityPage').then((module) => ({
+		default: module.SecurityPage,
+	})),
+);
 const SubProcessorsPage = lazy(() =>
 	import('./pages/SubProcessorsPage').then((module) => ({
 		default: module.SubProcessorsPage,
@@ -158,6 +163,7 @@ const AppShell: React.FC = () => {
 							element={<Navigate to="/reports" replace />}
 						/>
 						<Route path="/settings" element={<SettingsPage />} />
+						<Route path="/security" element={<SecurityPage />} />
 						<Route path="/sub-processors" element={<SubProcessorsPage />} />
 						<Route path="/privacy" element={<PrivacyPage />} />
 						<Route path="/terms" element={<TermsPage />} />

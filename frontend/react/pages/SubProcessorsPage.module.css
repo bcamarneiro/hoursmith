@@ -95,6 +95,66 @@
 	border-bottom: none;
 }
 
+/*
+ * Mobile (<640px): the 4-column table is unreadable at 390px even with
+ * horizontal scroll (ADA-305), so restructure each row into a stacked card
+ * with the column name shown inline via the cell's data-label.
+ */
+@media (max-width: 640px) {
+	.tableWrap {
+		overflow-x: visible;
+		border: none;
+		background: none;
+	}
+
+	.table,
+	.table tbody,
+	.table tr,
+	.table td {
+		display: block;
+		width: 100%;
+	}
+
+	.table thead {
+		/* Visually hidden but kept for assistive tech. */
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	.table tr {
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		background: var(--color-surface);
+		margin-bottom: var(--space-3);
+		padding: var(--space-2) 0;
+	}
+
+	.table td {
+		display: grid;
+		grid-template-columns: minmax(0, 40%) minmax(0, 60%);
+		gap: var(--space-3);
+		border-bottom: 1px solid var(--color-border);
+		padding: var(--space-3) var(--space-4);
+	}
+
+	.table tr td:last-child {
+		border-bottom: none;
+	}
+
+	.table td::before {
+		content: attr(data-label);
+		font-weight: var(--font-semibold);
+		color: var(--color-text);
+	}
+}
+
 .notActive {
 	list-style: disc;
 	padding-left: var(--space-5);
