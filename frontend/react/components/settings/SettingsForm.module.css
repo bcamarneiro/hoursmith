@@ -88,6 +88,34 @@
 	color: var(--color-text-tertiary);
 }
 
+/* Per-user expected-hours overrides (ADA-392): one compact row per configured
+   team member with a small "h/day" number input. */
+.expectedHoursRows {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.expectedHoursRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+}
+
+.expectedHoursRow span {
+	font-size: var(--text-sm);
+	color: var(--color-text-secondary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.expectedHoursInput {
+	width: 8rem;
+	flex: 0 0 auto;
+}
+
 /* ADA-273 — Proxy URL "Hosted by Premium" / "Self-hosted" pills */
 .badgePremium,
 .badgeNeutral {

@@ -1,40 +1,91 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ScopeSection } from '../ScopeSection';
 
+function renderScope(
+	overrides: Partial<React.ComponentProps<typeof ScopeSection>> = {},
+) {
+	const props: React.ComponentProps<typeof ScopeSection> = {
+		jqlFilter: '',
+		allowedUsers: '',
+		allowedUserSuggestions: [],
+		handleChange: vi.fn(),
+		onAllowedUsersChange: vi.fn(),
+		jqlFilterId: 'jql',
+		allowedUsersId: 'au',
+		expectedDailyHours: 8,
+		expectedHoursByUser: {},
+		onExpectedDailyHoursChange: vi.fn(),
+		onExpectedHoursOverrideChange: vi.fn(),
+		expectedDailyHoursId: 'edh',
+		...overrides,
+	};
+	render(<ScopeSection {...props} />);
+	return props;
+}
+
 describe('ScopeSection', () => {
 	it('renders the JQL filter input bound to the prop value', () => {
-		render(
-			<ScopeSection
-				jqlFilter="project = X"
-				allowedUsers=""
-				allowedUserSuggestions={[]}
-				handleChange={vi.fn()}
-				onAllowedUsersChange={vi.fn()}
-				jqlFilterId="jql"
-				allowedUsersId="au"
-			/>,
-		);
+		renderScope({ jqlFilter: 'project = X' });
 		expect(screen.getByLabelText(/JQL Filter/)).toHaveValue('project = X');
 	});
 
-	it('forwards chip-editor changes via onAllowedUsersChange', () => {
-		const onAllowedUsersChange = vi.fn();
-		render(
-			<ScopeSection
-				jqlFilter=""
-				allowedUsers="alice@example.com"
-				allowedUserSuggestions={['bob@example.com']}
-				handleChange={vi.fn()}
-				onAllowedUsersChange={onAllowedUsersChange}
-				jqlFilterId="jql"
-				allowedUsersId="au"
-			/>,
-		);
-		// We don't simulate AllowedUsersInput internals here; just confirm the
-		// section renders with the prop value and the chip editor mounts.
+	it('renders the chip editor with the prop value', () => {
+		renderScope({ allowedUsers: 'alice@example.com' });
 		expect(screen.getByText(/Team Members/)).toBeInTheDocument();
+	});
+
+	it('binds the team-wide expected hours input', () => {
+		const onExpectedDailyHoursChange = vi.fn();
+		renderScope({ expectedDailyHours: 6, onExpectedDailyHoursChange });
+		const input = screen.getByLabelText(/Expected hours per day/);
+		expect(input).toHaveValue(6);
+		fireEvent.change(input, { target: { value: '7.5' } });
+		expect(onExpectedDailyHoursChange).toHaveBeenCalledWith(7.5);
+	});
+
+	it('falls back to 8h when the team-wide input is cleared', () => {
+		const onExpectedDailyHoursChange = vi.fn();
+		renderScope({ onExpectedDailyHoursChange });
+		fireEvent.change(screen.getByLabelText(/Expected hours per day/), {
+			target: { value: '' },
+		});
+		expect(onExpectedDailyHoursChange).toHaveBeenCalledWith(8);
+	});
+
+	it('shows a per-person override row per configured member', () => {
+		const onExpectedHoursOverrideChange = vi.fn();
+		renderScope({
+			allowedUsers: 'alice@example.com, bob@example.com',
+			expectedHoursByUser: { 'alice@example.com': 6 },
+			onExpectedHoursOverrideChange,
+		});
+		const alice = screen.getByLabelText(
+			/Expected hours per day for alice@example.com/,
+		);
+		expect(alice).toHaveValue(6);
+
+		// Editing bob sets an override; clearing alice removes it (null).
+		fireEvent.change(
+			screen.getByLabelText(/Expected hours per day for bob@example.com/),
+			{ target: { value: '4' } },
+		);
+		expect(onExpectedHoursOverrideChange).toHaveBeenCalledWith(
+			'bob@example.com',
+			4,
+		);
+		fireEvent.change(alice, { target: { value: '' } });
+		expect(onExpectedHoursOverrideChange).toHaveBeenCalledWith(
+			'alice@example.com',
+			null,
+		);
+	});
+
+	it('hides per-person overrides when no members are configured', () => {
+		renderScope({ allowedUsers: '' });
+		expect(screen.queryByText(/Per-person overrides/)).not.toBeInTheDocument();
 	});
 });

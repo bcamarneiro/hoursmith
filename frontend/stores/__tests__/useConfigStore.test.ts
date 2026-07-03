@@ -209,3 +209,54 @@ describe('github config fields', () => {
 		expect(c.githubHost).toBe('github.example.com');
 	});
 });
+
+describe('expected-hours config (ADA-392)', () => {
+	it('defaults to 8h/day and an empty override map', () => {
+		const c = createDefaultConfig();
+		expect(c.expectedDailyHours).toBe(8);
+		expect(c.expectedHoursByUser).toEqual({});
+	});
+
+	it('fills the 8h default for a pre-v9 blob missing the field', () => {
+		expect(normalizeConfig({}).expectedDailyHours).toBe(8);
+		expect(normalizeConfig({}).expectedHoursByUser).toEqual({});
+	});
+
+	it('clamps a valid daily-hours value and rejects out-of-range / non-numbers', () => {
+		expect(normalizeConfig({ expectedDailyHours: 6 }).expectedDailyHours).toBe(
+			6,
+		);
+		// Above 24h is clamped to 24.
+		expect(normalizeConfig({ expectedDailyHours: 40 }).expectedDailyHours).toBe(
+			24,
+		);
+		// Zero / negative / non-number fall back to the 8h default.
+		expect(normalizeConfig({ expectedDailyHours: 0 }).expectedDailyHours).toBe(
+			8,
+		);
+		expect(normalizeConfig({ expectedDailyHours: -3 }).expectedDailyHours).toBe(
+			8,
+		);
+		expect(
+			normalizeConfig({
+				expectedDailyHours: 'eight' as unknown as number,
+			}).expectedDailyHours,
+		).toBe(8);
+	});
+
+	it('lowercases override emails and drops invalid entries', () => {
+		const c = normalizeConfig({
+			expectedHoursByUser: {
+				'Bob@Example.com': 6,
+				'  alice@example.com  ': 4,
+				'invalid@example.com': 0,
+				'toohigh@example.com': 30,
+				'nan@example.com': Number.NaN,
+			},
+		});
+		expect(c.expectedHoursByUser).toEqual({
+			'bob@example.com': 6,
+			'alice@example.com': 4,
+		});
+	});
+});

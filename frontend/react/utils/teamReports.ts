@@ -33,6 +33,29 @@ export function getWeekdaysBetween(start: string, end: string): string[] {
 	return days;
 }
 
+/**
+ * Per-user working-hours configuration (ADA-392). `defaultDailyHours` is the
+ * team-wide per-weekday target; `byUser` maps a lowercased email to a
+ * per-person override so contractors / part-timers get an accurate target
+ * rather than being perpetually flagged red.
+ */
+export interface ExpectedHoursConfig {
+	defaultDailyHours: number;
+	byUser: Record<string, number>;
+}
+
+const DEFAULT_DAILY_HOURS = 8;
+
+function resolveDailyTargetSeconds(
+	email: string,
+	expectedHours: ExpectedHoursConfig | undefined,
+): number {
+	const perUser = email ? expectedHours?.byUser?.[email] : undefined;
+	const hours =
+		perUser ?? expectedHours?.defaultDailyHours ?? DEFAULT_DAILY_HOURS;
+	return hours * 3600;
+}
+
 function parseAllowedUsers(allowedUsers: string): Set<string> | null {
 	const entries = allowedUsers
 		.split(',')
@@ -51,6 +74,9 @@ export function buildTeamSummaries(
 	// Defaults to today; injected in tests. Pure enough — only used for a
 	// `<=` weekday comparison, never for grouping/bucketing.
 	asOf: string = toLocalDateString(new Date()),
+	// Per-user working-hours config (ADA-392). When omitted, every member gets
+	// the 8h/weekday baseline (behaviour unchanged from before this feature).
+	expectedHours?: ExpectedHoursConfig,
 ): TeamMemberSummary[] {
 	const allowedSet = parseAllowedUsers(allowedUsers);
 	// Group on a STABLE key so we never (a) drop authors that have no
@@ -161,10 +187,16 @@ export function buildTeamSummaries(
 		const memberAbsenceMap = email ? absenceDaysByUser?.get(email) : undefined;
 		const isAbsentOnDay = (day: string) => memberAbsenceMap?.has(day) ?? false;
 		const loggedOnDay = (day: string) => member.dailySeconds.get(day) ?? 0;
+		// Per-user daily target (ADA-392): the lead's override for this member, or
+		// the team default, or the 8h baseline. Drives both the full-week target
+		// and the prorated one, so gap / completeness % / RAG are all correct for
+		// part-timers instead of always red.
+		const dailyTargetSeconds = resolveDailyTargetSeconds(email, expectedHours);
 		const targetSeconds = sumWeekdayTargetSeconds(
 			weekdays,
 			isAbsentOnDay,
 			loggedOnDay,
+			dailyTargetSeconds,
 		);
 		// Prorated "expected by today" target + gap — the colored signal. Keeps
 		// the full-week target/gap above as the week-completion context.
@@ -172,6 +204,7 @@ export function buildTeamSummaries(
 			elapsedWeekdays,
 			isAbsentOnDay,
 			loggedOnDay,
+			dailyTargetSeconds,
 		);
 		const proratedGapSeconds = Math.max(
 			0,
@@ -240,6 +273,7 @@ export function buildManagerTrendModel(
 	allowedUsers: string,
 	absenceDaysByUser?: UserAbsenceDays,
 	asOf: string = toLocalDateString(new Date()),
+	expectedHours?: ExpectedHoursConfig,
 ): ManagerTrendModel {
 	const weekStarts = Array.from({ length: trendWeeks }, (_, index) =>
 		addDaysToIsoDate(endWeekStart, -7 * (trendWeeks - 1 - index)),
@@ -253,6 +287,7 @@ export function buildManagerTrendModel(
 			allowedUsers,
 			absenceDaysByUser,
 			asOf,
+			expectedHours,
 		);
 		const totalSeconds = members.reduce(
 			(sum, member) => sum + member.totalSeconds,

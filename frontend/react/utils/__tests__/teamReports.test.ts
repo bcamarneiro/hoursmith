@@ -169,6 +169,65 @@ describe('buildTeamSummaries', () => {
 		expect(summaries[0]?.proratedGapSeconds).toBe(summaries[0]?.gapSeconds);
 	});
 
+	it('applies a per-user expected-hours override so a part-timer has no gap (ADA-392)', () => {
+		// Bob is a 30h/week contractor → 6h/day. He logged 30h; with the default
+		// 8h/day he'd show a 10h gap, but his override makes the target 30h → no
+		// gap and no false "behind" colour.
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-02T09:00:00.000+0000',
+					30 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com,bob@example.com',
+			undefined,
+			'2026-03-20', // fully-elapsed week
+			{ defaultDailyHours: 8, byUser: { 'bob@example.com': 6 } },
+		);
+
+		const alice = summaries.find((s) => s.email === 'alice@example.com');
+		const bob = summaries.find((s) => s.email === 'bob@example.com');
+		expect(alice?.targetSeconds).toBe(40 * 3600);
+		expect(alice?.gapSeconds).toBe(0);
+		expect(bob?.targetSeconds).toBe(30 * 3600);
+		expect(bob?.gapSeconds).toBe(0);
+		expect(bob?.proratedGapSeconds).toBe(0);
+	});
+
+	it('applies the team default daily hours when no override is set (ADA-392)', () => {
+		// Team default of 6h/day → 30h week target for everyone without an override.
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					30 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+			undefined,
+			'2026-03-20',
+			{ defaultDailyHours: 6, byUser: {} },
+		);
+
+		expect(summaries[0]?.targetSeconds).toBe(30 * 3600);
+		expect(summaries[0]?.gapSeconds).toBe(0);
+	});
+
 	it('excludes backdated worklogs from a member weekly total and gap', () => {
 		const summaries = buildTeamSummaries(
 			[

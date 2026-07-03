@@ -91,12 +91,20 @@ export function useReportsTrendData(
 			trendWeeks,
 			config.allowedUsers,
 			absenceQuery.data,
+			// asOf defaults to today inside buildManagerTrendModel.
+			undefined,
+			{
+				defaultDailyHours: config.expectedDailyHours ?? 8,
+				byUser: config.expectedHoursByUser ?? {},
+			},
 		);
 	}, [
 		worklogsQuery.data,
 		weekStart,
 		trendWeeks,
 		config.allowedUsers,
+		config.expectedDailyHours,
+		config.expectedHoursByUser,
 		absenceQuery.data,
 	]);
 
