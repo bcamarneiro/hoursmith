@@ -100,7 +100,12 @@ export const HomePage: React.FC = () => {
 						{showCreateAccount && (
 							<Link
 								to="/auth/sign-up"
-								className={styles.primaryButton}
+								// For an unconfigured visitor the demo is the hero CTA — let
+								// them see the value before surrendering a token (ADA-484). Once
+								// they're configured, "Create account" reclaims primary.
+								className={
+									isConfigured ? styles.primaryButton : styles.secondaryButton
+								}
 								onClick={() =>
 									trackEvent('cta_create_account', { location: 'home' })
 								}
@@ -128,11 +133,9 @@ export const HomePage: React.FC = () => {
 							<>
 								<Link
 									to="/demo"
-									className={
-										showCreateAccount
-											? styles.secondaryButton
-											: styles.primaryButton
-									}
+									// Always the primary CTA for unconfigured visitors, even in
+									// premium builds where "Create account" is present (ADA-484).
+									className={styles.primaryButton}
 									onClick={() =>
 										trackEvent('demo_viewed', { source: 'home_cta' })
 									}
