@@ -8,7 +8,11 @@ import {
 	toLocalDateString,
 } from './date';
 import { sumWeekdayTargetSeconds } from './dayTarget';
-import { deriveOnTimeStatus } from './onTimeStatus';
+import {
+	computeWeeklyDeadline,
+	deriveOnTimeStatus,
+	type OnTimeStatus,
+} from './onTimeStatus';
 import { classifyWorklog } from './worklogClassifier';
 
 function isWeekday(dateStr: string): boolean {
@@ -298,11 +302,35 @@ export interface RecurringGapMember {
 	currentLoggedSeconds: number;
 }
 
+/** One week's on-time cell for a member in the RAG grid (ADA-388). `status` is
+ *  null for a week where the member had no row (not on the roster yet). */
+export interface OnTimeHistoryWeek {
+	weekStart: string;
+	weekEnd: string;
+	status: OnTimeStatus | null;
+}
+
+/** A member's on-time record across the trend window (ADA-388). */
+export interface OnTimeHistoryMember {
+	email: string;
+	displayName: string;
+	weeks: OnTimeHistoryWeek[];
+	/** Weeks classified `on-time`. */
+	onTimeWeeks: number;
+	/** Weeks the member had a rated status (appeared in the roster). */
+	ratedWeeks: number;
+	/** The most recent week's status (drives the row's headline chip). */
+	currentStatus: OnTimeStatus | null;
+}
+
 export interface ManagerTrendModel {
 	weeks: TeamTrendPoint[];
 	averageComplianceRate: number;
 	totalTrendGapSeconds: number;
 	recurringGapMembers: RecurringGapMember[];
+	/** Per-member on-time history for the RAG grid. Empty unless a deadline was
+	 *  supplied (the on-time feature is off otherwise). */
+	onTimeHistory: OnTimeHistoryMember[];
 }
 
 export function buildManagerTrendModel(
@@ -313,12 +341,23 @@ export function buildManagerTrendModel(
 	absenceDaysByUser?: UserAbsenceDays,
 	asOf: string = toLocalDateString(new Date()),
 	expectedHours?: ExpectedHoursConfig,
+	// Weekly-deadline config (ADA-388). When provided, each week gets its own
+	// deadline and members carry an on-time status, which feeds the RAG history.
+	deadlineConfig?: { weekday: number; time: string },
+	now: Date = new Date(),
 ): ManagerTrendModel {
 	const weekStarts = Array.from({ length: trendWeeks }, (_, index) =>
 		addDaysToIsoDate(endWeekStart, -7 * (trendWeeks - 1 - index)),
 	);
 	const weekSummaries = weekStarts.map((weekStart) => {
 		const weekEnd = addDaysToIsoDate(weekStart, 6);
+		const deadline = deadlineConfig
+			? computeWeeklyDeadline(
+					weekStart,
+					deadlineConfig.weekday,
+					deadlineConfig.time,
+				)
+			: undefined;
 		const members = buildTeamSummaries(
 			worklogs,
 			weekStart,
@@ -327,6 +366,8 @@ export function buildManagerTrendModel(
 			absenceDaysByUser,
 			asOf,
 			expectedHours,
+			deadline,
+			now,
 		);
 		const totalSeconds = members.reduce(
 			(sum, member) => sum + member.totalSeconds,
@@ -434,6 +475,55 @@ export function buildManagerTrendModel(
 				)
 			: 0;
 
+	// Per-member on-time history for the RAG grid (ADA-388). Only built when a
+	// deadline was supplied — otherwise members carry no on-time status.
+	const onTimeHistory: OnTimeHistoryMember[] = [];
+	if (deadlineConfig) {
+		const perWeekStatus = weekSummaries.map(({ members }) => {
+			const map = new Map<string, OnTimeStatus | null>();
+			for (const member of members) {
+				const key = member.email || `name:${member.displayName}`;
+				map.set(key, member.onTimeStatus ?? null);
+			}
+			return map;
+		});
+		const keys: string[] = [];
+		const displayNameByKey = new Map<string, string>();
+		const emailByKey = new Map<string, string>();
+		for (const { members } of weekSummaries) {
+			for (const member of members) {
+				const key = member.email || `name:${member.displayName}`;
+				if (!displayNameByKey.has(key)) {
+					keys.push(key);
+					displayNameByKey.set(key, member.displayName);
+					emailByKey.set(key, member.email);
+				}
+			}
+		}
+		for (const key of keys) {
+			const memberWeeks: OnTimeHistoryWeek[] = weekSummaries.map(
+				({ point }, index) => ({
+					weekStart: point.weekStart,
+					weekEnd: point.weekEnd,
+					status: perWeekStatus[index].get(key) ?? null,
+				}),
+			);
+			onTimeHistory.push({
+				email: emailByKey.get(key) ?? '',
+				displayName: displayNameByKey.get(key) ?? key,
+				weeks: memberWeeks,
+				onTimeWeeks: memberWeeks.filter((w) => w.status === 'on-time').length,
+				ratedWeeks: memberWeeks.filter((w) => w.status !== null).length,
+				currentStatus: memberWeeks[memberWeeks.length - 1]?.status ?? null,
+			});
+		}
+		// Worst record first so a lead spots chronic laggards at the top.
+		onTimeHistory.sort((a, b) => {
+			if (a.onTimeWeeks !== b.onTimeWeeks) return a.onTimeWeeks - b.onTimeWeeks;
+			return a.displayName.localeCompare(b.displayName);
+		});
+	}
+
 	return {
 		weeks,
 		averageComplianceRate,
@@ -442,5 +532,6 @@ export function buildManagerTrendModel(
 			0,
 		),
 		recurringGapMembers,
+		onTimeHistory,
 	};
 }

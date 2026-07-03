@@ -97,6 +97,11 @@ export function useReportsTrendData(
 				defaultDailyHours: config.expectedDailyHours ?? 8,
 				byUser: config.expectedHoursByUser ?? {},
 			},
+			// Weekly-deadline config for the on-time RAG history (ADA-388).
+			{
+				weekday: config.weeklyDeadlineWeekday ?? 5,
+				time: config.weeklyDeadlineTime ?? '18:00',
+			},
 		);
 	}, [
 		worklogsQuery.data,
@@ -105,6 +110,8 @@ export function useReportsTrendData(
 		config.allowedUsers,
 		config.expectedDailyHours,
 		config.expectedHoursByUser,
+		config.weeklyDeadlineWeekday,
+		config.weeklyDeadlineTime,
 		absenceQuery.data,
 	]);
 

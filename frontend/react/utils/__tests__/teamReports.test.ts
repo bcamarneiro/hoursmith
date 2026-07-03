@@ -495,6 +495,78 @@ describe('buildManagerTrendModel', () => {
 		]);
 	});
 
+	it('builds per-member on-time history for the RAG grid (ADA-388)', () => {
+		const now = new Date('2026-03-20T09:00:00'); // after both weeks' deadlines
+		const model = buildManagerTrendModel(
+			[
+				// Week of 2026-03-02: Alice full (on-time), Bob short (incomplete).
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-02T09:00:00.000+0000',
+					16 * 3600,
+				),
+				// Week of 2026-03-09: both full + on-time.
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-09T09:00:00.000+0000',
+					40 * 3600,
+				),
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-09T09:00:00.000+0000',
+					40 * 3600,
+				),
+			],
+			'2026-03-09',
+			2,
+			'alice@example.com,bob@example.com',
+			undefined,
+			'2026-03-20',
+			undefined,
+			{ weekday: 5, time: '18:00' },
+			now,
+		);
+
+		expect(model.onTimeHistory).toHaveLength(2);
+		const alice = model.onTimeHistory.find(
+			(m) => m.email === 'alice@example.com',
+		);
+		const bob = model.onTimeHistory.find((m) => m.email === 'bob@example.com');
+		expect(alice?.weeks.map((w) => w.status)).toEqual(['on-time', 'on-time']);
+		expect(alice?.onTimeWeeks).toBe(2);
+		expect(bob?.weeks.map((w) => w.status)).toEqual(['incomplete', 'on-time']);
+		expect(bob?.onTimeWeeks).toBe(1);
+		expect(bob?.ratedWeeks).toBe(2);
+		// Worst record first → Bob before Alice.
+		expect(model.onTimeHistory[0]?.email).toBe('bob@example.com');
+	});
+
+	it('leaves on-time history empty when no deadline config is supplied (ADA-388)', () => {
+		const model = buildManagerTrendModel(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+			],
+			'2026-03-02',
+			1,
+			'alice@example.com',
+		);
+		expect(model.onTimeHistory).toEqual([]);
+	});
+
 	it('floors complianceRate so it never reads 100 while a member has a gap (ADA-458)', () => {
 		// 7 of 8 members fully logged, 1 short. 7/8 = 87.5% → floor 87 (a round
 		// would inflate to 88). The point: a fractional rate that rounds up must

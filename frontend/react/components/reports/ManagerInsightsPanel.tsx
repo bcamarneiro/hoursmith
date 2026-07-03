@@ -10,6 +10,7 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { Spinner } from '../ui/Spinner';
 import { StatCard } from '../ui/StatCard';
 import * as styles from './ManagerInsightsPanel.module.css';
+import { TeamRagGrid } from './TeamRagGrid';
 
 type Props = {
 	trendWeeks: number;
@@ -104,6 +105,10 @@ export const ManagerInsightsPanel: React.FC<Props> = ({
 					<strong>Unable to load manager insights</strong>
 					<p>{errorMessage}</p>
 				</div>
+			) : null}
+
+			{model && model.onTimeHistory.length > 0 ? (
+				<TeamRagGrid members={model.onTimeHistory} />
 			) : null}
 
 			{model ? (
