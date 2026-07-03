@@ -478,7 +478,7 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 					: isComposed
 						? rawMessage
 						: isCorsFailure
-							? 'Your browser blocked direct access to Jira (CORS). Configure a CORS proxy in Settings, or use the hosted proxy.'
+							? 'Your network is blocking direct browser access to Jira — this is common on locked-down corporate networks, not a problem with your token. Set up a proxy below, or ask your IT team to allow browser access to your Jira host.'
 							: rawMessage;
 			// Map the failure to the fixed enum from the error *type* / captured HTTP
 			// status — never the raw message — so no Jira-derived text reaches analytics.
