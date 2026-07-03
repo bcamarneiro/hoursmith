@@ -95,10 +95,15 @@ merges:
   panel's existing "only attention" filter to the grid is a small follow-up.
 - **ADA-484 items 1/2/4** — Settings progressive disclosure + inline token
   walkthrough + CORS error copy (couples to the Settings redesign).
-- **ADA-274 (M3)** — the paid-lifecycle e2e (checkout → active → cancel → 403).
-  Needs a runnable Playwright env with Supabase/Polar/proxy mocked via
-  `page.route`, or a staging run against the Polar sandbox. Not authored here
-  because it can't be executed (and therefore verified) from this environment.
+- **ADA-274 (M3)** — the paid-lifecycle e2e. A **complementary offline spec**
+  shipped (PR #126, `e2e/paid-lifecycle.spec.ts`, verified green): the /account
+  subscription-state UI lifecycle (active → canceled → revoked) with the billing
+  backend mocked via `page.route`. The ticket's **actual** acceptance is a
+  *staging integration* test (`e2e/paywall-sandbox.spec.ts`) against
+  `staging.hoursmith.io` with real Polar-sandbox checkout, real webhook→Supabase
+  sync, and a real `/api/proxy` 403 — wired into `e2e-sandbox.yml`. That remains
+  open: blocked by ADA-341 + ADA-291 and needs CI secrets (Polar sandbox token,
+  AgentMail, Supabase staging service-role key) not available from here.
 - **`fetchTeamWorklogs`** in `frontend/services/teamService.ts` still uses the
   fixed 8h/day target and doesn't read the expected-hours config — the Reports
   path uses `buildTeamSummaries` (which does). Align the two producers if that
