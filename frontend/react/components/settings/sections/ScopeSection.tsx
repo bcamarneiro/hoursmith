@@ -22,6 +22,12 @@ type Props = {
 	onWeeklyDeadlineTimeChange: (time: string) => void;
 	weeklyDeadlineWeekdayId: string;
 	weeklyDeadlineTimeId: string;
+	monthlyDeadlineDay: number;
+	monthlyDeadlineTime: string;
+	onMonthlyDeadlineDayChange: (day: number) => void;
+	onMonthlyDeadlineTimeChange: (time: string) => void;
+	monthlyDeadlineDayId: string;
+	monthlyDeadlineTimeId: string;
 };
 
 const WEEKDAY_OPTIONS: { value: number; label: string }[] = [
@@ -33,6 +39,16 @@ const WEEKDAY_OPTIONS: { value: number; label: string }[] = [
 	{ value: 6, label: 'Saturday' },
 	{ value: 7, label: 'Sunday' },
 ];
+
+// 1st … 10th working day of the following month, for the monthly deadline.
+const WORKING_DAY_OPTIONS: { value: number; label: string }[] = Array.from(
+	{ length: 10 },
+	(_, i) => {
+		const n = i + 1;
+		const suffix = n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
+		return { value: n, label: `${n}${suffix} working day` };
+	},
+);
 
 /** Parse a number input into a per-day hours value, or null when the field is
  *  cleared / invalid (so a per-user override reverts to the team default). */
@@ -81,6 +97,12 @@ export const ScopeSection: React.FC<Props> = ({
 	onWeeklyDeadlineTimeChange,
 	weeklyDeadlineWeekdayId,
 	weeklyDeadlineTimeId,
+	monthlyDeadlineDay,
+	monthlyDeadlineTime,
+	onMonthlyDeadlineDayChange,
+	onMonthlyDeadlineTimeChange,
+	monthlyDeadlineDayId,
+	monthlyDeadlineTimeId,
 }) => {
 	const members = splitAllowedUsers(allowedUsers);
 	return (
@@ -207,6 +229,37 @@ export const ScopeSection: React.FC<Props> = ({
 				<small>
 					When each week's timesheets are due. Members are marked on-time, late,
 					or incomplete against this cutoff in Reports.
+				</small>
+			</div>
+			<div className={styles.formGroup}>
+				<span className={styles.fieldLabel}>Monthly deadline</span>
+				<div className={styles.deadlineRow}>
+					<select
+						id={monthlyDeadlineDayId}
+						value={monthlyDeadlineDay}
+						aria-label="Monthly deadline working day"
+						onChange={(e) =>
+							onMonthlyDeadlineDayChange(Number.parseInt(e.target.value, 10))
+						}
+					>
+						{WORKING_DAY_OPTIONS.map((option) => (
+							<option key={option.value} value={option.value}>
+								{option.label}
+							</option>
+						))}
+					</select>
+					<input
+						id={monthlyDeadlineTimeId}
+						type="time"
+						value={monthlyDeadlineTime}
+						aria-label="Monthly deadline time"
+						onChange={(e) => onMonthlyDeadlineTimeChange(e.target.value)}
+					/>
+				</div>
+				<small>
+					When each month's timesheets are due — counted as working days into
+					the following month (weekends skipped). Drives the on-time badges in
+					the monthly Reports view.
 				</small>
 			</div>
 		</fieldset>

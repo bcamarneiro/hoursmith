@@ -36,6 +36,45 @@ export function computeWeeklyDeadline(
 }
 
 /**
+ * Resolve the monthly timesheet deadline (ADA-549): the Nth *working day*
+ * (Mon–Fri) of the month AFTER the reported month. Timesheets for month M are
+ * due early in M+1 — e.g. the 3rd working day of the following month.
+ *
+ * Skips weekends only; public holidays aren't subtracted (they vary per person
+ * and per region — the weekly RAG history is the finer-grained signal).
+ *
+ * @param year             calendar year of the reported month.
+ * @param monthZeroIndexed 0=Jan … 11=Dec of the reported month.
+ * @param nthWorkingDay    1-based working-day ordinal in the following month.
+ * @param time             `HH:MM` (24h, local).
+ * @returns a `Date` at the local deadline moment.
+ */
+export function computeMonthlyDeadline(
+	year: number,
+	monthZeroIndexed: number,
+	nthWorkingDay: number,
+	time: string,
+): Date {
+	// First day of the following month (the Date constructor rolls Dec→Jan over).
+	const cursor = new Date(year, monthZeroIndexed + 1, 1, 0, 0, 0, 0);
+	let remaining = Math.max(1, Math.trunc(nthWorkingDay));
+	// Walk forward day by day, counting weekdays until we land on the Nth.
+	while (true) {
+		const dayOfWeek = cursor.getDay(); // 0=Sun … 6=Sat
+		if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+			remaining -= 1;
+			if (remaining === 0) break;
+		}
+		cursor.setDate(cursor.getDate() + 1);
+	}
+	const match = time.match(/^(\d{1,2}):(\d{2})$/);
+	const hours = match ? Number(match[1]) : 18;
+	const minutes = match ? Number(match[2]) : 0;
+	cursor.setHours(hours, minutes, 0, 0);
+	return cursor;
+}
+
+/**
  * Derive the on-time status from completeness figures. Pure — the caller
  * supplies whether the deadline has passed so this stays free of `Date.now()`.
  */

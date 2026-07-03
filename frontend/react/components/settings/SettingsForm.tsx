@@ -172,6 +172,8 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const expectedDailyHoursId = useId();
 	const weeklyDeadlineWeekdayId = useId();
 	const weeklyDeadlineTimeId = useId();
+	const monthlyDeadlineDayId = useId();
+	const monthlyDeadlineTimeId = useId();
 	const gitlabTokenId = useId();
 	const gitlabHostId = useId();
 	const rescueTimeKeyId = useId();
@@ -350,6 +352,15 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 
 	const handleWeeklyDeadlineTimeChange = (time: string) => {
 		updateFormField('weeklyDeadlineTime', time as never);
+	};
+
+	const handleMonthlyDeadlineDayChange = (day: number) => {
+		if (!Number.isFinite(day)) return;
+		updateFormField('monthlyDeadlineDay', day as never);
+	};
+
+	const handleMonthlyDeadlineTimeChange = (time: string) => {
+		updateFormField('monthlyDeadlineTime', time as never);
 	};
 
 	const handleSave = () => {
@@ -546,6 +557,12 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							onWeeklyDeadlineTimeChange={handleWeeklyDeadlineTimeChange}
 							weeklyDeadlineWeekdayId={weeklyDeadlineWeekdayId}
 							weeklyDeadlineTimeId={weeklyDeadlineTimeId}
+							monthlyDeadlineDay={formData.monthlyDeadlineDay ?? 3}
+							monthlyDeadlineTime={formData.monthlyDeadlineTime ?? '18:00'}
+							onMonthlyDeadlineDayChange={handleMonthlyDeadlineDayChange}
+							onMonthlyDeadlineTimeChange={handleMonthlyDeadlineTimeChange}
+							monthlyDeadlineDayId={monthlyDeadlineDayId}
+							monthlyDeadlineTimeId={monthlyDeadlineTimeId}
 						/>
 					</div>
 

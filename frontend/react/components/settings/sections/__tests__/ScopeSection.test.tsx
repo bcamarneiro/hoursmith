@@ -27,6 +27,12 @@ function renderScope(
 		onWeeklyDeadlineTimeChange: vi.fn(),
 		weeklyDeadlineWeekdayId: 'dwd',
 		weeklyDeadlineTimeId: 'dwt',
+		monthlyDeadlineDay: 3,
+		monthlyDeadlineTime: '18:00',
+		onMonthlyDeadlineDayChange: vi.fn(),
+		onMonthlyDeadlineTimeChange: vi.fn(),
+		monthlyDeadlineDayId: 'mdd',
+		monthlyDeadlineTimeId: 'mdt',
 		...overrides,
 	};
 	render(<ScopeSection {...props} />);
@@ -114,5 +120,26 @@ describe('ScopeSection', () => {
 		expect(time).toHaveValue('18:00');
 		fireEvent.change(time, { target: { value: '17:30' } });
 		expect(onWeeklyDeadlineTimeChange).toHaveBeenCalledWith('17:30');
+	});
+
+	it('binds the monthly-deadline working-day + time controls (ADA-549)', () => {
+		const onMonthlyDeadlineDayChange = vi.fn();
+		const onMonthlyDeadlineTimeChange = vi.fn();
+		renderScope({
+			monthlyDeadlineDay: 3,
+			monthlyDeadlineTime: '18:00',
+			onMonthlyDeadlineDayChange,
+			onMonthlyDeadlineTimeChange,
+		});
+
+		const day = screen.getByLabelText(/Monthly deadline working day/);
+		expect(day).toHaveValue('3');
+		fireEvent.change(day, { target: { value: '5' } });
+		expect(onMonthlyDeadlineDayChange).toHaveBeenCalledWith(5);
+
+		const time = screen.getByLabelText(/Monthly deadline time/);
+		expect(time).toHaveValue('18:00');
+		fireEvent.change(time, { target: { value: '12:00' } });
+		expect(onMonthlyDeadlineTimeChange).toHaveBeenCalledWith('12:00');
 	});
 });
