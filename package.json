@@ -79,5 +79,11 @@
 		"workerDirectory": [
 			"frontend/public"
 		]
+	},
+	"volta": {
+		"node": "22.22.0"
+	},
+	"engines": {
+		"node": ">=20.19"
 	}
 }
