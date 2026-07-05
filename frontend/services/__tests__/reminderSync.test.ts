@@ -1,18 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-	buildReminderStatePayload,
+	buildMemberStates,
 	postReminderState,
-	type ReminderLocalSettings,
 	type ReminderMemberInput,
 } from '../reminderSync.js';
-
-const settings: ReminderLocalSettings = {
-	enabled: true,
-	memberNudge: true,
-	leadDigest: true,
-	leadEmail: 'lead@team.co',
-	teamName: 'Team',
-};
 
 const members: ReminderMemberInput[] = [
 	{ email: 'a@b.co', displayName: 'A', complete: false, onLeave: false },
@@ -20,12 +11,11 @@ const members: ReminderMemberInput[] = [
 	{ email: '', displayName: 'ghost', complete: false, onLeave: false },
 ];
 
-describe('buildReminderStatePayload', () => {
+describe('buildMemberStates', () => {
 	it('maps members to the minimal per-period shape (no hours, no issue keys)', () => {
-		const payload = buildReminderStatePayload(settings, members, '2026-03-02');
-		expect(payload.settings).toBe(settings);
-		expect(payload.states).toHaveLength(2); // empty-email member dropped
-		expect(payload.states[0]).toEqual({
+		const states = buildMemberStates(members, '2026-03-02');
+		expect(states).toHaveLength(2); // empty-email member dropped
+		expect(states[0]).toEqual({
 			memberEmail: 'a@b.co',
 			displayName: 'A',
 			periodKey: '2026-03-02',
@@ -33,7 +23,7 @@ describe('buildReminderStatePayload', () => {
 			onLeave: false,
 		});
 		// only the whitelisted keys ever leave the client
-		expect(Object.keys(payload.states[0]).sort()).toEqual([
+		expect(Object.keys(states[0]).sort()).toEqual([
 			'complete',
 			'displayName',
 			'memberEmail',
@@ -50,7 +40,10 @@ describe('postReminderState', () => {
 		);
 		const result = await postReminderState(
 			'tok',
-			buildReminderStatePayload(settings, members, 'p'),
+			{
+				settings: { enabled: true, memberNudge: true, leadDigest: true },
+				states: buildMemberStates(members, 'p'),
+			},
 			fetchImpl as unknown as typeof fetch,
 		);
 		expect(result.ok).toBe(true);
@@ -72,7 +65,7 @@ describe('postReminderState', () => {
 		);
 		const result = await postReminderState(
 			'tok',
-			buildReminderStatePayload(settings, [], 'p'),
+			{ settings: { enabled: false, memberNudge: true, leadDigest: true } },
 			fetchImpl as unknown as typeof fetch,
 		);
 		expect(result).toMatchObject({
@@ -88,7 +81,7 @@ describe('postReminderState', () => {
 		});
 		const result = await postReminderState(
 			'tok',
-			buildReminderStatePayload(settings, [], 'p'),
+			{ settings: { enabled: false, memberNudge: true, leadDigest: true } },
 			fetchImpl as unknown as typeof fetch,
 		);
 		expect(result).toMatchObject({ ok: false, status: 0, error: 'offline' });

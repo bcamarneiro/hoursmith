@@ -117,6 +117,9 @@ export function initAnalytics(): void {
 			before_send: sanitizeExceptionEvent,
 		});
 		instance = posthog;
+		// Re-notify flag subscribers whenever PostHog (re)loads flags, including
+		// listeners registered before this async chunk resolved.
+		posthog.onFeatureFlags(() => notifyFlagListeners());
 		for (const [event, properties] of pending)
 			posthog.capture(event, properties);
 		pending = [];
@@ -195,4 +198,46 @@ export function captureException(
 	// Routed through the same `before_send` sanitizer as autocaptured exceptions,
 	// so the message + stack are redacted before transmission.
 	instance.captureException(error, properties);
+}
+
+// --- Feature flags (runtime exposure switches, ADA-552) -------------------
+//
+// Flags decide *exposure* — "show this to this user now" — not capability or
+// authorization. Capability (which code ships in the bundle) is a compile-time
+// `__BUILD_TIER__` concern; authorization (entitlement) is server-enforced.
+// A flag is client-evaluated and user-visible, so NEVER gate security on one.
+//
+// Fail-safe by design: when analytics is disabled (no key / opt-out / DNT) or
+// the SDK chunk hasn't resolved yet, `isFeatureEnabled` returns the caller's
+// fallback — so a flag-gated feature stays in its default (usually off) state.
+
+let flagListeners: Array<() => void> = [];
+
+function notifyFlagListeners(): void {
+	for (const listener of flagListeners) listener();
+}
+
+/**
+ * Read a PostHog feature flag as a boolean. Returns `fallback` when analytics
+ * is unavailable or flags haven't loaded. Multivariate string values collapse
+ * to `true` (flag present/enabled); use PostHog's own API directly if you need
+ * the variant.
+ */
+export function isFeatureEnabled(flag: string, fallback = false): boolean {
+	if (!instance) return fallback;
+	const value = instance.isFeatureEnabled(flag);
+	return typeof value === 'boolean' ? value : fallback;
+}
+
+/**
+ * Subscribe to flag (re)loads; the callback fires when PostHog first loads
+ * flags and on any later refresh. Returns an unsubscribe function. Safe to call
+ * before the SDK is ready — the listener is retained and notified once flags
+ * arrive.
+ */
+export function onFeatureFlags(callback: () => void): () => void {
+	flagListeners.push(callback);
+	return () => {
+		flagListeners = flagListeners.filter((listener) => listener !== callback);
+	};
 }

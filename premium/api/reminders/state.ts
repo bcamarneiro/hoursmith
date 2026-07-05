@@ -17,6 +17,7 @@
 import { getEntitlement } from '../_lib/entitlement.js';
 import {
 	defaultRemindersStore,
+	type ReminderSettingsRow,
 	type ReminderStateInput,
 	type RemindersStore,
 } from '../_lib/reminders/store.js';
@@ -40,7 +41,7 @@ export async function handleReminderState(
 	request: Request,
 	deps: ReminderStateDeps = {},
 ): Promise<Response> {
-	if (request.method !== 'POST') {
+	if (request.method !== 'POST' && request.method !== 'GET') {
 		return json(405, { error: 'method_not_allowed' });
 	}
 
@@ -51,21 +52,6 @@ export async function handleReminderState(
 		return json(entitlement.status, { error: entitlement.code });
 	}
 	const userId = entitlement.userId;
-
-	let body: unknown;
-	try {
-		body = await request.json();
-	} catch {
-		log({ userId, status: 400, note: 'bad_json' });
-		return json(400, { error: 'bad_json' });
-	}
-
-	const settings = parseSettings(body);
-	const states = parseStates(body);
-	if (!settings) {
-		log({ userId, status: 400, note: 'bad_settings' });
-		return json(400, { error: 'bad_settings' });
-	}
 
 	let store: RemindersStore;
 	try {
@@ -79,9 +65,44 @@ export async function handleReminderState(
 		return json(500, { error: 'server_misconfigured' });
 	}
 
+	// GET hydrates the Settings UI with the lead's saved reminder config.
+	if (request.method === 'GET') {
+		try {
+			const row = await store.getSettings(userId);
+			log({ userId, status: 200, note: 'hydrate' });
+			return json(200, { settings: settingsView(row) });
+		} catch (err) {
+			log({
+				userId,
+				status: 500,
+				note: `read_failed:${(err as Error).message}`,
+			});
+			return json(500, { error: 'reminder_read_failed' });
+		}
+	}
+
+	let body: unknown;
 	try {
-		await store.upsertSettings(userId, settings);
-		await store.upsertStates(userId, states);
+		body = await request.json();
+	} catch {
+		log({ userId, status: 400, note: 'bad_json' });
+		return json(400, { error: 'bad_json' });
+	}
+
+	// Two independent callers hit this: the Settings panel syncs `settings`;
+	// the Reports view syncs `states`. Each sends only its half, so a partial
+	// body must NOT wipe the other half — upsert only what's present. A body
+	// with neither is a client bug.
+	const settings = parseSettings(body);
+	const states = parseStates(body);
+	if (!settings && states.length === 0) {
+		log({ userId, status: 400, note: 'empty_payload' });
+		return json(400, { error: 'empty_payload' });
+	}
+
+	try {
+		if (settings) await store.upsertSettings(userId, settings);
+		if (states.length > 0) await store.upsertStates(userId, states);
 	} catch (err) {
 		log({
 			userId,
@@ -93,6 +114,23 @@ export async function handleReminderState(
 
 	log({ userId, status: 200, note: `states:${states.length}` });
 	return json(200, { ok: true, states: states.length });
+}
+
+/** Shape the stored row (or defaults, when unset) for the hydrate response. */
+function settingsView(row: ReminderSettingsRow | null): {
+	enabled: boolean;
+	memberNudge: boolean;
+	leadDigest: boolean;
+	leadEmail: string;
+	teamName: string;
+} {
+	return {
+		enabled: row?.enabled ?? false,
+		memberNudge: row?.member_nudge ?? true,
+		leadDigest: row?.lead_digest ?? true,
+		leadEmail: row?.lead_email ?? '',
+		teamName: row?.team_name ?? '',
+	};
 }
 
 // --- parsing (defensive: the body is untrusted) ---

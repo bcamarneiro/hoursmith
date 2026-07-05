@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { isPremiumBuild } from '../../../buildTier';
 import type {
 	AbsenceAssignment,
 	CalendarFeed,
@@ -14,6 +15,7 @@ import {
 	SETTINGS_RAIL_ITEMS,
 	SETTINGS_SECTION_IDS,
 } from '../../constants/settingsSections';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { downloadAsFile } from '../../utils/downloadFile';
 import { splitCsvEmailList, uniqueEmailEntries } from '../../utils/emailList';
 import {
@@ -32,6 +34,7 @@ import { ConnectionSection } from './sections/ConnectionSection';
 import { IntegrationsSection } from './sections/IntegrationsSection';
 import { PermissionsSection } from './sections/PermissionsSection';
 import { PreferencesSection } from './sections/PreferencesSection';
+import { RemindersSection } from './sections/RemindersSection';
 import { ScopeSection } from './sections/ScopeSection';
 
 type FeedEntry = {
@@ -162,6 +165,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	);
 	const activeSection = controlledActiveSection ?? internalActiveSection;
 	const selectSection = onSelectSection ?? setInternalActiveSection;
+	const remindersUiFlag = useFeatureFlag('reminders-ui');
 
 	const jiraHostId = useId();
 	const emailId = useId();
@@ -458,9 +462,23 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		}
 	};
 
-	const configRailItems = SETTINGS_RAIL_ITEMS.filter(
-		(item) => item.group === 'config',
-	);
+	// Reminders (ADA-552): Hosted-tier capability, revealed behind the
+	// `reminders-ui` flag (default off) so the panel can ship dark and be
+	// switched on once the email provider + DNS are live.
+	const showReminders = isPremiumBuild() && remindersUiFlag;
+
+	const configRailItems = [
+		...SETTINGS_RAIL_ITEMS.filter((item) => item.group === 'config'),
+		...(showReminders
+			? [
+					{
+						id: SETTINGS_SECTION_IDS.reminders,
+						label: 'Reminders',
+						group: 'config' as const,
+					},
+				]
+			: []),
+	];
 	const savedRailItems = SETTINGS_RAIL_ITEMS.filter(
 		(item) => item.group === 'saved',
 	);
@@ -639,6 +657,12 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							analyticsOptOutId={analyticsOptOutId}
 						/>
 					</div>
+
+					{showReminders && (
+						<div hidden={activeSection !== SETTINGS_SECTION_IDS.reminders}>
+							<RemindersSection />
+						</div>
+					)}
 
 					<div hidden={activeSection !== dataSectionId}>
 						<section className={styles.section}>
