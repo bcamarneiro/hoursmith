@@ -239,9 +239,9 @@ describe('handleReminderState', () => {
 			message: '',
 		}) as const;
 
-	it('rejects a non-POST', async () => {
+	it('rejects a method that is neither POST nor GET', async () => {
 		const res = await handleReminderState(
-			new Request('https://x', { method: 'GET' }),
+			new Request('https://x', { method: 'DELETE' }),
 		);
 		expect(res.status).toBe(405);
 	});
@@ -285,11 +285,77 @@ describe('handleReminderState', () => {
 		expect(store.stateWrites[0].states[0].memberEmail).toBe('a@b.co');
 	});
 
-	it('400s on a body with no settings', async () => {
+	it('400s on an empty payload (neither settings nor states)', async () => {
 		const res = await handleReminderState(stateReq({ states: [] }), {
 			getEntitlementFn: entOk,
 			store: new FakeStore(),
 		});
 		expect(res.status).toBe(400);
+	});
+
+	it('settings-only POST upserts settings and leaves states untouched', async () => {
+		const store = new FakeStore();
+		const res = await handleReminderState(
+			stateReq({ settings: { enabled: true } }),
+			{ getEntitlementFn: entOk, store },
+		);
+		expect(res.status).toBe(200);
+		expect(store.settingsWrites).toHaveLength(1);
+		expect(store.stateWrites).toHaveLength(0); // never wipes the other half
+	});
+
+	it('states-only POST upserts states and leaves settings untouched', async () => {
+		const store = new FakeStore();
+		const res = await handleReminderState(
+			stateReq({
+				states: [
+					{
+						memberEmail: 'a@b.co',
+						displayName: 'A',
+						periodKey: '2026-03-02',
+						complete: false,
+						onLeave: false,
+					},
+				],
+			}),
+			{ getEntitlementFn: entOk, store },
+		);
+		expect(res.status).toBe(200);
+		expect(store.settingsWrites).toHaveLength(0);
+		expect(store.stateWrites[0].states).toHaveLength(1);
+	});
+
+	it('GET hydrates the caller saved settings', async () => {
+		const store = new FakeStore([], {
+			'owner-1': settingsRow('owner-1', { member_nudge: false }),
+		});
+		const res = await handleReminderState(
+			new Request('https://x/api/reminders/state', {
+				method: 'GET',
+				headers: { authorization: 'Bearer t' },
+			}),
+			{ getEntitlementFn: entOk, store },
+		);
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({
+			settings: {
+				enabled: true,
+				memberNudge: false,
+				leadDigest: true,
+				leadEmail: 'lead@team.co',
+				teamName: 'Team',
+			},
+		});
+	});
+
+	it('GET returns safe defaults when nothing is saved yet', async () => {
+		const res = await handleReminderState(
+			new Request('https://x/api/reminders/state', {
+				method: 'GET',
+				headers: { authorization: 'Bearer t' },
+			}),
+			{ getEntitlementFn: entOk, store: new FakeStore() },
+		);
+		expect(await res.json()).toMatchObject({ settings: { enabled: false } });
 	});
 });

@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import type { WorklogFetchProgress } from '../../../../types/worklogLoading';
+import { isPremiumBuild } from '../../../buildTier';
 import { describeServiceError } from '../../../services/serviceErrors';
 import type { TeamMemberSummary } from '../../../services/teamService';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useReminderStateSync } from '../../hooks/useReminderStateSync';
 import type {
 	ReportsSortDirection,
 	ReportsSortField,
@@ -316,6 +319,16 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 	notConfigured,
 }) => {
 	const weekdays = getWeekdays(weekStart);
+
+	// Keep the server's reminder state fresh from what the lead sees here, so the
+	// cron can chase behind members (ADA-552). Dark until the `reminders-ui` flag
+	// is on and the lead has opted in; a no-op in the Free build.
+	const remindersUiFlag = useFeatureFlag('reminders-ui');
+	useReminderStateSync(
+		teamMembers,
+		weekStart,
+		isPremiumBuild() && remindersUiFlag && !weekLoading,
+	);
 
 	if (notConfigured) {
 		return (

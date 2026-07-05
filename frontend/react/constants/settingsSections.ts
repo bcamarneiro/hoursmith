@@ -6,6 +6,7 @@ export const SETTINGS_SECTION_IDS = {
 	integrations: 'settings-integrations',
 	calendarMappings: 'settings-calendar-mappings',
 	preferences: 'settings-preferences',
+	reminders: 'settings-reminders',
 } as const;
 
 export type SettingsSectionId =
