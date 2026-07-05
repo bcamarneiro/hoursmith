@@ -3,6 +3,12 @@
 	"buildCommand": "npm run build:vercel",
 	"outputDirectory": "dist",
 	"regions": ["fra1"],
+	"crons": [
+		{
+			"path": "/api/cron/reminders",
+			"schedule": "0 15 * * 1-5"
+		}
+	],
 	"rewrites": [
 		{
 			"source": "/api/proxy/:path*",
