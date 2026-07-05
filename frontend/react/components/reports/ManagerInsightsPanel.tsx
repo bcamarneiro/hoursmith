@@ -62,9 +62,9 @@ export const ManagerInsightsPanel: React.FC<Props> = ({
 					<p className={styles.kicker}>Manager mode</p>
 					<h2 id="manager-insights-title">Multi-week team signals</h2>
 					<p className={styles.description}>
-						This panel stays team-wide for the configured reporting scope so
-						recurring compliance patterns stay visible even when the table below
-						is filtered.
+						This panel stays team-wide so recurring gap patterns — often a
+						shared process or workload issue, not an individual failing — stay
+						visible even when the table below is filtered.
 					</p>
 				</div>
 				<label className={styles.rangeField}>
@@ -148,33 +148,44 @@ export const ManagerInsightsPanel: React.FC<Props> = ({
 
 					<section className={styles.attentionSection}>
 						<div className={styles.sectionHeader}>
-							<strong>Recurring attention list</strong>
+							<strong>Who might need a hand</strong>
 							<span>
-								People showing gaps across this {trendWeeks}-week window
+								Recurring gaps over the last {trendWeeks} weeks — usually a
+								process or workload signal worth a conversation, not a ranking.
 							</span>
 						</div>
 						{model.recurringGapMembers.length > 0 ? (
-							<ul className={styles.attentionList}>
-								{model.recurringGapMembers.slice(0, 5).map((member) => (
-									<li key={member.email} className={styles.attentionItem}>
-										<div>
-											<strong>{member.displayName}</strong>
-											<span>{member.gapWeeks} weeks with gap</span>
-										</div>
-										<div className={styles.attentionMetrics}>
-											<span>
-												Current: {formatHours(member.currentGapSeconds)}
-											</span>
-											<span>
-												Avg gap: {formatHours(member.averageGapSeconds)}
-											</span>
-											<span>
-												Logged now: {formatHours(member.currentLoggedSeconds)}
-											</span>
-										</div>
-									</li>
-								))}
-							</ul>
+							// Per-person names are an explicit opt-in (ADA-479): the default
+							// manager view is aggregate so it reads as "spot a shared
+							// pattern", not "open a dossier". Reveal individuals only when
+							// the lead deliberately expands, framed as offering help.
+							<details className={styles.perPersonDisclosure}>
+								<summary>
+									Show who's had recurring gaps (
+									{model.recurringGapMembers.length})
+								</summary>
+								<ul className={styles.attentionList}>
+									{model.recurringGapMembers.slice(0, 5).map((member) => (
+										<li key={member.email} className={styles.attentionItem}>
+											<div>
+												<strong>{member.displayName}</strong>
+												<span>{member.gapWeeks} weeks with gap</span>
+											</div>
+											<div className={styles.attentionMetrics}>
+												<span>
+													Current: {formatHours(member.currentGapSeconds)}
+												</span>
+												<span>
+													Avg gap: {formatHours(member.averageGapSeconds)}
+												</span>
+												<span>
+													Logged now: {formatHours(member.currentLoggedSeconds)}
+												</span>
+											</div>
+										</li>
+									))}
+								</ul>
+							</details>
 						) : (
 							<p className={styles.emptyState}>
 								No recurring gap pattern detected across this trend window.
@@ -183,6 +194,14 @@ export const ManagerInsightsPanel: React.FC<Props> = ({
 					</section>
 				</div>
 			) : null}
+
+			{/* Completeness ≠ productivity (ADA-479): state plainly, in-product,
+			    that this is a timeliness/hygiene signal so it isn't repurposed as
+			    a performance metric. */}
+			<p className={styles.disclaimer}>
+				Completeness measures whether hours are logged on time — a timeliness
+				and hygiene signal. It is not a measure of productivity or performance.
+			</p>
 		</section>
 	);
 };

@@ -86,7 +86,8 @@ export const HomePage: React.FC = () => {
 				<div className={styles.heroContent}>
 					<div className={styles.eyebrow}>For team leads who live in Jira</div>
 					<h1 className={styles.title}>
-						Chase your team's missing Jira worklogs before invoice day.
+						Close your team's timesheets before invoice day — without chasing
+						anyone.
 					</h1>
 					<p className={styles.description}>
 						A team-lead's dashboard that pulls everyone's logged hours into one
@@ -179,9 +180,9 @@ export const HomePage: React.FC = () => {
 				<div className={styles.whyLabel}>Why this exists</div>
 				<p className={styles.whyText}>
 					I'm Bruno. I lead a small team at a consultancy in Porto. Every Friday
-					at 4pm I open Hoursmith, scan the week, and message whoever forgot to
-					log Thursday. On the 1st I export a CSV for my client's finance team.
-					Hoursmith is what I built to stop dreading invoice day.
+					at 4pm I open Hoursmith, scan the week, and give a nudge to anyone who
+					hasn't logged Thursday yet. On the 1st I export a CSV for my client's
+					finance team. Hoursmith is what I built to stop dreading invoice day.
 				</p>
 				<p className={styles.whySignature}>
 					— Bruno Camarneiro, Future Sketches
