@@ -118,8 +118,12 @@ export function initAnalytics(): void {
 		});
 		instance = posthog;
 		// Re-notify flag subscribers whenever PostHog (re)loads flags, including
-		// listeners registered before this async chunk resolved.
-		posthog.onFeatureFlags(() => notifyFlagListeners());
+		// listeners registered before this async chunk resolved. Guarded so an
+		// older SDK build (or a partial test mock) without the API can't throw
+		// inside this promise chain.
+		if (typeof posthog.onFeatureFlags === 'function') {
+			posthog.onFeatureFlags(() => notifyFlagListeners());
+		}
 		for (const [event, properties] of pending)
 			posthog.capture(event, properties);
 		pending = [];
@@ -224,7 +228,9 @@ function notifyFlagListeners(): void {
  * the variant.
  */
 export function isFeatureEnabled(flag: string, fallback = false): boolean {
-	if (!instance) return fallback;
+	if (!instance || typeof instance.isFeatureEnabled !== 'function') {
+		return fallback;
+	}
 	const value = instance.isFeatureEnabled(flag);
 	return typeof value === 'boolean' ? value : fallback;
 }
