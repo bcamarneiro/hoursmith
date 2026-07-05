@@ -37,6 +37,7 @@ create table public.reminder_completeness_state (
     id uuid primary key default gen_random_uuid(),
     owner_user_id uuid not null references auth.users (id) on delete cascade,
     member_email text not null,
+    display_name text not null default '',
     period_key text not null,
     complete boolean not null default false,
     on_leave boolean not null default false,
