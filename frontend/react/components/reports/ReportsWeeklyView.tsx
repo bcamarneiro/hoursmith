@@ -10,6 +10,7 @@ import * as styles from '../../pages/ReportsPage.module.css';
 import { addDaysToIsoDate, parseIsoDateLocal } from '../../utils/date';
 import { formatHours } from '../../utils/format';
 import { describeOnTimeStatus } from '../../utils/onTimeStatus';
+import type { TeamCoverage } from '../../utils/teamCoverage';
 import type { ManagerTrendModel } from '../../utils/teamReports';
 import { TeamStatsCards } from '../team/TeamStatsCards';
 import { Button } from '../ui/Button';
@@ -194,6 +195,53 @@ function SummaryRow({
 	);
 }
 
+// Coverage / visibility banner (ADA-488). Surfaces expected-vs-observed so a
+// permission hole or a genuinely-absent 0h member never reads as "all clear".
+// Rides the amber warning tone (never the ember brand accent).
+function TeamCoverageBanner({ coverage }: { coverage: TeamCoverage }) {
+	if (!coverage.rosterConfigured) {
+		return (
+			<div
+				className={`${styles.coverageBanner} ${styles.coverageBannerWarning}`}
+			>
+				<strong>No team roster set</strong>
+				<span>
+					This board is built only from people who logged time, so anyone who
+					logged nothing this week won't appear here. Add your team in{' '}
+					<Link to="/settings">Settings</Link> to track 0h members too.
+				</span>
+			</div>
+		);
+	}
+	if (coverage.noWorklogCount > 0) {
+		const { rosterSize, loggedCount, noWorklogCount } = coverage;
+		return (
+			<div
+				className={`${styles.coverageBanner} ${styles.coverageBannerWarning}`}
+			>
+				<strong>
+					Roster {rosterSize} · logged {loggedCount} · no worklogs{' '}
+					{noWorklogCount}
+				</strong>
+				<span>
+					{noWorklogCount} roster{' '}
+					{noWorklogCount === 1 ? 'member has' : 'members have'} nothing logged
+					this week — shown in red below. A 0h row can mean they're behind or
+					that your token can't see their work, so nothing is silently dropped.
+				</span>
+			</div>
+		);
+	}
+	return (
+		<div className={`${styles.coverageBanner} ${styles.coverageBannerOk}`}>
+			<strong>Full roster coverage</strong>
+			<span>
+				All {coverage.rosterSize} roster members logged time this week.
+			</span>
+		</div>
+	);
+}
+
 function SortIndicator({
 	field,
 	activeField,
@@ -230,6 +278,8 @@ type Props = {
 	trendsError: unknown;
 	hasNoFilteredWeeklyResults: boolean;
 	weeklySummary: { totalSeconds: number; totalGapSeconds: number } | null;
+	/** Roster-vs-observed coverage for the visibility banner (ADA-488). */
+	coverage?: TeamCoverage;
 	/** Re-runs the weekly team fetch from the data-error surface (ADA-476). */
 	onRetry?: () => void;
 	onMemberClick: (name: string) => void;
@@ -260,6 +310,7 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 	trendsError,
 	hasNoFilteredWeeklyResults,
 	weeklySummary,
+	coverage,
 	onRetry,
 	onMemberClick,
 	notConfigured,
@@ -293,6 +344,9 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 							: 'No team gap remaining'}
 					</span>
 				</div>
+			)}
+			{coverage && !weekLoading && !teamError && teamMembers.length > 0 && (
+				<TeamCoverageBanner coverage={coverage} />
 			)}
 			{teamError &&
 				(() => {

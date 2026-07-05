@@ -38,6 +38,7 @@ import {
 	buildReportsSnapshotHtml,
 	buildReportsSnapshotMarkdown,
 } from '../utils/reportSnapshots';
+import { computeTeamCoverage } from '../utils/teamCoverage';
 import { buildTeamCsv } from '../utils/teamCsvExport';
 import { uid } from '../utils/uid';
 import { classifyWorklog } from '../utils/worklogClassifier';
@@ -644,6 +645,13 @@ export const ReportsPage: React.FC = () => {
 			config.monthlyDeadlineTime,
 		],
 	);
+	// Roster-vs-observed coverage for the weekly visibility banner (ADA-488).
+	// Uses the unfiltered team set so a search/attention filter never changes the
+	// coverage headline.
+	const teamCoverage = useMemo(
+		() => computeTeamCoverage(teamMembers, allowedUsers),
+		[teamMembers, allowedUsers],
+	);
 	const weeklySummary = useMemo(() => {
 		if (viewMode !== 'weekly' || sortedMembers.length === 0) return null;
 		return {
@@ -875,6 +883,7 @@ export const ReportsPage: React.FC = () => {
 					trendsError={trendsError}
 					hasNoFilteredWeeklyResults={hasNoFilteredWeeklyResults}
 					weeklySummary={weeklySummary}
+					coverage={teamCoverage}
 					onRetry={handleRetryWeekly}
 					onMemberClick={handleMemberClick}
 					notConfigured={!config.jiraHost || !config.apiToken}
