@@ -30,7 +30,7 @@ import { useTeamData } from '../hooks/useTeamData';
 import { useTimesheetDataFetcher } from '../hooks/useTimesheetDataFetcher';
 import { describeFreshness } from '../utils/dataFreshness';
 import { addDaysToIsoDate, monthLabel } from '../utils/date';
-import { downloadAsFile } from '../utils/downloadFile';
+import { downloadAsFile, downloadBinaryFile } from '../utils/downloadFile';
 import { deriveMonthlyReportState } from '../utils/monthlyReport';
 import { computeMonthlyDeadline } from '../utils/onTimeStatus';
 import { validateReportsConsistency } from '../utils/reportConsistency';
@@ -38,6 +38,10 @@ import {
 	buildReportsSnapshotHtml,
 	buildReportsSnapshotMarkdown,
 } from '../utils/reportSnapshots';
+import {
+	buildTeamCompletenessCsv,
+	buildTeamCompletenessWorkbook,
+} from '../utils/teamCompletenessExport';
 import { computeTeamCoverage } from '../utils/teamCoverage';
 import { buildTeamCsv } from '../utils/teamCsvExport';
 import { uid } from '../utils/uid';
@@ -375,6 +379,36 @@ export const ReportsPage: React.FC = () => {
 		const filename = `team-report-${weekStart}.csv`;
 		downloadAsFile(csv, filename, 'text/csv;charset=utf-8');
 		toast.success('Weekly report exported');
+	};
+
+	// Completeness summary export (ADA-390): hand the lead's manager / HR / PMO
+	// the expected-vs-logged / completeness-% / on-time picture. Reuses the
+	// current sort + people filter (sortedMembers) and the provenance-footer
+	// preference. CSV carries a UTF-8 BOM + the repo's ';' separator so it opens
+	// cleanly in Excel; the .xlsx path is a real (hand-built) OOXML workbook.
+	const handleExportCompletenessCsv = () => {
+		const csv = buildTeamCompletenessCsv(sortedMembers, {
+			provenance: { jiraHost: config.jiraHost },
+			includeProvenance: config.includeCsvProvenance,
+			period: `${weekStart}..${weekEnd}`,
+		});
+		// Prepend a UTF-8 BOM so Excel detects the encoding and the ';' separator.
+		downloadAsFile(
+			`﻿${csv}`,
+			`team-completeness-${weekStart}.csv`,
+			'text/csv;charset=utf-8',
+		);
+		toast.success('Completeness CSV exported');
+	};
+
+	const handleExportCompletenessXlsx = () => {
+		const bytes = buildTeamCompletenessWorkbook(sortedMembers);
+		downloadBinaryFile(
+			bytes,
+			`team-completeness-${weekStart}.xlsx`,
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		);
+		toast.success('Completeness Excel exported');
 	};
 
 	// Keyboard shortcuts for month/week navigation
@@ -831,6 +865,11 @@ export const ReportsPage: React.FC = () => {
 				onExportSnapshotMarkdown={handleExportSnapshotMarkdown}
 				onExportPrimary={
 					viewMode === 'weekly' ? handleExportTeamCsv : handleDownloadAll
+				}
+				onExportCompletenessCsv={handleExportCompletenessCsv}
+				onExportCompletenessXlsx={handleExportCompletenessXlsx}
+				canExportCompleteness={
+					viewMode === 'weekly' && sortedMembers.length > 0
 				}
 				onValidateConsistency={handleValidateConsistency}
 				validationState={validationState}
