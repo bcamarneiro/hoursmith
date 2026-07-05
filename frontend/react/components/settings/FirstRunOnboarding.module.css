@@ -1,0 +1,119 @@
+.onboarding {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-5);
+	padding: var(--space-6);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-xl);
+	background:
+		radial-gradient(
+			circle at top right,
+			color-mix(in srgb, var(--color-primary) 12%, transparent),
+			transparent 40%
+		), var(--color-surface);
+}
+
+.kicker {
+	margin: 0 0 var(--space-2);
+	font-size: var(--text-xs);
+	font-weight: var(--font-semibold);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--color-primary);
+}
+
+.intro h2 {
+	margin: 0 0 var(--space-2);
+	font-size: var(--text-2xl);
+	color: var(--color-text);
+}
+
+.lede {
+	margin: 0;
+	font-size: var(--text-sm);
+	line-height: var(--leading-relaxed);
+	color: var(--color-text-secondary);
+	max-width: 60ch;
+}
+
+.paths {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-4);
+}
+
+.pathCard {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding: var(--space-5);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-lg);
+	background: var(--color-surface-raised);
+}
+
+.pathTitle {
+	margin: 0;
+	font-size: var(--text-lg);
+	color: var(--color-text);
+}
+
+.pathBody {
+	margin: 0;
+	flex: 1;
+	font-size: var(--text-sm);
+	line-height: var(--leading-relaxed);
+	color: var(--color-text-secondary);
+}
+
+.pathBody code {
+	font-size: 0.9em;
+	padding: 0 var(--space-1);
+	border-radius: var(--radius-sm);
+	background: var(--color-surface);
+}
+
+.primaryCta {
+	align-self: flex-start;
+	padding: var(--space-2) var(--space-4);
+	border-radius: var(--radius-md);
+	background: var(--color-primary);
+	color: var(--color-on-primary, #fff);
+	font-weight: var(--font-medium);
+	text-decoration: none;
+}
+
+.secondaryCta {
+	align-self: flex-start;
+	padding: var(--space-2) var(--space-4);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: transparent;
+	color: var(--color-text);
+	font-weight: var(--font-medium);
+	cursor: pointer;
+}
+
+.hostedSoon {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+}
+
+.badge {
+	align-self: flex-start;
+	padding: 2px var(--space-2);
+	border-radius: var(--radius-sm);
+	font-size: var(--text-xs);
+	font-weight: var(--font-semibold);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	background: var(--color-info-bg, var(--color-surface));
+	color: var(--color-info, var(--color-text-secondary));
+}
+
+@media (max-width: 720px) {
+	.paths {
+		grid-template-columns: 1fr;
+	}
+}
