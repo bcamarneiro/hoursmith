@@ -46,6 +46,14 @@ import * as styles from './ReportsPage.module.css';
 type SortField = 'name' | 'total' | 'gap';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'monthly' | 'weekly';
+
+// The weekly team view lands on "who's behind first" (ADA-435): the lead's
+// recurring Job-2 task is chasing the gap, so the largest shortfall belongs on
+// top, not alphabetical order. Single source of truth for the initial sort and
+// for the filters-cleared reset. A shared `?sort=`/`?dir=` link still overrides
+// this (useReportsURLState applies URL sort params only when present).
+export const DEFAULT_SORT_FIELD: SortField = 'gap';
+export const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
 type ReportsValidationState = {
 	status: 'idle' | 'checking' | 'consistent' | 'inconsistent' | 'error';
 	message: string;
@@ -126,8 +134,10 @@ export const ReportsPage: React.FC = () => {
 	// deep-link isn't normalized back to weekly by the URL-write effect on the
 	// first render (ADA-448).
 	const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewModeFromURL);
-	const [sortField, setSortField] = useState<SortField>('name');
-	const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+	const [sortField, setSortField] = useState<SortField>(DEFAULT_SORT_FIELD);
+	const [sortDirection, setSortDirection] = useState<SortDirection>(
+		DEFAULT_SORT_DIRECTION,
+	);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [onlyAttentionNeeded, setOnlyAttentionNeeded] = useState(false);
 	const [managerMode, setManagerMode] = useState(false);
@@ -407,8 +417,10 @@ export const ReportsPage: React.FC = () => {
 		setOnlyAttentionNeeded(false);
 		setManagerMode(false);
 		setTrendWeeks(6);
-		setSortField('name');
-		setSortDirection('asc');
+		// Clearing filters returns to the "who's behind first" default (ADA-435),
+		// not alphabetical, so a reset still surfaces the gap.
+		setSortField(DEFAULT_SORT_FIELD);
+		setSortDirection(DEFAULT_SORT_DIRECTION);
 		setSelectedUser('');
 		toast.info('Reports filters cleared');
 	};
