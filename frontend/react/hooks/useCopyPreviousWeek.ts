@@ -58,7 +58,7 @@ export function deriveWeekWorklogs(
 		if (wl.author?.emailAddress?.toLowerCase() !== lowerEmail) continue;
 		// Skip backdated submissions entirely — they don't represent recurring
 		// work for that week and shouldn't seed next-week suggestions.
-		const c = classifyWorklog(wl);
+		const c = wl.classified ?? classifyWorklog(wl);
 		if (c.isBackdated) continue;
 		const day = c.loggedOn;
 		if (day && day >= weekStart && day <= weekEnd) {

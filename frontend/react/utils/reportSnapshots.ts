@@ -102,7 +102,7 @@ function summarizeMonthlyEntries(
 				if (!dateKey) continue;
 				if (!isDateInMonth(dateKey, year, monthZeroIndexed)) continue;
 				for (const worklog of worklogs) {
-					if (classifyWorklog(worklog).isBackdated) continue;
+					if (worklog.classified?.isBackdated ?? classifyWorklog(worklog).isBackdated) continue;
 					totalSeconds += worklog.timeSpentSeconds ?? 0;
 					entryCount += 1;
 					activeDaySet.add(dateKey);
@@ -138,7 +138,7 @@ function buildDailyBreakdown(
 		if (!dateKey) continue;
 		if (!isDateInMonth(dateKey, year, monthZeroIndexed)) continue;
 		for (const worklog of worklogs) {
-			if (classifyWorklog(worklog).isBackdated) continue;
+			if (worklog.classified?.isBackdated ?? classifyWorklog(worklog).isBackdated) continue;
 			const bucket = buckets.get(dateKey) ?? {
 				entries: 0,
 				totalSeconds: 0,

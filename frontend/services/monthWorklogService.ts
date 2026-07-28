@@ -192,9 +192,10 @@ export async function fetchMonthWorklogs(
 			// Embedded worklogs are COMPLETE — use them directly, filter by date in JS
 			for (const wl of embedded.worklogs) {
 				if (!matchesAuthor(wl)) continue;
-				const day = classifyWorklog(wl).loggedOn;
+				const classified = classifyWorklog(wl);
+				const day = classified.loggedOn;
 				if (day && day >= startStr && day <= endStr) {
-					allWorklogs.push({ ...wl, issue });
+					allWorklogs.push({ ...wl, issue, classified });
 				}
 			}
 		} else {
@@ -257,7 +258,7 @@ export async function fetchMonthWorklogs(
 					};
 					return (data.worklogs || [])
 						.filter(matchesAuthor)
-						.map((wl) => ({ ...wl, issue }));
+						.map((wl) => ({ ...wl, issue, classified: classifyWorklog(wl) }));
 				}),
 			);
 			for (const worklogs of results) {

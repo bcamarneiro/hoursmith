@@ -1,5 +1,4 @@
-import type React from 'react';
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { EnrichedJiraWorklog } from '../../../types/jira';
 import type { AbsenceDay } from '../../services/absenceService';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
@@ -30,7 +29,7 @@ type Props = {
 	defaultCollapsed?: boolean;
 };
 
-export const TimesheetGrid: React.FC<Props> = ({
+const TimesheetGridBase: React.FC<Props> = ({
 	user,
 	days,
 	issueSummaries,
@@ -63,7 +62,7 @@ export const TimesheetGrid: React.FC<Props> = ({
 		for (const [day, list] of Object.entries(projected.loggedDays)) {
 			let counted = 0;
 			for (const wl of list) {
-				if (classifyWorklog(wl).isBackdated) continue;
+				if (wl.classified?.isBackdated ?? classifyWorklog(wl).isBackdated) continue;
 				counted += wl.timeSpentSeconds ?? 0;
 			}
 			if (counted > 0) loggedByDay.set(day, counted);
@@ -146,3 +145,5 @@ export const TimesheetGrid: React.FC<Props> = ({
 		</div>
 	);
 };
+
+export const TimesheetGrid = React.memo(TimesheetGridBase);

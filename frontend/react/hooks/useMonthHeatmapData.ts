@@ -27,7 +27,7 @@ export function buildMonthHeatmapBuckets(
 
 	for (const wl of worklogs) {
 		if (wl.author?.emailAddress?.toLowerCase() !== lowerEmail) continue;
-		const c = classifyWorklog(wl);
+		const c = wl.classified ?? classifyWorklog(wl);
 		const day = c.loggedOn;
 		const seconds = wl.timeSpentSeconds ?? 0;
 		if (day) {

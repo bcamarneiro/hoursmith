@@ -25,7 +25,7 @@ export const WorklogList: React.FC<Props> = ({
 	const backdated: EnrichedJiraWorklog[] = [];
 
 	for (const wl of worklogs) {
-		if (classifyWorklog(wl).isBackdated) backdated.push(wl);
+		if (wl.classified?.isBackdated ?? classifyWorklog(wl).isBackdated) backdated.push(wl);
 		else regular.push(wl);
 	}
 

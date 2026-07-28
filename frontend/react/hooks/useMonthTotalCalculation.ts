@@ -16,7 +16,7 @@ export function useMonthTotalCalculation(
 				continue;
 			}
 			for (const wl of dayWorklogs) {
-				if (classifyWorklog(wl).isBackdated) continue;
+					if (wl.classified?.isBackdated ?? classifyWorklog(wl).isBackdated) continue;
 				userTotalSeconds += wl.timeSpentSeconds ?? 0;
 			}
 		}

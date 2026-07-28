@@ -42,13 +42,13 @@ function computeUserSummary(
 	let backdatedCount = 0;
 
 	for (const wl of worklogs) {
-		const c = classifyWorklog(wl);
-		const key = policy === 'logged' ? c.loggedOn : c.intendedFor;
+		const classified = wl.classified ?? classifyWorklog(wl);
+		const key = policy === 'logged' ? classified.loggedOn : classified.intendedFor;
 		if (!key.startsWith(expected)) continue;
 		const seconds = wl.timeSpentSeconds ?? 0;
 		totalSeconds += seconds;
 		worklogCount++;
-		if (c.isBackdated) {
+		if (classified.isBackdated) {
 			backdatedSeconds += seconds;
 			backdatedCount++;
 		}

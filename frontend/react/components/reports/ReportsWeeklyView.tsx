@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import type { WorklogFetchProgress } from '../../../../types/worklogLoading';
 import { describeServiceError } from '../../../services/serviceErrors';
@@ -65,15 +66,15 @@ function getComplianceMessage(members: TeamMemberSummary[]): string {
 		: 'Every team member hit their logging target this week.';
 }
 
-function TeamMemberRow({
-	member,
-	weekdays,
-	onMemberClick,
-}: {
+const TeamMemberRowBase: React.FC<{
 	member: TeamMemberSummary;
 	weekdays: string[];
 	onMemberClick: (name: string) => void;
-}) {
+}> = ({
+	member,
+	weekdays,
+	onMemberClick,
+}) => {
 	// Guard against a zero target (e.g. a full week of PTO) — a bare division
 	// would feed NaN/Infinity into ProgressBar (ADA-458). No target → 0%.
 	const pct =
@@ -123,6 +124,8 @@ function TeamMemberRow({
 		</tr>
 	);
 }
+
+const TeamMemberRow = React.memo(TeamMemberRowBase);
 
 function SummaryRow({
 	members,

@@ -51,7 +51,7 @@ export function validateReportsConsistency(
 		if (!email) continue;
 		if (allowedSet && !allowedSet.has(email)) continue;
 
-		const classified = classifyWorklog(worklog);
+		const classified = worklog.classified ?? classifyWorklog(worklog);
 		// Backdated worklogs never contribute to weekly/monthly totals anywhere
 		// in the app (buildTeamSummaries and the Monthly Reports view + CSV both
 		// drop them — see the ghost-reconciliation invariant). The consistency

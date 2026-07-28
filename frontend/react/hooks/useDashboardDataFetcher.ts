@@ -51,7 +51,7 @@ export function deriveWeekWorklogs(
 
 	for (const wl of worklogs) {
 		if (wl.author?.emailAddress?.toLowerCase() !== lowerEmail) continue;
-		const c = classifyWorklog(wl);
+		const c = wl.classified ?? classifyWorklog(wl);
 		const day = c.loggedOn;
 		if (day >= weekStart && day <= weekEnd) {
 			entries.push({
@@ -86,7 +86,7 @@ export function deriveWeekGhosts(
 
 	for (const wl of worklogs) {
 		if (wl.author?.emailAddress?.toLowerCase() !== lowerEmail) continue;
-		const c = classifyWorklog(wl);
+		const c = wl.classified ?? classifyWorklog(wl);
 		if (!c.isBackdated) continue;
 		if (!c.intendedFor || !c.loggedOn) continue;
 		if (c.intendedFor === c.loggedOn) continue; // not a ghost
