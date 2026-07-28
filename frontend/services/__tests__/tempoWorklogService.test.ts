@@ -20,6 +20,7 @@ function routeFetch(handlers: {
 	myself?: object;
 	tempo?: object;
 	jiraSearch?: object;
+	jiraUser?: object;
 }) {
 	vi.spyOn(bridge, 'getProxyOverrideState').mockReturnValue({
 		hostedProxyUrl: null,
@@ -38,6 +39,10 @@ function routeFetch(handlers: {
 				return new Response(JSON.stringify(handlers.tempo), { status: 200 });
 			if (url.includes('/search/jql'))
 				return new Response(JSON.stringify(handlers.jiraSearch), {
+					status: 200,
+				});
+			if (url.includes('/rest/api/3/user'))
+				return new Response(JSON.stringify(handlers.jiraUser ?? {}), {
 					status: 200,
 				});
 			throw new Error(`unexpected url ${url}`);
@@ -155,5 +160,103 @@ describe('fetchMonthWorklogsTempo', () => {
 		await expect(
 			fetchMonthWorklogsTempo(config, 2026, 5, undefined),
 		).rejects.toMatchObject({ kind: 'server-error' });
+	});
+
+	it('team-wide fetch uses GET /4/worklogs (no user scope) and resolves authors', async () => {
+		routeFetch({
+			tempo: {
+				results: [
+					{
+						tempoWorklogId: 100,
+						issue: { id: 2001 },
+						timeSpentSeconds: 7200,
+						startDate: '2026-06-10',
+						startTime: '09:00:00',
+						description: 'team work',
+						author: { accountId: 'acc-alice' },
+					},
+					{
+						tempoWorklogId: 101,
+						issue: { id: 2001 },
+						timeSpentSeconds: 3600,
+						startDate: '2026-06-10',
+						startTime: '14:00:00',
+						description: 'more team work',
+						author: { accountId: 'acc-bob' },
+					},
+				],
+				metadata: {},
+			},
+			jiraSearch: {
+				issues: [{ id: '2001', key: 'TEAM-1', fields: { summary: 'Team task' } }],
+				isLast: true,
+			},
+			jiraUser: { accountId: 'acc-alice', emailAddress: 'alice@x.com', displayName: 'Alice' },
+		});
+
+		// Override fetch to return different users for different accountIds
+		const fetchMock = vi.fn(async (url: string) => {
+			if (url.includes('/myself'))
+				return new Response(JSON.stringify({ accountId: 'acc-1' }), { status: 200 });
+			if (url.includes('api.tempo.io'))
+				return new Response(JSON.stringify({
+					results: [
+						{
+							tempoWorklogId: 100,
+							issue: { id: 2001 },
+							timeSpentSeconds: 7200,
+							startDate: '2026-06-10',
+							startTime: '09:00:00',
+							description: 'team work',
+							author: { accountId: 'acc-alice' },
+						},
+						{
+							tempoWorklogId: 101,
+							issue: { id: 2001 },
+							timeSpentSeconds: 3600,
+							startDate: '2026-06-10',
+							startTime: '14:00:00',
+							description: 'more team work',
+							author: { accountId: 'acc-bob' },
+						},
+					],
+					metadata: {},
+				}), { status: 200 });
+			if (url.includes('/search/jql'))
+				return new Response(JSON.stringify({
+					issues: [{ id: '2001', key: 'TEAM-1', fields: { summary: 'Team task' } }],
+					isLast: true,
+				}), { status: 200 });
+			if (url.includes('/rest/api/3/user') && url.includes('acc-alice'))
+				return new Response(JSON.stringify({
+					accountId: 'acc-alice',
+					emailAddress: 'alice@x.com',
+					displayName: 'Alice',
+				}), { status: 200 });
+			if (url.includes('/rest/api/3/user') && url.includes('acc-bob'))
+				return new Response(JSON.stringify({
+					accountId: 'acc-bob',
+					emailAddress: 'bob@x.com',
+					displayName: 'Bob',
+				}), { status: 200 });
+			throw new Error(`unexpected url ${url}`);
+		});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const out = await fetchMonthWorklogsTempo(config, 2026, 5, { currentUserOnly: false });
+		expect(out).toHaveLength(2);
+
+		// Verify the Tempo call used the team-wide endpoint (no /user/ in path)
+		const tempoCall = fetchMock.mock.calls.find(
+			(args: unknown[]) => (args[0] as string).includes('api.tempo.io'),
+		);
+		expect(tempoCall).toBeDefined();
+		expect((tempoCall![0] as string)).not.toContain('/user/');
+
+		// Verify authors are resolved per-worklog
+		expect(out[0].author?.emailAddress).toBe('alice@x.com');
+		expect(out[0].author?.displayName).toBe('Alice');
+		expect(out[1].author?.emailAddress).toBe('bob@x.com');
+		expect(out[1].author?.displayName).toBe('Bob');
 	});
 });

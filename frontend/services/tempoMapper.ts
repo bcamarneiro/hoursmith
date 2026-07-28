@@ -1,4 +1,6 @@
-import type { EnrichedJiraWorklog, JiraIssue } from '../../types/jira';
+import type { EnrichedJiraWorklog, JiraIssue, JiraUser } from '../../types/jira';
+import { buildJiraRequest } from './jiraSearch';
+import { fromHttpResponse, fromNetworkError } from './serviceErrors';
 import { searchAllIssues } from './jiraSearch';
 
 export interface TempoWorklog {
@@ -24,18 +26,37 @@ export function placeholderIssue(id: string, key?: string): JiraIssue {
 /**
  * Map a Tempo worklog onto the app's `EnrichedJiraWorklog`. The day basis is
  * Tempo's `startDate` (already the worker's wall clock); `started` is synthesized
- * only so `worklogMonth()`/`new Date()` consumers keep working. `author` is
- * synthesized with the current user's email so downstream email grouping works.
+ * only so `worklogMonth()`/`new Date()` consumers keep working.
+ *
+ * `authorMap` lets callers supply per-worklog author info (team reads) or fall
+ * back to a single user's email (current-user reads). When the map is provided,
+ * the author's `emailAddress` and `displayName` come from the resolved Jira user;
+ * when it's absent, `fallbackEmail` is used for backward compatibility.
  */
 export function mapTempoWorklog(
 	wl: TempoWorklog,
 	issueMap: Map<string, JiraIssue>,
-	email: string,
+	fallbackEmailOrAuthorMap: string | Map<string, JiraUser>,
 ): EnrichedJiraWorklog {
 	const issueId = String(wl.issue.id);
 	const issue =
 		issueMap.get(issueId) ?? placeholderIssue(issueId, wl.issue.key);
 	const started = `${wl.startDate}T${wl.startTime ?? '00:00:00'}`;
+
+	let author: JiraUser;
+	if (typeof fallbackEmailOrAuthorMap === 'string') {
+		author = { accountId: wl.author?.accountId, emailAddress: fallbackEmailOrAuthorMap };
+	} else {
+		const resolved = wl.author?.accountId
+			? fallbackEmailOrAuthorMap.get(wl.author.accountId)
+			: undefined;
+		author = {
+			accountId: wl.author?.accountId,
+			emailAddress: resolved?.emailAddress,
+			displayName: resolved?.displayName,
+		};
+	}
+
 	return {
 		id: String(wl.tempoWorklogId),
 		issueId,
@@ -43,9 +64,50 @@ export function mapTempoWorklog(
 		created: started,
 		timeSpentSeconds: wl.timeSpentSeconds,
 		comment: wl.description ?? '',
-		author: { accountId: wl.author?.accountId, emailAddress: email },
+		author,
 		issue,
 	};
+}
+
+interface AuthorLookupConfig {
+	jiraHost: string;
+	email: string;
+	apiToken: string;
+	corsProxy: string;
+}
+
+/**
+ * Resolve a set of Tempo `author.accountId` values to Jira user objects via
+ * `/rest/api/3/user?accountId=…`. Returns a map keyed by accountId. Missing /
+ * unauthorized lookups are silently omitted — the mapper falls back to
+ * `emailAddress: undefined` for those worklogs, which is fine for display.
+ */
+export async function resolveAuthorMap(
+	config: AuthorLookupConfig,
+	accountIds: string[],
+	signal?: AbortSignal,
+): Promise<Map<string, JiraUser>> {
+	const map = new Map<string, JiraUser>();
+	const unique = [...new Set(accountIds.filter(Boolean))];
+	if (unique.length === 0) return map;
+
+	await Promise.all(
+		unique.map(async (accountId) => {
+			const { url, headers } = buildJiraRequest(
+				config,
+				`/rest/api/3/user?accountId=${encodeURIComponent(accountId)}`,
+			);
+			try {
+				const res = await fetch(url, { headers, signal });
+				if (!res.ok) return; // skip unresolvable authors silently
+				const user = (await res.json()) as JiraUser;
+				map.set(accountId, user);
+			} catch {
+				// network error on a single user lookup — skip, don't fail the batch
+			}
+		}),
+	);
+	return map;
 }
 
 export function chunkIds(ids: string[], size: number): string[][] {

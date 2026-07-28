@@ -18,7 +18,9 @@ export function readMonth(
 	signal?: AbortSignal,
 ) {
 	return source === 'tempo'
-		? fetchMonthWorklogsTempo(config, year, month, signal)
+		? fetchMonthWorklogsTempo(config, year, month, {
+				currentUserOnly: options?.currentUserOnly,
+		  }, signal)
 		: fetchMonthWorklogs(config, year, month, options, signal);
 }
 
@@ -27,9 +29,12 @@ export function readWeek(
 	config: Config,
 	weekStart: string,
 	weekEnd: string,
+	options?: { currentUserOnly?: boolean },
 	signal?: AbortSignal,
 ) {
 	return source === 'tempo'
-		? fetchWeekWorklogsTempo(config, weekStart, weekEnd, signal)
+		? fetchWeekWorklogsTempo(config, weekStart, weekEnd, {
+				currentUserOnly: options?.currentUserOnly,
+		  }, signal)
 		: fetchWeekWorklogs(config, weekStart, weekEnd, signal);
 }

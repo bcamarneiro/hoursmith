@@ -1,4 +1,4 @@
-import type { EnrichedJiraWorklog } from '../../types/jira';
+import type { EnrichedJiraWorklog, JiraUser } from '../../types/jira';
 import { resolveAccountId } from './jiraIdentity';
 import { fromHttpResponse, fromNetworkError } from './serviceErrors';
 import { buildTempoRequest } from './tempoGateway';
@@ -6,6 +6,7 @@ import {
 	type TempoWorklog,
 	fetchIssueMetadata,
 	mapTempoWorklog,
+	resolveAuthorMap,
 } from './tempoMapper';
 import type { WorklogEntry } from './worklogService';
 
@@ -26,12 +27,13 @@ interface TempoPage {
 	metadata?: { next?: string };
 }
 
-/** Fetch every Tempo worklog for the user + range, following `metadata.next`. */
+/** Fetch every Tempo worklog for the range, following `metadata.next`. */
 async function fetchAllTempoWorklogs(
 	config: TempoServiceConfig,
 	accountId: string,
 	from: string,
 	to: string,
+	options: { currentUserOnly?: boolean } = {},
 	signal?: AbortSignal,
 ): Promise<TempoWorklog[]> {
 	const all: TempoWorklog[] = [];
@@ -40,7 +42,12 @@ async function fetchAllTempoWorklogs(
 		to,
 		limit: '1000',
 	});
-	let path = `worklogs/user/${accountId}`;
+	// Team-wide reads use `worklogs` (no user scope); user-scoped reads use
+	// `worklogs/user/{accountId}`. The design spec (2026-06-24) requires the
+	// non-user-scoped endpoint for team aggregation.
+	let path = options.currentUserOnly === false
+		? 'worklogs'
+		: `worklogs/user/${accountId}`;
 
 	while (params) {
 		const { url, headers } = buildTempoRequest(
@@ -73,10 +80,24 @@ async function fetchAllTempoWorklogs(
 async function enrichAndMap(
 	config: TempoServiceConfig,
 	worklogs: TempoWorklog[],
+	options: { currentUserOnly?: boolean } = {},
 	signal?: AbortSignal,
 ): Promise<EnrichedJiraWorklog[]> {
 	const ids = worklogs.map((w) => String(w.issue.id));
 	const issueMap = await fetchIssueMetadata(ids, config, signal);
+
+	if (options.currentUserOnly === false) {
+		// Team reads: resolve each distinct author.accountId → Jira user so the
+		// mapped worklog carries the real author's email/displayName.
+		const accountIds = worklogs
+			.map((w) => w.author?.accountId)
+			.filter((id): id is string => !!id);
+		const authorMap = await resolveAuthorMap(config, accountIds, signal);
+		return worklogs.map((w) => mapTempoWorklog(w, issueMap, authorMap));
+	}
+
+	// Current-user reads: all worklogs belong to the configured user, so use
+	// their email directly (backward-compatible path).
 	return worklogs.map((w) => mapTempoWorklog(w, issueMap, config.email));
 }
 
@@ -84,9 +105,21 @@ export async function fetchMonthWorklogsTempo(
 	config: TempoServiceConfig,
 	year: number,
 	month: number, // 0-indexed
-	signal?: AbortSignal,
+	optionsOrSignal?: AbortSignal | { currentUserOnly?: boolean },
+	maybeSignal?: AbortSignal,
 ): Promise<EnrichedJiraWorklog[]> {
 	if (!config.jiraHost || !config.apiToken || !config.tempoApiToken) return [];
+
+	// Backward-compatible overload: old callers pass signal as 4th arg.
+	let signal: AbortSignal | undefined;
+	let opts: { currentUserOnly?: boolean } = {};
+	if (optionsOrSignal instanceof AbortSignal) {
+		signal = optionsOrSignal;
+	} else if (optionsOrSignal) {
+		opts = optionsOrSignal;
+		signal = maybeSignal;
+	}
+
 	const accountId = await resolveAccountId(config, signal);
 	const daysInMonth = new Date(year, month + 1, 0).getDate();
 	const from = `${year}-${pad(month + 1)}-01`;
@@ -96,27 +129,41 @@ export async function fetchMonthWorklogsTempo(
 		accountId,
 		from,
 		to,
+		opts,
 		signal,
 	);
-	return enrichAndMap(config, worklogs, signal);
+	return enrichAndMap(config, worklogs, opts, signal);
 }
 
 export async function fetchWeekWorklogsTempo(
 	config: TempoServiceConfig,
 	weekStart: string,
 	weekEnd: string,
-	signal?: AbortSignal,
+	optionsOrSignal?: AbortSignal | { currentUserOnly?: boolean },
+	maybeSignal?: AbortSignal,
 ): Promise<WorklogEntry[]> {
 	if (!config.jiraHost || !config.apiToken || !config.tempoApiToken) return [];
+
+	// Backward-compatible overload: old callers pass signal as 4th arg.
+	let signal: AbortSignal | undefined;
+	let opts: { currentUserOnly?: boolean } = {};
+	if (optionsOrSignal instanceof AbortSignal) {
+		signal = optionsOrSignal;
+	} else if (optionsOrSignal) {
+		opts = optionsOrSignal;
+		signal = maybeSignal;
+	}
+
 	const accountId = await resolveAccountId(config, signal);
 	const worklogs = await fetchAllTempoWorklogs(
 		config,
 		accountId,
 		weekStart,
 		weekEnd,
+		opts,
 		signal,
 	);
-	const enriched = await enrichAndMap(config, worklogs, signal);
+	const enriched = await enrichAndMap(config, worklogs, opts, signal);
 	return enriched
 		.filter((wl) => {
 			const day = (wl.started ?? '').slice(0, 10);
