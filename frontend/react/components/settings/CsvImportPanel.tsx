@@ -70,6 +70,17 @@ export const CsvImportPanel: React.FC<Props> = ({ onImport }) => {
 			const file = e.target.files?.[0];
 			if (!file) return;
 
+			// Guard against oversized files that could freeze the browser
+			const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+			if (file.size > MAX_FILE_SIZE) {
+				setState({
+					...INITIAL_STATE,
+					error: `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum size is 10 MB.`,
+				});
+				e.target.value = '';
+				return;
+			}
+
 			const reader = new FileReader();
 			reader.onload = (event) => {
 				try {
@@ -153,7 +164,7 @@ export const CsvImportPanel: React.FC<Props> = ({ onImport }) => {
 	);
 
 	const handleReset = useCallback(() => {
-		setState(INITIAL_STATE);
+		setState(() => ({ ...INITIAL_STATE }));
 	}, []);
 
 	const handleSubmit = useCallback(async () => {

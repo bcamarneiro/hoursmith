@@ -45,6 +45,12 @@ describe('parseDuration', () => {
 		expect(parseDuration('5400')).toBe(5400);
 	});
 
+	it('parses bare small integers as minutes', () => {
+		expect(parseDuration('2')).toBe(120);
+		expect(parseDuration('15')).toBe(900);
+		expect(parseDuration('23')).toBe(1380);
+	});
+
 	it('parses small decimal numbers as hours', () => {
 		expect(parseDuration('0.5')).toBe(1800);
 	});

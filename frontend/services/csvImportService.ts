@@ -195,6 +195,7 @@ export function detectPreset(parsed: ParsedCsv): PresetDetection {
  * - "1.5h" → 5400
  * - "90m" → 5400
  * - "5400" (bare number, assumed seconds) → 5400
+ * - "2" (bare integer < 24, assumed minutes) → 120
  * - "1:30" (hours:minutes) → 5400
  * - "01:30:00" (hours:minutes:seconds) → 5400
  * - "1h30m" (no space) → 5400
@@ -238,15 +239,23 @@ export function parseDuration(raw: string): number {
 		return Math.round(hours * 3600 + minutes * 60 + seconds);
 	}
 
-	// Try decimal hours (e.g. "1.5" meaning 1.5 hours)
-	const decimalHours = Number.parseFloat(value);
-	if (!Number.isNaN(decimalHours) && decimalHours > 0) {
-		// Heuristic: if the number is small (< 24), assume hours; otherwise seconds
-		if (decimalHours < 24) {
-			return Math.round(decimalHours * 3600);
+	// Try bare number heuristic.
+	// - Decimal numbers (e.g. "1.5") → hours (Harvest format)
+	// - Bare integers < 24 → minutes (intuitive for small values)
+	// - Bare integers >= 24 → seconds (Tempo format)
+	const numericValue = Number.parseFloat(value);
+	if (!Number.isNaN(numericValue) && numericValue > 0) {
+		const isInteger = Number.isInteger(numericValue);
+		if (!isInteger) {
+			// Decimal number → treat as hours (e.g. Harvest "1.5" = 1h 30m)
+			return Math.round(numericValue * 3600);
 		}
-		// Large numbers are likely seconds
-		return Math.round(decimalHours);
+		if (numericValue < 24) {
+			// Small integer → treat as minutes (e.g. "2" = 2m)
+			return Math.round(numericValue * 60);
+		}
+		// Large integer → treat as seconds (e.g. Tempo "5400")
+		return Math.round(numericValue);
 	}
 
 	return 0;
@@ -281,6 +290,11 @@ export function secondsToJiraTime(totalSeconds: number): string {
  * - "2024-01-15T10:30:00Z" (ISO with time)
  * - "Jan 15, 2024" (English month name)
  * - "15-Jan-2024"
+ *
+ * When both day and month are ≤ 12 (e.g. "03/04/2024"), US format (MM/DD/YYYY)
+ * is assumed. This is an inherent ambiguity of numeric date formats — users with
+ * EU-style data where both values are ≤ 12 should use ISO format or month-name
+ * format in their CSV exports.
  *
  * Returns null if the date cannot be parsed.
  */
