@@ -26,7 +26,8 @@ import { useDashboardDataFetcher } from '../hooks/useDashboardDataFetcher';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useMonthHeatmapData } from '../hooks/useMonthHeatmapData';
 import { usePageTitle } from '../hooks/usePageTitle';
-import { addDaysToIsoDate } from '../utils/date';
+import { useWorklogOperations } from '../hooks/useWorklogOperations';
+import { addDaysToIsoDate, withLocalOffset } from '../utils/date';
 import { downloadAsFile } from '../utils/downloadFile';
 import { generateWeeklyCsv } from '../utils/weekCsvExport';
 import { buildWeeklyCloseAssistantModel } from '../utils/weeklyCloseAssistant';
@@ -77,6 +78,14 @@ export const MyWeekPage: React.FC = () => {
 		useComplianceReminder();
 	const { copyPreviousWeek, isLoading: isCopyingPrevWeek } =
 		useCopyPreviousWeek();
+	const { createMultipleWorklogs, deleteWorklog } = useWorklogOperations();
+	const markMultipleSuggestionsLogged = useDashboardStore(
+		(s) => s.markMultipleSuggestionsLogged,
+	);
+	const unmarkMultipleSuggestionsLogged = useDashboardStore(
+		(s) => s.unmarkMultipleSuggestionsLogged,
+	);
+	const [isLoggingAllSuggestions, setIsLoggingAllSuggestions] = useState(false);
 	const monthHeatmap = useMonthHeatmapData();
 
 	// Fetch absence days for the heatmap month range
@@ -168,6 +177,65 @@ export const MyWeekPage: React.FC = () => {
 		}
 	};
 
+	const allLoggableSuggestions = useMemo(
+		() =>
+			daySummaries.flatMap((day) =>
+				day.suggestions
+					.filter((s) => !s.logged && !!s.issueKey)
+					.map((s) => ({ suggestion: s, date: day.date })),
+			),
+		[daySummaries],
+	);
+
+	const handleLogAllSuggestions = async () => {
+		if (allLoggableSuggestions.length === 0) return;
+		setIsLoggingAllSuggestions(true);
+		try {
+			const params = allLoggableSuggestions.map(({ suggestion: s }) => ({
+				issueKey: s.issueKey,
+				timeSpent: s.suggestedTimeSpent,
+				comment: '',
+				started: withLocalOffset(`${s.date}T09:00`),
+			}));
+
+			const result = await createMultipleWorklogs(params);
+
+			const failedKeys = new Set(result.failed);
+			const successIds = allLoggableSuggestions
+				.filter(({ suggestion: s }) => !failedKeys.has(s.issueKey))
+				.map(({ suggestion: s }) => s.id);
+
+			if (successIds.length > 0) {
+				markMultipleSuggestionsLogged(successIds);
+			}
+
+			if (result.failed.length === 0) {
+				toast.success(`Logged all ${result.success} worklogs for the week`, {
+					action: {
+						label: 'Undo',
+						onClick: () => {
+							Promise.all(
+								result.created.map((w) =>
+									deleteWorklog(w.issueKey, w.worklogId),
+								),
+							).then(() => {
+								unmarkMultipleSuggestionsLogged(successIds);
+							});
+						},
+					},
+				});
+			} else {
+				toast.error(
+					`Logged ${result.success} of ${params.length}: failed ${result.failed.join(', ')}`,
+				);
+			}
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : 'Batch log failed');
+		} finally {
+			setIsLoggingAllSuggestions(false);
+		}
+	};
+
 	if (!jiraHost) {
 		return (
 			<div className={styles.container}>
@@ -256,13 +324,29 @@ export const MyWeekPage: React.FC = () => {
 					<Button variant="secondary" onClick={() => setIsTemplatesOpen(true)}>
 						Templates
 					</Button>
-					<Button
-						variant="secondary"
-						onClick={handleCopyPrevWeek}
-						disabled={isCopyingPrevWeek || daySummaries.length === 0}
-					>
-						{isCopyingPrevWeek ? 'Copying...' : 'Copy Prev Week'}
-					</Button>
+				<Button
+					variant="secondary"
+					onClick={handleCopyPrevWeek}
+					disabled={isCopyingPrevWeek || daySummaries.length === 0}
+				>
+					{isCopyingPrevWeek ? 'Copying...' : 'Copy Prev Week'}
+				</Button>
+				<Button
+					variant="primary"
+					onClick={handleLogAllSuggestions}
+					disabled={
+						isLoggingAllSuggestions || allLoggableSuggestions.length === 0
+					}
+					title={
+						allLoggableSuggestions.length > 0
+							? `Log all ${allLoggableSuggestions.length} pending suggestions`
+							: 'No pending suggestions to log'
+					}
+				>
+					{isLoggingAllSuggestions
+						? 'Logging...'
+						: `Log All${allLoggableSuggestions.length > 0 ? ` (${allLoggableSuggestions.length})` : ''}`}
+				</Button>
 					<Button
 						variant="secondary"
 						onClick={handleExportMd}
