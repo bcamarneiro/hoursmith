@@ -9,6 +9,7 @@ import {
 import {
 	buildConnectionScope,
 	getCachedWorklogs,
+	mergeWorklogs,
 	storeWorklogs,
 	isIndexedDBAvailable,
 } from '../../services/worklogCache';
@@ -86,7 +87,15 @@ export function useMonthWorklogs(
 			jqlFilter,
 		),
 		queryFn: async ({ signal }) => {
-			const worklogs = await fetchMonthWorklogs(
+			// Check for cached data to enable incremental sync
+			let cachedData = null;
+			if (cacheEnabled && isIndexedDBAvailable()) {
+				cachedData = await getCachedWorklogs(connectionScope, year, month);
+			}
+
+			// If we have a recent sync, fetch only the delta (issues updated since last sync)
+			const since = cachedData?.lastSyncTime ?? undefined;
+			const fetchedWorklogs = await fetchMonthWorklogs(
 				config,
 				year,
 				month,
@@ -94,16 +103,35 @@ export function useMonthWorklogs(
 					currentUserOnly,
 					jqlFilter: options?.jqlFilter,
 					onProgress: onProgress ?? undefined,
+					since,
 				},
 				signal,
 			);
 
 			// Persist to IndexedDB if cache is enabled
 			if (cacheEnabled && isIndexedDBAvailable()) {
-				await storeWorklogs(connectionScope, year, month, worklogs);
+				if (since) {
+					// Delta sync: merge new worklogs with existing cache
+					await mergeWorklogs(connectionScope, year, month, fetchedWorklogs);
+				} else {
+					// Full sync: overwrite cache
+					await storeWorklogs(connectionScope, year, month, fetchedWorklogs);
+				}
 			}
 
-			return worklogs;
+			// If we did a delta sync, merge with cached data for the return value
+			if (since && cachedData) {
+				const mergedMap = new Map<string, WorklogItem>();
+				for (const w of cachedData.worklogs) {
+					mergedMap.set(w.id, w);
+				}
+				for (const w of fetchedWorklogs) {
+					mergedMap.set(w.id, w);
+				}
+				return Array.from(mergedMap.values());
+			}
+
+			return fetchedWorklogs;
 		},
 		enabled: (options?.enabled ?? true) && !!jiraHost && !!apiToken,
 		staleTime: 15 * 60 * 1000,
