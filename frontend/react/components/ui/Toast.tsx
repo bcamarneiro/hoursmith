@@ -81,10 +81,10 @@ export const ToastContainer: React.FC = () => {
 		if (timer) {
 			clearTimeout(timer);
 			timersRef.current.delete(id);
-		}
-		const deadline = remainingRef.current.get(id);
-		if (deadline) {
-			remainingRef.current.set(id, Math.max(0, deadline - Date.now()));
+			const deadline = remainingRef.current.get(id);
+			if (deadline) {
+				remainingRef.current.set(id, Math.max(0, deadline - Date.now()));
+			}
 		}
 	}, []);
 

@@ -637,10 +637,10 @@ export const IntegrationsSection: React.FC<Props> = ({
 						{integrationTests.calendar.loading
 							? 'Testing...'
 							: 'Test calendars'}
-					</Button>
-				</div>
-					{integrationTests.calendar.result ? (
-					<p
+				</Button>
+			</div>
+			{integrationTests.calendar.result ? (
+				<p
 						className={`${styles.testResult} ${integrationTests.calendar.result.success ? styles.testSuccess : styles.testError}`}
 						role="status"
 						aria-live="polite"
