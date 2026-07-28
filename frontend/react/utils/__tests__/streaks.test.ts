@@ -139,6 +139,17 @@ describe('computeCurrentDayStreak', () => {
 		];
 		expect(computeCurrentDayStreak(weekdays, '2026-03-04')).toBe(3);
 	});
+
+	it('handles weekend today with unmet weekday before weekend', () => {
+		const weekdays = [
+			{ date: '2026-03-02', met: true }, // Mon
+			{ date: '2026-03-03', met: true }, // Tue
+			{ date: '2026-03-04', met: false }, // Wed - not met
+			// Thu/Fri missing (weekend today is Sat)
+		];
+		// Today is Saturday 2026-03-07 - should return 0 because Wed wasn't met
+		expect(computeCurrentDayStreak(weekdays, '2026-03-07')).toBe(0);
+	});
 });
 
 describe('isWeekComplete', () => {

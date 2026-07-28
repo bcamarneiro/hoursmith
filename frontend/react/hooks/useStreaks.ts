@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DaySummary } from '../../../types/Suggestion';
 import {
 	computeCurrentDayStreak,
@@ -6,6 +6,7 @@ import {
 	toWeekdayMetInfo,
 	type StreakDayInput,
 } from '../utils/streaks';
+import { migrateStorageKey } from '../stores/migrateStorageKeys';
 
 /**
  * localStorage keys for streak persistence.
@@ -14,6 +15,10 @@ import {
 const STORAGE_KEY_BEST_DAY = 'hoursmith-streak-best-day';
 const STORAGE_KEY_BEST_WEEK = 'hoursmith-streak-best-week';
 const STORAGE_KEY_DAY_LOG = 'hoursmith-streak-day-log';
+
+// Carry existing users' data across the jira-timesheet → hoursmith rename.
+migrateStorageKey('jira-timesheet-best-streaks', STORAGE_KEY_BEST_DAY);
+migrateStorageKey('jira-timesheet-best-streaks', STORAGE_KEY_BEST_WEEK);
 
 /** A persisted record of a weekday's met-status. */
 interface DayLogEntry {
@@ -142,7 +147,6 @@ export function useStreaks(daySummaries: DaySummary[]): StreakState {
 	const dayLog = useMemo(() => {
 		const existing = readDayLog();
 		const merged = mergeDayLog(existing, currentWeekdays);
-		// Write back if changed (use ref to avoid infinite loops)
 		return merged;
 	}, [currentWeekdays]);
 
@@ -167,24 +171,21 @@ export function useStreaks(daySummaries: DaySummary[]): StreakState {
 		[dayLog, today],
 	);
 
-	// Compute and persist best streaks
-	const bestDayStreak = useMemo(() => {
-		const prevBest = readBest(STORAGE_KEY_BEST_DAY);
-		const newBest = Math.max(prevBest, dayStreak);
-		if (newBest > prevBest) {
-			writeBest(STORAGE_KEY_BEST_DAY, newBest);
-		}
-		return newBest;
-	}, [dayStreak]);
+	// Best streaks - read initial values, update via useEffect
+	const [bestDayStreak, setBestDayStreak] = useState(() => readBest(STORAGE_KEY_BEST_DAY));
+	const [bestWeekStreak, setBestWeekStreak] = useState(() => readBest(STORAGE_KEY_BEST_WEEK));
 
-	const bestWeekStreak = useMemo(() => {
-		const prevBest = readBest(STORAGE_KEY_BEST_WEEK);
-		const newBest = Math.max(prevBest, weekStreak);
-		if (newBest > prevBest) {
-			writeBest(STORAGE_KEY_BEST_WEEK, newBest);
+	// Persist best streaks when current streaks exceed them
+	useEffect(() => {
+		if (dayStreak > bestDayStreak) {
+			writeBest(STORAGE_KEY_BEST_DAY, dayStreak);
+			setBestDayStreak(dayStreak);
 		}
-		return newBest;
-	}, [weekStreak]);
+		if (weekStreak > bestWeekStreak) {
+			writeBest(STORAGE_KEY_BEST_WEEK, weekStreak);
+			setBestWeekStreak(weekStreak);
+		}
+	}, [dayStreak, weekStreak, bestDayStreak, bestWeekStreak]);
 
 	return { dayStreak, bestDayStreak, weekStreak, bestWeekStreak };
 }
