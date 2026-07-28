@@ -176,6 +176,12 @@ export const ReportsPage: React.FC = () => {
 	const removeReportPreset = useUserDataStore(
 		(state) => state.removeReportPreset,
 	);
+	const defaultReportPresetId = useUserDataStore(
+		(state) => state.defaultReportPresetId,
+	);
+	const setDefaultReportPreset = useUserDataStore(
+		(state) => state.setDefaultReportPreset,
+	);
 	const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
 	const monthEnd = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(new Date(currentYear, currentMonth + 1, 0).getDate()).padStart(2, '0')}`;
 	const { data: monthlyAbsenceDaysByUser } = useAbsenceDaysByUser(
@@ -451,6 +457,20 @@ export const ReportsPage: React.FC = () => {
 			preset ? `Removed preset "${preset.label}"` : 'Removed report preset',
 		);
 	};
+
+	// Apply default preset on mount if it exists
+	useEffect(() => {
+		if (defaultReportPresetId && reportPresets.length > 0) {
+			const defaultPreset = reportPresets.find(
+				(preset) => preset.id === defaultReportPresetId,
+			);
+			if (defaultPreset) {
+				handleApplyPreset(defaultPreset);
+			}
+		}
+		// Only run on mount
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const handleCopyShareLink = async () => {
 		try {
@@ -757,6 +777,7 @@ export const ReportsPage: React.FC = () => {
 				sortField={sortField}
 				sortDirection={sortDirection}
 				presets={reportPresets}
+				defaultPresetId={defaultReportPresetId}
 				onSearchChange={setSearchQuery}
 				onOnlyAttentionNeededChange={setOnlyAttentionNeeded}
 				onManagerModeChange={setManagerMode}
@@ -765,6 +786,7 @@ export const ReportsPage: React.FC = () => {
 				onSavePreset={handleSavePreset}
 				onApplyPreset={handleApplyPreset}
 				onRemovePreset={handleRemovePreset}
+				onSetDefaultPreset={setDefaultReportPreset}
 				onCopyShareLink={handleCopyShareLink}
 				onExportSnapshotHtml={handleExportSnapshotHtml}
 				onExportSnapshotMarkdown={handleExportSnapshotMarkdown}

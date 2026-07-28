@@ -32,6 +32,7 @@ type Props = {
 	sortField: ReportsSortField;
 	sortDirection: ReportsSortDirection;
 	presets: ReportPreset[];
+	defaultPresetId: string | null;
 	onSearchChange: (value: string) => void;
 	onOnlyAttentionNeededChange: (value: boolean) => void;
 	onManagerModeChange: (value: boolean) => void;
@@ -40,6 +41,7 @@ type Props = {
 	onSavePreset: (label: string) => void;
 	onApplyPreset: (preset: ReportPreset) => void;
 	onRemovePreset: (id: string) => void;
+	onSetDefaultPreset: (id: string | null) => void;
 	onCopyShareLink: () => Promise<void> | void;
 	onExportSnapshotHtml: () => void;
 	onExportSnapshotMarkdown: () => void;
@@ -74,6 +76,7 @@ export const ReportsControlPanel: React.FC<Props> = ({
 	sortField,
 	sortDirection,
 	presets,
+	defaultPresetId,
 	onSearchChange,
 	onOnlyAttentionNeededChange,
 	onManagerModeChange,
@@ -82,6 +85,7 @@ export const ReportsControlPanel: React.FC<Props> = ({
 	onSavePreset,
 	onApplyPreset,
 	onRemovePreset,
+	onSetDefaultPreset,
 	onCopyShareLink,
 	onExportSnapshotHtml,
 	onExportSnapshotMarkdown,
@@ -345,26 +349,38 @@ export const ReportsControlPanel: React.FC<Props> = ({
 
 				{presets.length > 0 ? (
 					<div className={styles.presetList}>
-						{presets.map((preset) => (
-							<div key={preset.id} className={styles.presetChip}>
-								<button
-									type="button"
-									className={styles.presetApply}
-									onClick={() => onApplyPreset(preset)}
-								>
-									<span>{preset.label}</span>
-									<small>{preset.viewMode}</small>
-								</button>
-								<button
-									type="button"
-									className={styles.presetRemove}
-									onClick={() => onRemovePreset(preset.id)}
-									aria-label={`Remove preset ${preset.label}`}
-								>
-									&times;
-								</button>
-							</div>
-						))}
+						{presets.map((preset) => {
+							const isDefault = defaultPresetId === preset.id;
+							return (
+								<div key={preset.id} className={styles.presetChip}>
+									<button
+										type="button"
+										className={styles.presetDefault}
+										onClick={() => onSetDefaultPreset(isDefault ? null : preset.id)}
+										title={isDefault ? 'Unset as default preset' : 'Set as default preset'}
+										aria-label={isDefault ? 'Unset as default preset' : 'Set as default preset'}
+									>
+										{isDefault ? '★' : '☆'}
+									</button>
+									<button
+										type="button"
+										className={styles.presetApply}
+										onClick={() => onApplyPreset(preset)}
+									>
+										<span>{preset.label}</span>
+										<small>{preset.viewMode}</small>
+									</button>
+									<button
+										type="button"
+										className={styles.presetRemove}
+										onClick={() => onRemovePreset(preset.id)}
+										aria-label={`Remove preset ${preset.label}`}
+									>
+										&times;
+									</button>
+								</div>
+							);
+						})}
 					</div>
 				) : (
 					<p className={styles.emptyPresets}>

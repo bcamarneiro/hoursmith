@@ -304,4 +304,112 @@ describe('useUserDataStore — defensive merge', () => {
 		expect(merged.favorites[0].issueKey).toBe('PROJ-99');
 		expect(merged.dayNotes).toEqual({ '2026-05-01': 'note' });
 	});
+
+	it('sets and clears defaultReportPresetId', () => {
+		act(() => {
+			useUserDataStore.getState().saveReportPreset({
+				id: 'test-preset',
+				label: 'Test Preset',
+				viewMode: 'weekly',
+				searchQuery: '',
+				onlyAttentionNeeded: false,
+				managerMode: false,
+				trendWeeks: 4,
+				sortField: 'name',
+				sortDirection: 'asc',
+				selectedUser: null,
+			});
+		});
+
+		const presetId = useUserDataStore.getState().reportPresets[0].id;
+
+		act(() => {
+			useUserDataStore.getState().setDefaultReportPreset(presetId);
+		});
+
+		expect(useUserDataStore.getState().defaultReportPresetId).toBe(presetId);
+
+		act(() => {
+			useUserDataStore.getState().setDefaultReportPreset(null);
+		});
+
+		expect(useUserDataStore.getState().defaultReportPresetId).toBeNull();
+	});
+
+	it('clears defaultReportPresetId when the preset is removed', () => {
+		act(() => {
+			useUserDataStore.getState().saveReportPreset({
+				id: 'test-preset',
+				label: 'Test Preset',
+				viewMode: 'weekly',
+				searchQuery: '',
+				onlyAttentionNeeded: false,
+				managerMode: false,
+				trendWeeks: 4,
+				sortField: 'name',
+				sortDirection: 'asc',
+				selectedUser: null,
+			});
+		});
+
+		const presetId = useUserDataStore.getState().reportPresets[0].id;
+
+		act(() => {
+			useUserDataStore.getState().setDefaultReportPreset(presetId);
+		});
+
+		expect(useUserDataStore.getState().defaultReportPresetId).toBe(presetId);
+
+		act(() => {
+			useUserDataStore.getState().removeReportPreset(presetId);
+		});
+
+		expect(useUserDataStore.getState().defaultReportPresetId).toBeNull();
+		expect(useUserDataStore.getState().reportPresets).toHaveLength(0);
+	});
+
+	it('validates defaultReportPresetId during merge', async () => {
+		const { useUserDataStore: store } = await import('../useUserDataStore');
+		const merge = (store.persist.getOptions().merge ?? ((a) => a as never)) as (
+			a: unknown,
+			b: unknown,
+		) => unknown;
+
+		// Test with valid default ID
+		const validPreset = {
+			id: 'preset-1',
+			label: 'Test',
+			viewMode: 'weekly' as const,
+			searchQuery: '',
+			onlyAttentionNeeded: false,
+			managerMode: false,
+			trendWeeks: 4,
+			sortField: 'name' as const,
+			sortDirection: 'asc' as const,
+			selectedUser: null,
+		};
+
+		const persistedWithValidDefault = {
+			reportPresets: [validPreset],
+			defaultReportPresetId: 'preset-1',
+		};
+
+		const mergedValid = merge(
+			persistedWithValidDefault,
+			store.getState(),
+		) as ReturnType<typeof store.getState>;
+		expect(mergedValid.defaultReportPresetId).toBe('preset-1');
+
+		// Test with invalid default ID (preset doesn't exist)
+		const persistedWithInvalidDefault = {
+			reportPresets: [validPreset],
+			defaultReportPresetId: 'non-existent-id',
+		};
+
+		const mergedInvalid = merge(
+			persistedWithInvalidDefault,
+			store.getState(),
+		) as ReturnType<typeof store.getState>;
+		expect(mergedInvalid.defaultReportPresetId).toBeNull();
+	});
 });

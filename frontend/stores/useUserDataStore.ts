@@ -83,6 +83,7 @@ interface UserDataState {
 	dayNotes: Record<string, string>;
 	calendarMappings: CalendarMapping[];
 	reportPresets: ReportPreset[];
+	defaultReportPresetId: string | null;
 	addFavorite: (issue: FavoriteIssue) => void;
 	removeFavorite: (issueKey: string) => void;
 	addTemplate: (template: RecurringTemplate) => void;
@@ -107,6 +108,7 @@ interface UserDataState {
 	) => void;
 	saveReportPreset: (preset: ReportPreset) => void;
 	removeReportPreset: (id: string) => void;
+	setDefaultReportPreset: (id: string | null) => void;
 }
 
 function normalizeIssueKey(issueKey: unknown): string {
@@ -275,6 +277,7 @@ export const useUserDataStore = create<UserDataState>()(
 			dayNotes: {},
 			calendarMappings: [],
 			reportPresets: [],
+			defaultReportPresetId: null,
 
 			addFavorite: (issue) =>
 				set((state) => {
@@ -484,6 +487,15 @@ export const useUserDataStore = create<UserDataState>()(
 					reportPresets: state.reportPresets.filter(
 						(preset) => preset.id !== id,
 					),
+					defaultReportPresetId:
+						state.defaultReportPresetId === id
+							? null
+							: state.defaultReportPresetId,
+				})),
+
+			setDefaultReportPreset: (id) =>
+				set(() => ({
+					defaultReportPresetId: id,
 				})),
 		}),
 		{
@@ -539,7 +551,23 @@ export const useUserDataStore = create<UserDataState>()(
 								(mapping) => !!mapping.issueKey && mapping.patterns.length > 0,
 							),
 					),
-					reportPresets: dedupeByCaseInsensitive(
+				reportPresets: dedupeByCaseInsensitive(
+					safeArray<ReportPreset>(
+						persistedState?.reportPresets,
+						currentState.reportPresets,
+					)
+						.map(normalizeReportPreset)
+						.filter((preset) => !!preset.id && !!preset.label),
+					(preset) => preset.id,
+				),
+				defaultReportPresetId: (() => {
+					const persistedDefault =
+						typeof persistedState?.defaultReportPresetId === 'string'
+							? persistedState.defaultReportPresetId
+							: null;
+					if (!persistedDefault) return null;
+					// Only keep the default if the preset still exists after merge.
+					const mergedPresets = dedupeByCaseInsensitive(
 						safeArray<ReportPreset>(
 							persistedState?.reportPresets,
 							currentState.reportPresets,
@@ -547,8 +575,12 @@ export const useUserDataStore = create<UserDataState>()(
 							.map(normalizeReportPreset)
 							.filter((preset) => !!preset.id && !!preset.label),
 						(preset) => preset.id,
-					),
-				};
+					);
+					return mergedPresets.some((p) => p.id === persistedDefault)
+						? persistedDefault
+						: null;
+				})(),
+			};
 			},
 		},
 	),
