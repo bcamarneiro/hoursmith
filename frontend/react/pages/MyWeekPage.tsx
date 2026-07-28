@@ -14,6 +14,7 @@ import { SourceStatusBar } from '../components/dashboard/SourceStatusBar';
 import { TemplatesManager } from '../components/dashboard/TemplatesManager';
 import { WeeklyCloseAssistant } from '../components/dashboard/WeeklyCloseAssistant';
 import { WeekNavigator } from '../components/dashboard/WeekNavigator';
+import { StreakBadge } from '../components/dashboard/StreakBadge';
 import { WeekOverview } from '../components/dashboard/WeekOverview';
 import { Button } from '../components/ui/Button';
 import { Spinner } from '../components/ui/Spinner';
@@ -367,6 +368,8 @@ export const MyWeekPage: React.FC = () => {
 					/>
 
 					<WeekOverview days={daySummaries} />
+
+				<StreakBadge daySummaries={daySummaries} />
 
 					{orderedWeekdays.length > 0 && (
 						<div id={GAP_DAYS_SECTION_ID} className={styles.daysSection}>
