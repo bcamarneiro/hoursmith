@@ -29,6 +29,8 @@ const baseConfig = {
 	gitlabToken: '',
 	gitlabHost: '',
 	rescueTimeApiKey: '',
+	wakatimeApiKey: '',
+	wakatimeBaseUrl: '',
 	calendarFeeds: [],
 	absenceAssignments: [],
 	complianceReminderEnabled: false,
@@ -55,8 +57,9 @@ describe('useSettingsFormStore', () => {
 						result: { success: false, message: 'Invalid token' },
 					},
 					calendar: { loading: false, result: null },
-					rescuetime: { loading: true, result: null },
-				},
+				rescuetime: { loading: true, result: null },
+				wakatime: { loading: false, result: null },
+			},
 			});
 			useUIStore.setState({
 				selectedTab: 'home',
@@ -85,6 +88,7 @@ describe('useSettingsFormStore', () => {
 			gitlab: { loading: false, result: null },
 			calendar: { loading: false, result: null },
 			rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 		});
 	});
 
@@ -153,6 +157,7 @@ describe('useSettingsFormStore', () => {
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 					},
 				});
 			});
@@ -206,6 +211,7 @@ describe('useSettingsFormStore', () => {
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 					},
 				});
 			});
@@ -250,6 +256,7 @@ describe('useSettingsFormStore', () => {
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 					},
 				});
 			});
@@ -290,6 +297,7 @@ describe('useSettingsFormStore', () => {
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 					},
 				});
 			});
@@ -321,6 +329,7 @@ describe('useSettingsFormStore', () => {
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 					},
 				});
 			});
@@ -378,6 +387,7 @@ describe('useSettingsFormStore', () => {
 						gitlab: { loading: false, result: null },
 						calendar: { loading: false, result: null },
 						rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 					},
 				});
 			});
@@ -419,6 +429,7 @@ describe('useSettingsFormStore', () => {
 					gitlab: { loading: false, result: null },
 					calendar: { loading: false, result: null },
 					rescuetime: { loading: false, result: null },
+			wakatime: { loading: false, result: null },
 				},
 			});
 			useSettingsFormStore

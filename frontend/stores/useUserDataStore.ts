@@ -52,6 +52,18 @@ export interface CalendarMapping {
 	patterns: string[];
 }
 
+/**
+ * Maps a WakaTime project name to a Jira issue. When WakaTime reports coding
+ * time against a project, the mapped issue receives a worklog suggestion with
+ * the actual duration as the suggested quantity.
+ */
+export interface WakaTimeProjectMapping {
+	/** WakaTime project name (exact match, case-insensitive). */
+	projectName: string;
+	issueKey: string;
+	issueSummary?: string;
+}
+
 export interface RecurringTemplate {
 	id: string;
 	issueKey: string;
@@ -82,6 +94,7 @@ interface UserDataState {
 	commentPresets: string[];
 	dayNotes: Record<string, string>;
 	calendarMappings: CalendarMapping[];
+	wakatimeMappings: WakaTimeProjectMapping[];
 	reportPresets: ReportPreset[];
 	addFavorite: (issue: FavoriteIssue) => void;
 	removeFavorite: (issueKey: string) => void;
@@ -105,6 +118,9 @@ interface UserDataState {
 		pattern: string,
 		issueSummary?: string,
 	) => void;
+	addWakaTimeMapping: (mapping: WakaTimeProjectMapping) => void;
+	removeWakaTimeMapping: (projectName: string) => void;
+	updateWakaTimeMapping: (projectName: string, updated: WakaTimeProjectMapping) => void;
 	saveReportPreset: (preset: ReportPreset) => void;
 	removeReportPreset: (id: string) => void;
 }
@@ -182,6 +198,18 @@ function normalizeCalendarMapping(mapping: CalendarMapping): CalendarMapping {
 		issueKey: normalizeIssueKey(raw.issueKey),
 		issueSummary: summary || undefined,
 		patterns,
+	};
+}
+
+function normalizeWakaTimeMapping(mapping: WakaTimeProjectMapping): WakaTimeProjectMapping {
+	const raw = mapping as Partial<WakaTimeProjectMapping>;
+	return {
+		projectName: asString(raw.projectName).trim(),
+		issueKey: normalizeIssueKey(raw.issueKey),
+		issueSummary:
+			typeof raw.issueSummary === 'string'
+				? raw.issueSummary.trim() || undefined
+				: undefined,
 	};
 }
 
@@ -274,6 +302,7 @@ export const useUserDataStore = create<UserDataState>()(
 			commentPresets: [],
 			dayNotes: {},
 			calendarMappings: [],
+			wakatimeMappings: [],
 			reportPresets: [],
 
 			addFavorite: (issue) =>
@@ -444,19 +473,70 @@ export const useUserDataStore = create<UserDataState>()(
 							),
 						};
 					}
-					return {
-						calendarMappings: [
-							...state.calendarMappings,
-							{
-								issueKey: key,
-								issueSummary: issueSummary?.trim() || undefined,
-								patterns: [trimmed],
-							},
-						],
-					};
-				}),
+				return {
+					calendarMappings: [
+						...state.calendarMappings,
+						{
+							issueKey: key,
+							issueSummary: issueSummary?.trim() || undefined,
+							patterns: [trimmed],
+						},
+					],
+				};
+			}),
 
-			saveReportPreset: (preset) =>
+		addWakaTimeMapping: (mapping) =>
+			set((state) => {
+				const normalized = normalizeWakaTimeMapping(mapping);
+				if (!normalized.projectName || !normalized.issueKey) {
+					return state;
+				}
+				if (
+					state.wakatimeMappings.some(
+						(m) =>
+							m.projectName.toLowerCase() === normalized.projectName.toLowerCase(),
+					)
+				) {
+					return state;
+				}
+				return {
+					wakatimeMappings: [...state.wakatimeMappings, normalized],
+				};
+			}),
+
+		removeWakaTimeMapping: (projectName) =>
+			set((state) => {
+				const name = projectName.trim().toLowerCase();
+				return {
+					wakatimeMappings: state.wakatimeMappings.filter(
+						(m) => m.projectName.toLowerCase() !== name,
+					),
+				};
+			}),
+
+		updateWakaTimeMapping: (projectName, updated) =>
+			set((state) => {
+				const targetName = projectName.trim().toLowerCase();
+				const normalized = normalizeWakaTimeMapping(updated);
+				if (!normalized.projectName || !normalized.issueKey) {
+					return state;
+				}
+				const isDuplicate = state.wakatimeMappings.some(
+					(m) =>
+						m.projectName.toLowerCase() === normalized.projectName.toLowerCase() &&
+						m.projectName.toLowerCase() !== targetName,
+				);
+				if (isDuplicate) {
+					return state;
+				}
+				return {
+					wakatimeMappings: state.wakatimeMappings.map((m) =>
+						m.projectName.toLowerCase() === targetName ? normalized : m,
+					),
+				};
+			}),
+
+		saveReportPreset: (preset) =>
 				set((state) => {
 					const normalized = normalizeReportPreset(preset);
 					if (!normalized.id || !normalized.label) {
@@ -529,17 +609,26 @@ export const useUserDataStore = create<UserDataState>()(
 						persistedState?.dayNotes,
 						currentState.dayNotes,
 					),
-					calendarMappings: mergeCalendarMappings(
-						safeArray<CalendarMapping>(
-							persistedState?.calendarMappings,
-							currentState.calendarMappings,
-						)
-							.map(normalizeCalendarMapping)
-							.filter(
-								(mapping) => !!mapping.issueKey && mapping.patterns.length > 0,
-							),
-					),
-					reportPresets: dedupeByCaseInsensitive(
+				calendarMappings: mergeCalendarMappings(
+					safeArray<CalendarMapping>(
+						persistedState?.calendarMappings,
+						currentState.calendarMappings,
+					)
+						.map(normalizeCalendarMapping)
+						.filter(
+							(mapping) => !!mapping.issueKey && mapping.patterns.length > 0,
+						),
+				),
+				wakatimeMappings: dedupeByCaseInsensitive(
+					safeArray<WakaTimeProjectMapping>(
+						persistedState?.wakatimeMappings,
+						currentState.wakatimeMappings,
+					)
+						.map(normalizeWakaTimeMapping)
+						.filter((m) => !!m.projectName && !!m.issueKey),
+					(m) => m.projectName,
+				),
+				reportPresets: dedupeByCaseInsensitive(
 						safeArray<ReportPreset>(
 							persistedState?.reportPresets,
 							currentState.reportPresets,

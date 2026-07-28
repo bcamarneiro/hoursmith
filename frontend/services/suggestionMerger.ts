@@ -2,6 +2,7 @@ import type {
 	DaySummary,
 	LoggedWorklog,
 	RescueTimeDaySummary,
+	WakaTimeDaySummary,
 	WorklogSuggestion,
 } from '../../types/Suggestion';
 import {
@@ -13,6 +14,7 @@ import { computeDayTargetSeconds } from '../react/utils/dayTarget';
 import type {
 	FavoriteIssue,
 	RecurringTemplate,
+	WakaTimeProjectMapping,
 } from '../stores/useUserDataStore';
 import type { AbsenceDay } from './absenceService';
 
@@ -33,6 +35,8 @@ export interface MergeSuggestionsInput {
 	gitlabSuggestions: WorklogSuggestion[];
 	calendarSuggestions: WorklogSuggestion[];
 	rescueTimeData: Map<string, RescueTimeDaySummary>;
+	wakatimeData?: Map<string, WakaTimeDaySummary>;
+	wakatimeMappings?: WakaTimeProjectMapping[];
 	existingWorklogs: WorklogEntry[];
 	favorites?: FavoriteIssue[];
 	templates?: RecurringTemplate[];
@@ -244,6 +248,8 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 		gitlabSuggestions,
 		calendarSuggestions,
 		rescueTimeData,
+		wakatimeData,
+		wakatimeMappings = [],
 		existingWorklogs,
 		favorites = [],
 		templates = [],
@@ -300,6 +306,39 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 		...gitlabSuggestions,
 		...mappedCalendar,
 	];
+
+	// Generate WakaTime-based suggestions from project→Jira mappings.
+	// Each mapped project gets a suggestion with the actual coding duration.
+	if (wakatimeData && wakatimeMappings.length > 0) {
+		for (const date of dates) {
+			if (isWeekend(date)) continue;
+			const wtDay = wakatimeData.get(date);
+			if (!wtDay) continue;
+
+			for (const mapping of wakatimeMappings) {
+				const project = wtDay.projects.find(
+					(p) => p.name.toLowerCase() === mapping.projectName.toLowerCase(),
+				);
+				if (!project) continue;
+
+				const key = `${date}::${mapping.issueKey}`;
+				if (loggedSet.has(key)) continue;
+
+				allSuggestions.push({
+					id: `wt-${mapping.projectName}-${date}`,
+					source: 'wakatime',
+					issueKey: mapping.issueKey,
+					issueSummary: mapping.issueSummary,
+					date,
+					suggestedTimeSpent: formatTimeSpent(project.totalSeconds),
+					suggestedSeconds: project.totalSeconds,
+					confidence: 'high',
+					reason: `WakaTime: ${project.totalSeconds > 0 ? formatTimeSpent(project.totalSeconds) : ''} in ${mapping.projectName}`,
+					logged: false,
+				});
+			}
+		}
+	}
 
 	// Deduplicate: same (date, issueKey), keep higher confidence
 	const deduped = new Map<string, WorklogSuggestion>();
@@ -430,6 +469,7 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 			suggestions: [...roundedSuggestions, ...dayUnmapped],
 			loggedWorklogs: loggedWorklogsByDay.get(date) ?? [],
 			rescueTime: rtDay,
+			wakatime: wakatimeData?.get(date),
 		};
 	});
 }

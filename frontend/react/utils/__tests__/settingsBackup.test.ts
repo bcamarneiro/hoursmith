@@ -18,6 +18,8 @@ const defaultConfig = {
 	gitlabToken: '',
 	gitlabHost: '',
 	rescueTimeApiKey: '',
+	wakatimeApiKey: '',
+	wakatimeBaseUrl: '',
 	calendarFeeds: [],
 	absenceAssignments: [],
 	complianceReminderEnabled: false,

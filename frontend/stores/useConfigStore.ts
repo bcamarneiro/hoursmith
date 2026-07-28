@@ -42,6 +42,13 @@ export interface Config {
 	gitlabToken: string;
 	gitlabHost: string;
 	rescueTimeApiKey: string;
+	wakatimeApiKey: string;
+	/**
+	 * Base URL for WakaTime-compatible API. Defaults to https://api.wakatime.com.
+	 * Set to a Wakapi instance URL (e.g. https://wakapi.example.com) for
+	 * self-hosted privacy-preserving setups.
+	 */
+	wakatimeBaseUrl: string;
 	calendarFeeds: CalendarFeed[];
 	absenceAssignments: AbsenceAssignment[];
 	complianceReminderEnabled: boolean;
@@ -179,6 +186,8 @@ export function createDefaultConfig(): Config {
 		gitlabToken: '',
 		gitlabHost: '',
 		rescueTimeApiKey: '',
+		wakatimeApiKey: '',
+		wakatimeBaseUrl: '',
 		calendarFeeds: [],
 		absenceAssignments: [],
 		complianceReminderEnabled: false,
@@ -261,6 +270,14 @@ export function normalizeConfig(
 			typeof config?.rescueTimeApiKey === 'string'
 				? config.rescueTimeApiKey.trim()
 				: fallback.rescueTimeApiKey.trim(),
+		wakatimeApiKey:
+			typeof config?.wakatimeApiKey === 'string'
+				? config.wakatimeApiKey.trim()
+				: fallback.wakatimeApiKey.trim(),
+		wakatimeBaseUrl:
+			typeof config?.wakatimeBaseUrl === 'string'
+				? config.wakatimeBaseUrl.trim()
+				: fallback.wakatimeBaseUrl.trim(),
 		calendarFeeds: normalizedCalendarFeeds,
 		absenceAssignments: normalizedAbsenceAssignments,
 		complianceReminderEnabled:

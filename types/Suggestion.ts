@@ -7,6 +7,7 @@ export interface WorklogSuggestion {
 		| 'gitlab'
 		| 'calendar'
 		| 'rescuetime'
+		| 'wakatime'
 		| 'favorite'
 		| 'template'
 		| 'previous-week';
@@ -34,6 +35,16 @@ export interface RescueTimeDaySummary {
 	topActivities: RescueTimeActivity[];
 }
 
+export interface WakaTimeProjectDuration {
+	name: string;
+	totalSeconds: number;
+}
+
+export interface WakaTimeDaySummary {
+	totalCodingSeconds: number;
+	projects: WakaTimeProjectDuration[];
+}
+
 /**
  * A real (already-logged, non-backdated) Jira worklog placed on its day.
  * Surfaced per-day so the user can act on it (e.g. clone it elsewhere) — the
@@ -58,6 +69,7 @@ export interface DaySummary {
 	/** Non-backdated worklogs logged on this day (drives the "Clone to…" UI). */
 	loggedWorklogs: LoggedWorklog[];
 	rescueTime?: RescueTimeDaySummary;
+	wakatime?: WakaTimeDaySummary;
 }
 
 export interface WeekRange {
