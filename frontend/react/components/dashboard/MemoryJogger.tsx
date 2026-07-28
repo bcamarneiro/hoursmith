@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import type { MemoryJogQuestion } from '../../utils/memoryJogger';
 import styles from './MemoryJogger.module.css';
 
@@ -29,8 +30,8 @@ export const MemoryJogger: React.FC<MemoryJoggerProps> = ({ questions }) => {
 			</button>
 			{expanded && (
 				<ul className={styles.list}>
-					{questions.map((q, i) => (
-						<li key={i} className={styles.item}>
+					{questions.map((q) => (
+						<li key={q.id} className={styles.item}>
 							<span className={styles.question}>{q.question}</span>
 							{q.hint && <span className={styles.hint}>{q.hint}</span>}
 						</li>

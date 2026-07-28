@@ -151,21 +151,21 @@ export const PreferencesSection: React.FC<Props> = ({
 				</small>
 			</div>
 			<div className={styles.formGroup}>
-			<label>
-				<input
-					type="checkbox"
-					id={memoryJogEnabledId}
-					name="memoryJogEnabled"
-					checked={memoryJogEnabled}
-					onChange={handleChange}
-				/>{' '}
-				Show memory-jog questions on incomplete days
-			</label>
-			<small>
-				Displays contextual prompts on day cards that aren&apos;t fully logged
-				to help you recall unlogged work. Off by default.
-			</small>
-		</div>
-	</fieldset>
+				<label>
+					<input
+						type="checkbox"
+						id={memoryJogEnabledId}
+						name="memoryJogEnabled"
+						checked={memoryJogEnabled}
+						onChange={handleChange}
+					/>{' '}
+					Show memory-jog questions on incomplete days
+				</label>
+				<small>
+					Displays contextual prompts on day cards that aren&apos;t fully logged
+					to help you recall unlogged work. Off by default.
+				</small>
+			</div>
+		</fieldset>
 	);
 };

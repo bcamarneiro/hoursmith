@@ -14,6 +14,8 @@ const baseProps = {
 	includeCsvProvenanceId: 'include-csv-provenance',
 	analyticsOptOut: false,
 	analyticsOptOutId: 'analytics-opt-out',
+	memoryJogEnabled: false,
+	memoryJogEnabledId: 'memory-jog-enabled',
 };
 
 describe('PreferencesSection', () => {

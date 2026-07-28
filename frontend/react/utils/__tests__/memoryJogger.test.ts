@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type {
+	DaySummary,
+	WorklogSuggestion,
+} from '../../../../types/Suggestion';
 import { generateMemoryJogQuestions } from '../memoryJogger';
-import type { DaySummary, WorklogSuggestion } from '../../../../types/Suggestion';
 
-function makeSuggestion(overrides: Partial<WorklogSuggestion>): WorklogSuggestion {
+function makeSuggestion(
+	overrides: Partial<WorklogSuggestion>,
+): WorklogSuggestion {
 	return {
 		id: 'test-id',
 		source: 'jira-activity',
@@ -55,9 +60,15 @@ describe('generateMemoryJogQuestions', () => {
 	});
 
 	it('formats durations correctly in gap question', () => {
-		expect(generateMemoryJogQuestions(makeDay({ gapSeconds: 1800 }))[0].question).toContain('30m');
-		expect(generateMemoryJogQuestions(makeDay({ gapSeconds: 5400 }))[0].question).toContain('1h 30m');
-		expect(generateMemoryJogQuestions(makeDay({ gapSeconds: 28800 }))[0].question).toContain('8h');
+		expect(
+			generateMemoryJogQuestions(makeDay({ gapSeconds: 1800 }))[0].question,
+		).toContain('30m');
+		expect(
+			generateMemoryJogQuestions(makeDay({ gapSeconds: 5400 }))[0].question,
+		).toContain('1h 30m');
+		expect(
+			generateMemoryJogQuestions(makeDay({ gapSeconds: 28800 }))[0].question,
+		).toContain('8h');
 	});
 
 	it('generates calendar-based question when unlogged calendar suggestions exist', () => {
@@ -74,7 +85,9 @@ describe('generateMemoryJogQuestions', () => {
 		});
 		const questions = generateMemoryJogQuestions(day);
 		expect(questions.length).toBeGreaterThanOrEqual(2);
-		const calendarQ = questions.find((q) => q.question.includes('calendar events'));
+		const calendarQ = questions.find((q) =>
+			q.question.includes('calendar events'),
+		);
 		expect(calendarQ).toBeDefined();
 		expect(calendarQ?.hint).toContain('Design Review');
 	});
@@ -92,7 +105,9 @@ describe('generateMemoryJogQuestions', () => {
 			],
 		});
 		const questions = generateMemoryJogQuestions(day);
-		const calendarQ = questions.find((q) => q.question.includes('calendar events'));
+		const calendarQ = questions.find((q) =>
+			q.question.includes('calendar events'),
+		);
 		expect(calendarQ).toBeUndefined();
 	});
 
@@ -126,7 +141,9 @@ describe('generateMemoryJogQuestions', () => {
 			],
 		});
 		const questions = generateMemoryJogQuestions(day);
-		const jiraQ = questions.find((q) => q.question.includes('touched these issues'));
+		const jiraQ = questions.find((q) =>
+			q.question.includes('touched these issues'),
+		);
 		expect(jiraQ).toBeDefined();
 		expect(jiraQ?.hint).toContain('PROJ-201');
 	});
@@ -135,14 +152,32 @@ describe('generateMemoryJogQuestions', () => {
 		const day = makeDay({
 			gapSeconds: 7200,
 			suggestions: [
-				makeSuggestion({ source: 'calendar', calendarEventTitle: 'Event 1', logged: false }),
-				makeSuggestion({ source: 'calendar', calendarEventTitle: 'Event 2', logged: false }),
-				makeSuggestion({ source: 'calendar', calendarEventTitle: 'Event 3', logged: false }),
-				makeSuggestion({ source: 'calendar', calendarEventTitle: 'Event 4', logged: false }),
+				makeSuggestion({
+					source: 'calendar',
+					calendarEventTitle: 'Event 1',
+					logged: false,
+				}),
+				makeSuggestion({
+					source: 'calendar',
+					calendarEventTitle: 'Event 2',
+					logged: false,
+				}),
+				makeSuggestion({
+					source: 'calendar',
+					calendarEventTitle: 'Event 3',
+					logged: false,
+				}),
+				makeSuggestion({
+					source: 'calendar',
+					calendarEventTitle: 'Event 4',
+					logged: false,
+				}),
 			],
 		});
 		const questions = generateMemoryJogQuestions(day);
-		const calendarQ = questions.find((q) => q.question.includes('calendar events'));
+		const calendarQ = questions.find((q) =>
+			q.question.includes('calendar events'),
+		);
 		expect(calendarQ?.hint).toContain('Event 1');
 		expect(calendarQ?.hint).toContain('Event 2');
 		expect(calendarQ?.hint).toContain('Event 3');
@@ -153,9 +188,21 @@ describe('generateMemoryJogQuestions', () => {
 		const day = makeDay({
 			gapSeconds: 14400,
 			suggestions: [
-				makeSuggestion({ source: 'calendar', calendarEventTitle: 'Meeting', logged: false }),
-				makeSuggestion({ source: 'gitlab', issueSummary: 'Commit work', logged: false }),
-				makeSuggestion({ source: 'jira-activity', issueKey: 'PROJ-1', logged: false }),
+				makeSuggestion({
+					source: 'calendar',
+					calendarEventTitle: 'Meeting',
+					logged: false,
+				}),
+				makeSuggestion({
+					source: 'gitlab',
+					issueSummary: 'Commit work',
+					logged: false,
+				}),
+				makeSuggestion({
+					source: 'jira-activity',
+					issueKey: 'PROJ-1',
+					logged: false,
+				}),
 			],
 		});
 		const questions = generateMemoryJogQuestions(day);
