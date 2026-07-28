@@ -39,7 +39,10 @@ export interface RoundHoursReason {
 	wholeHours: number;
 }
 
-export type AnomalyReason = UnderLoggedReason | DuplicateReason | RoundHoursReason;
+export type AnomalyReason =
+	| UnderLoggedReason
+	| DuplicateReason
+	| RoundHoursReason;
 
 // ── Day stats ───────────────────────────────────────────────────────────────
 
@@ -140,7 +143,9 @@ export function detectUnderLogged(
  * value. Returns one {@link DuplicateReason} per cluster of 2+ matches.
  */
 export function detectDuplicates(
-	worklogs: ReadonlyArray<Pick<JiraWorklog, 'issueKey' | 'timeSpentSeconds' | 'id'>>,
+	worklogs: ReadonlyArray<
+		Pick<JiraWorklog, 'issueKey' | 'timeSpentSeconds' | 'id'>
+	>,
 ): DuplicateReason[] {
 	// Bucket by `${issueKey}|${timeSpentSeconds}`.
 	const buckets = new Map<string, string[]>();
@@ -188,7 +193,9 @@ export interface RoundHoursOptions {
  * rather than actual time tracking. The function is deterministic and pure.
  */
 export function detectRoundHours(
-	worklogs: ReadonlyArray<Pick<JiraWorklog, 'issueKey' | 'timeSpentSeconds' | 'id'>>,
+	worklogs: ReadonlyArray<
+		Pick<JiraWorklog, 'issueKey' | 'timeSpentSeconds' | 'id'>
+	>,
 	options: RoundHoursOptions = {},
 ): RoundHoursReason[] {
 	const minHours = options.minHours ?? 1;
@@ -216,7 +223,9 @@ export function detectRoundHours(
 
 // ── Combined entry point ───────────────────────────────────────────────────
 
-export interface AnomalyDetectionOptions extends UnderLoggedOptions, RoundHoursOptions {}
+export interface AnomalyDetectionOptions
+	extends UnderLoggedOptions,
+		RoundHoursOptions {}
 
 export interface DayAnomalies {
 	day: string;

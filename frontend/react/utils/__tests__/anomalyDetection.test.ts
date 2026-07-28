@@ -76,9 +76,9 @@ describe('detectUnderLogged', () => {
 		const stats = computeDayStats('2026-03-02', []);
 		const reason = detectUnderLogged(stats, BASELINE_DAY_SECONDS);
 		expect(reason).not.toBeNull();
-		expect(reason!.kind).toBe('under-logged');
-		expect(reason!.loggedSeconds).toBe(0);
-		expect(reason!.ratio).toBe(0);
+		expect(reason?.kind).toBe('under-logged');
+		expect(reason?.loggedSeconds).toBe(0);
+		expect(reason?.ratio).toBe(0);
 	});
 
 	it('flags a day below the default 50% threshold', () => {
@@ -87,7 +87,7 @@ describe('detectUnderLogged', () => {
 		]);
 		const reason = detectUnderLogged(stats, BASELINE_DAY_SECONDS);
 		expect(reason).not.toBeNull();
-		expect(reason!.ratio).toBeCloseTo(3600 / BASELINE_DAY_SECONDS);
+		expect(reason?.ratio).toBeCloseTo(3600 / BASELINE_DAY_SECONDS);
 	});
 
 	it('does not flag when above threshold', () => {
