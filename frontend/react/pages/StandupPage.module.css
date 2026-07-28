@@ -1,0 +1,144 @@
+.container {
+	max-width: 700px;
+	margin: 0 auto;
+	padding: var(--space-6);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-5);
+}
+
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--space-3);
+}
+
+.title {
+	font-size: var(--text-xl);
+	font-weight: var(--font-bold);
+	margin: 0;
+}
+
+.subtitle {
+	font-size: var(--text-sm);
+	color: var(--color-text-secondary);
+	margin: var(--space-1) 0 0;
+}
+
+.headerActions {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.output {
+	background: var(--color-surface-alt, var(--color-surface));
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	padding: var(--space-4);
+	font-family: var(--font-mono, ui-monospace, monospace);
+	font-size: var(--text-sm);
+	line-height: 1.6;
+	white-space: pre-wrap;
+	word-break: break-word;
+	color: var(--color-text);
+	margin: 0;
+}
+
+.loading {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-3);
+	padding: var(--space-12) 0;
+	color: var(--color-text-secondary);
+}
+
+.empty {
+	text-align: center;
+	padding: var(--space-8);
+	color: var(--color-text-secondary);
+}
+
+.empty h3 {
+	color: var(--color-text);
+	margin-bottom: var(--space-2);
+}
+
+.empty a {
+	color: var(--color-primary);
+}
+
+.error {
+	text-align: center;
+	padding: var(--space-6);
+	color: var(--color-text-secondary);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+}
+
+.error a {
+	color: var(--color-primary);
+}
+
+/* Empty setup state (no Jira configured) */
+.emptySetup {
+	text-align: center;
+	padding: var(--space-12) var(--space-4);
+}
+
+.emptySetupText {
+	max-width: 480px;
+	margin: 0 auto var(--space-6);
+}
+
+.emptySetupText h2 {
+	margin-bottom: var(--space-3);
+}
+
+.emptySetupText p {
+	color: var(--color-text-secondary);
+	line-height: 1.6;
+}
+
+.emptyActions {
+	display: flex;
+	gap: var(--space-3);
+	justify-content: center;
+}
+
+.primaryLink {
+	display: inline-block;
+	padding: var(--space-2) var(--space-4);
+	background: var(--color-primary);
+	color: var(--color-text-inverse);
+	text-decoration: none;
+	border-radius: var(--radius-md);
+	font-weight: var(--font-medium);
+}
+
+.secondaryLink {
+	display: inline-block;
+	padding: var(--space-2) var(--space-4);
+	color: var(--color-text-secondary);
+	text-decoration: none;
+	border-radius: var(--radius-md);
+	font-weight: var(--font-medium);
+}
+
+.secondaryLink:hover {
+	color: var(--color-text);
+}
+
+@media (max-width: 640px) {
+	.header {
+		flex-direction: column;
+	}
+
+	.headerActions {
+		width: 100%;
+		justify-content: flex-end;
+	}
+}
