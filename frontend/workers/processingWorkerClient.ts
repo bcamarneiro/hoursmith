@@ -106,6 +106,7 @@ export function postToWorker(
 
 	return new Promise<ProcessingWorkerResponse>((resolve, reject) => {
 		pending.set(id, { resolve, reject });
+		clearIdleTimer(); // prevent idle termination while request is in-flight
 		w.postMessage(msg);
 	});
 }
