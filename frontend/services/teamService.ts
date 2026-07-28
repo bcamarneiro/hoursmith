@@ -141,6 +141,9 @@ export async function fetchTeamWorklogs(
 		const batchSize = 10;
 
 		for (let i = 0; i < truncatedKeys.length; i += batchSize) {
+			// Check abort signal before each batch (ADA-420)
+			if (signal?.aborted) break;
+
 			const batch = truncatedKeys.slice(i, i + batchSize);
 			const results = await Promise.all(
 				batch.map(async (key) => {
