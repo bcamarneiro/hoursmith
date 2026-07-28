@@ -132,6 +132,11 @@
 	--shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.04);
 	--shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.1), 0 8px 10px rgba(0, 0, 0, 0.04);
 
+	/* Focus ring (WCAG 2.4.7) */
+	--focus-ring-color: var(--color-primary);
+	--focus-ring-width: 2px;
+	--focus-ring-offset: 2px;
+
 	/* Transitions */
 	--transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
 	--transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -343,4 +348,16 @@
 	font-family: var(--font-mono);
 	font-variant-numeric: tabular-nums;
 	letter-spacing: -0.01em;
+}
+
+/* ============================================================
+   Reduced motion (WCAG 2.3.3) — collapse all transition tokens
+   to instant so components that reference them stop animating.
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--transition-fast: 0ms;
+		--transition-base: 0ms;
+		--transition-slow: 0ms;
+	}
 }

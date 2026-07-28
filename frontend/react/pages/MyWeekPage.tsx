@@ -232,8 +232,11 @@ export const MyWeekPage: React.FC = () => {
 
 	const hasGaps = orderedWeekdays.some((d) => d.gapSeconds > 0);
 	const jumpToGapDays = () => {
+		const prefersReducedMotion = window.matchMedia(
+			'(prefers-reduced-motion: reduce)',
+		).matches;
 		document.getElementById(GAP_DAYS_SECTION_ID)?.scrollIntoView({
-			behavior: 'smooth',
+			behavior: prefersReducedMotion ? 'auto' : 'smooth',
 			block: 'start',
 		});
 	};

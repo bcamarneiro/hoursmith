@@ -91,8 +91,11 @@ export const SettingsPage: React.FC = () => {
 	// and scrolls it into view (replaces the old scroll-to-anchor behaviour).
 	const selectSection = (sectionId: string) => {
 		setActiveSection(sectionId);
+		const prefersReducedMotion = window.matchMedia(
+			'(prefers-reduced-motion: reduce)',
+		).matches;
 		document.getElementById(SETTINGS_SECTION_IDS.form)?.scrollIntoView({
-			behavior: 'smooth',
+			behavior: prefersReducedMotion ? 'auto' : 'smooth',
 			block: 'start',
 		});
 	};
