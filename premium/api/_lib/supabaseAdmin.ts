@@ -11,12 +11,22 @@
  */
 
 import { userIdFromToken } from './auth.js';
+import type {
+	Team,
+	TeamMembership,
+	TeamInvite,
+	TeamRole,
+} from '../../../types/team.js';
 
 export interface ProfileRow {
 	id: string;
 	email: string;
 	created_at: string;
 }
+
+export interface TeamRow extends Team {}
+export interface TeamMembershipRow extends TeamMembership {}
+export interface TeamInviteRow extends TeamInvite {}
 
 export interface SubscriptionRow {
 	user_id: string;
@@ -73,6 +83,25 @@ export interface SupabaseAdminClient {
 	 * already seen (a duplicate delivery that must not be reprocessed).
 	 */
 	recordBillingEvent(eventId: string): Promise<boolean>;
+	// Team methods (ADA-489)
+	getTeamByOwner(ownerId: string): Promise<TeamRow | null>;
+	getTeamById(teamId: string): Promise<TeamRow | null>;
+	getTeamByInviteToken(token: string): Promise<TeamRow | null>;
+	createTeam(input: { id: string; name: string; ownerId: string; seatLimit: number }): Promise<TeamRow>;
+	updateTeamSeatLimit(teamId: string, seatLimit: number): Promise<void>;
+	deleteTeam(teamId: string): Promise<void>;
+	getTeamMembers(teamId: string): Promise<Array<TeamMembershipRow & { email: string }>>;
+	getTeamMembership(teamId: string, userId: string): Promise<TeamMembershipRow | null>;
+	getUserTeamMembership(userId: string): Promise<(TeamMembershipRow & { team_name: string }) | null>;
+	addTeamMember(teamId: string, userId: string, role: TeamRole): Promise<void>;
+	removeTeamMember(teamId: string, userId: string): Promise<void>;
+	updateMemberRole(teamId: string, userId: string, role: TeamRole): Promise<void>;
+	createTeamInvite(input: { id: string; teamId: string; email: string; role: TeamRole; token: string; invitedBy: string; expiresAt: string }): Promise<TeamInviteRow>;
+	getTeamInviteByToken(token: string): Promise<TeamInviteRow | null>;
+	getTeamInvites(teamId: string): Promise<TeamInviteRow[]>;
+	markInviteAccepted(inviteId: string): Promise<void>;
+	deleteTeamInvite(inviteId: string): Promise<void>;
+	getProfileByEmail(email: string): Promise<ProfileRow | null>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -293,5 +322,323 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		}
 		const rows = (await res.json()) as unknown[];
 		return Array.isArray(rows) && rows.length > 0;
+	}
+
+	// Team methods (ADA-489)
+
+	async getTeamByOwner(ownerId: string): Promise<TeamRow | null> {
+		const params = new URLSearchParams({
+			owner_id: `eq.${ownerId}`,
+			select: 'id,name,owner_id,seat_limit,created_at,updated_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/teams?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getTeamByOwner failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as TeamRow[];
+		return rows[0] ?? null;
+	}
+
+	async getTeamById(teamId: string): Promise<TeamRow | null> {
+		const params = new URLSearchParams({
+			id: `eq.${teamId}`,
+			select: 'id,name,owner_id,seat_limit,created_at,updated_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/teams?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getTeamById failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as TeamRow[];
+		return rows[0] ?? null;
+	}
+
+	async getTeamByInviteToken(token: string): Promise<TeamRow | null> {
+		const inviteParams = new URLSearchParams({
+			token: `eq.${token}`,
+			select: 'team_id',
+		});
+		const inviteRes = await fetch(
+			`${this.url}/rest/v1/team_invites?${inviteParams.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!inviteRes.ok) {
+			throw new Error(`supabaseAdmin.getTeamByInviteToken failed: ${inviteRes.status}`);
+		}
+		const invites = (await inviteRes.json()) as Array<{ team_id: string }>;
+		if (invites.length === 0) return null;
+
+		return this.getTeamById(invites[0].team_id);
+	}
+
+	async createTeam(input: { id: string; name: string; ownerId: string; seatLimit: number }): Promise<TeamRow> {
+		const res = await fetch(`${this.url}/rest/v1/teams`, {
+			method: 'POST',
+			headers: this.headers({
+				'content-type': 'application/json',
+				prefer: 'return=representation',
+			}),
+			body: JSON.stringify({
+				id: input.id,
+				name: input.name,
+				owner_id: input.ownerId,
+				seat_limit: input.seatLimit,
+			}),
+		});
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.createTeam failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as TeamRow[];
+		return rows[0];
+	}
+
+	async updateTeamSeatLimit(teamId: string, seatLimit: number): Promise<void> {
+		const params = new URLSearchParams({ id: `eq.${teamId}` });
+		const res = await fetch(
+			`${this.url}/rest/v1/teams?${params.toString()}`,
+			{
+				method: 'PATCH',
+				headers: this.headers({
+					'content-type': 'application/json',
+					prefer: 'return=minimal',
+				}),
+				body: JSON.stringify({ seat_limit: seatLimit, updated_at: new Date().toISOString() }),
+			},
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.updateTeamSeatLimit failed: ${res.status}`);
+		}
+	}
+
+	async deleteTeam(teamId: string): Promise<void> {
+		const params = new URLSearchParams({ id: `eq.${teamId}` });
+		const res = await fetch(
+			`${this.url}/rest/v1/teams?${params.toString()}`,
+			{ method: 'DELETE', headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.deleteTeam failed: ${res.status}`);
+		}
+	}
+
+	async getTeamMembers(teamId: string): Promise<Array<TeamMembershipRow & { email: string }>> {
+		const params = new URLSearchParams({
+			team_id: `eq.${teamId}`,
+			select: 'team_id,user_id,role,joined_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/team_memberships?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getTeamMembers failed: ${res.status}`);
+		}
+		const memberships = (await res.json()) as TeamMembershipRow[];
+
+		// Fetch emails for each member
+		const membersWithEmail = await Promise.all(
+			memberships.map(async (m) => {
+				const profile = await this.getProfile(m.user_id);
+				return { ...m, email: profile?.email ?? 'unknown' };
+			}),
+		);
+
+		return membersWithEmail;
+	}
+
+	async getTeamMembership(teamId: string, userId: string): Promise<TeamMembershipRow | null> {
+		const params = new URLSearchParams({
+			team_id: `eq.${teamId}`,
+			user_id: `eq.${userId}`,
+			select: 'team_id,user_id,role,joined_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/team_memberships?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getTeamMembership failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as TeamMembershipRow[];
+		return rows[0] ?? null;
+	}
+
+	async getUserTeamMembership(userId: string): Promise<(TeamMembershipRow & { team_name: string }) | null> {
+		const params = new URLSearchParams({
+			user_id: `eq.${userId}`,
+			select: 'team_id,user_id,role,joined_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/team_memberships?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getUserTeamMembership failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as TeamMembershipRow[];
+		if (rows.length === 0) return null;
+
+		const team = await this.getTeamById(rows[0].team_id);
+		if (!team) return null;
+
+		return { ...rows[0], team_name: team.name };
+	}
+
+	async addTeamMember(teamId: string, userId: string, role: TeamRole): Promise<void> {
+		const res = await fetch(`${this.url}/rest/v1/team_memberships`, {
+			method: 'POST',
+			headers: this.headers({
+				'content-type': 'application/json',
+				prefer: 'return=minimal',
+			}),
+			body: JSON.stringify({
+				team_id: teamId,
+				user_id: userId,
+				role,
+			}),
+		});
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.addTeamMember failed: ${res.status}`);
+		}
+	}
+
+	async removeTeamMember(teamId: string, userId: string): Promise<void> {
+		const params = new URLSearchParams({
+			team_id: `eq.${teamId}`,
+			user_id: `eq.${userId}`,
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/team_memberships?${params.toString()}`,
+			{ method: 'DELETE', headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.removeTeamMember failed: ${res.status}`);
+		}
+	}
+
+	async updateMemberRole(teamId: string, userId: string, role: TeamRole): Promise<void> {
+		const params = new URLSearchParams({
+			team_id: `eq.${teamId}`,
+			user_id: `eq.${userId}`,
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/team_memberships?${params.toString()}`,
+			{
+				method: 'PATCH',
+				headers: this.headers({
+					'content-type': 'application/json',
+					prefer: 'return=minimal',
+				}),
+				body: JSON.stringify({ role }),
+			},
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.updateMemberRole failed: ${res.status}`);
+		}
+	}
+
+	async createTeamInvite(input: { id: string; teamId: string; email: string; role: TeamRole; token: string; invitedBy: string; expiresAt: string }): Promise<TeamInviteRow> {
+		const res = await fetch(`${this.url}/rest/v1/team_invites`, {
+			method: 'POST',
+			headers: this.headers({
+				'content-type': 'application/json',
+				prefer: 'return=representation',
+			}),
+			body: JSON.stringify({
+				id: input.id,
+				team_id: input.teamId,
+				email: input.email,
+				role: input.role,
+				token: input.token,
+				invited_by: input.invitedBy,
+				expires_at: input.expiresAt,
+			}),
+		});
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.createTeamInvite failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as TeamInviteRow[];
+		return rows[0];
+	}
+
+	async getTeamInviteByToken(token: string): Promise<TeamInviteRow | null> {
+		const params = new URLSearchParams({
+			token: `eq.${token}`,
+			select: 'id,team_id,email,role,token,invited_by,expires_at,accepted_at,created_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/team_invites?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getTeamInviteByToken failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as TeamInviteRow[];
+		return rows[0] ?? null;
+	}
+
+	async getTeamInvites(teamId: string): Promise<TeamInviteRow[]> {
+		const params = new URLSearchParams({
+			team_id: `eq.${teamId}`,
+			select: 'id,team_id,email,role,token,invited_by,expires_at,accepted_at,created_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/team_invites?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getTeamInvites failed: ${res.status}`);
+		}
+		return (await res.json()) as TeamInviteRow[];
+	}
+
+	async markInviteAccepted(inviteId: string): Promise<void> {
+		const params = new URLSearchParams({ id: `eq.${inviteId}` });
+		const res = await fetch(
+			`${this.url}/rest/v1/team_invites?${params.toString()}`,
+			{
+				method: 'PATCH',
+				headers: this.headers({
+					'content-type': 'application/json',
+					prefer: 'return=minimal',
+				}),
+				body: JSON.stringify({ accepted_at: new Date().toISOString() }),
+			},
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.markInviteAccepted failed: ${res.status}`);
+		}
+	}
+
+	async deleteTeamInvite(inviteId: string): Promise<void> {
+		const params = new URLSearchParams({ id: `eq.${inviteId}` });
+		const res = await fetch(
+			`${this.url}/rest/v1/team_invites?${params.toString()}`,
+			{ method: 'DELETE', headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.deleteTeamInvite failed: ${res.status}`);
+		}
+	}
+
+	async getProfileByEmail(email: string): Promise<ProfileRow | null> {
+		const params = new URLSearchParams({
+			email: `eq.${email}`,
+			select: 'id,email,created_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/profiles?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getProfileByEmail failed: ${res.status}`);
+		}
+		const rows = (await res.json()) as ProfileRow[];
+		return rows[0] ?? null;
 	}
 }
