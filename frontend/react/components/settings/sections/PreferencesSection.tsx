@@ -26,6 +26,7 @@ type Props = {
 	includeAbsenceInCsv: boolean;
 	includeCsvProvenance: boolean;
 	analyticsOptOut: boolean;
+	worklogCacheEnabled: boolean;
 	handleSelectChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 	handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 	themeId: string;
@@ -33,6 +34,7 @@ type Props = {
 	includeAbsenceInCsvId: string;
 	includeCsvProvenanceId: string;
 	analyticsOptOutId: string;
+	worklogCacheId: string;
 };
 
 /**
@@ -45,6 +47,7 @@ export const PreferencesSection: React.FC<Props> = ({
 	includeAbsenceInCsv,
 	includeCsvProvenance,
 	analyticsOptOut,
+	worklogCacheEnabled,
 	handleSelectChange,
 	handleChange,
 	themeId,
@@ -52,6 +55,7 @@ export const PreferencesSection: React.FC<Props> = ({
 	includeAbsenceInCsvId,
 	includeCsvProvenanceId,
 	analyticsOptOutId,
+	worklogCacheId,
 }) => {
 	// ADA-451: apply the selected theme live as the user changes it, instead of
 	// only after Save. On unmount (e.g. navigating away without saving) restore
@@ -144,6 +148,24 @@ export const PreferencesSection: React.FC<Props> = ({
 				<small>
 					When checked, Hoursmith stops sending anonymous, privacy-preserving
 					product analytics. No personal data or Jira content is ever collected.
+				</small>
+			</div>
+			<div className={styles.formGroup}>
+				<span className={styles.fieldLabel}>Offline cache</span>
+				<label>
+					<input
+						type="checkbox"
+						id={worklogCacheId}
+						name="worklogCacheEnabled"
+						checked={worklogCacheEnabled}
+						onChange={handleChange}
+					/>{' '}
+					Persist fetched worklogs locally (IndexedDB)
+				</label>
+				<small>
+					Stores worklogs on disk so repeat visits load instantly and fetch only
+					changes. Scoped per Jira connection and cleared on sign-out. Off by
+					default — enable only if you accept local persistence of Jira data.
 				</small>
 			</div>
 		</fieldset>

@@ -5,6 +5,11 @@ import {
 	fetchMonthWorklogs,
 	type WorklogItem,
 } from '../../services/monthWorklogService';
+import {
+	clearConnectionCache,
+	loadMonthWorklogs,
+	saveMonthWorklogs,
+} from '../../services/worklogCache';
 import { useConfigStore } from '../../stores/useConfigStore';
 import {
 	buildJiraConnectionFingerprint,
@@ -53,18 +58,44 @@ export function useMonthWorklogs(
 	const currentUserOnly = options?.currentUserOnly ?? false;
 	const jqlFilter = options?.jqlFilter ?? '';
 	const onProgress = options?.onProgress;
+	const cacheEnabled = config.worklogCacheEnabled;
+
+	const queryKey = monthWorklogsQueryKey(
+		year,
+		month,
+		jiraHost,
+		corsProxy,
+		currentUserOnly,
+		jqlFilter,
+	);
+
+	// Pre-populate React Query cache from IndexedDB on mount for instant reloads.
+	// The network fetch still runs (React Query handles staleness), but the UI
+	// shows cached data immediately instead of a loading spinner.
+	useEffect(() => {
+		if (!cacheEnabled || !jiraHost || !apiToken) return;
+
+		const fingerprint = buildJiraConnectionFingerprint(config);
+		let cancelled = false;
+
+		loadMonthWorklogs(fingerprint, year, month).then((cached) => {
+			if (cancelled || !cached) return;
+			// Only pre-populate if the query has no data yet
+			const existing = queryClient.getQueryData(queryKey);
+			if (!existing) {
+				queryClient.setQueryData(queryKey, cached);
+			}
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [cacheEnabled, jiraHost, apiToken, config, year, month, queryClient, queryKey]);
 
 	const result = useQuery<WorklogItem[]>({
-		queryKey: monthWorklogsQueryKey(
-			year,
-			month,
-			jiraHost,
-			corsProxy,
-			currentUserOnly,
-			jqlFilter,
-		),
-		queryFn: ({ signal }) =>
-			fetchMonthWorklogs(
+		queryKey,
+		queryFn: async ({ signal }) => {
+			const worklogs = await fetchMonthWorklogs(
 				config,
 				year,
 				month,
@@ -74,7 +105,19 @@ export function useMonthWorklogs(
 					onProgress: onProgress ?? undefined,
 				},
 				signal,
-			),
+			);
+
+			// Persist to IndexedDB after successful fetch (opt-in)
+			if (cacheEnabled) {
+				const fingerprint = buildJiraConnectionFingerprint(config);
+				saveMonthWorklogs(fingerprint, year, month, worklogs).catch(() => {
+					// Cache write failure is non-fatal — the data is already in
+					// the React Query cache and the UI is unaffected.
+				});
+			}
+
+			return worklogs;
+		},
 		enabled: (options?.enabled ?? true) && !!jiraHost && !!apiToken,
 		staleTime: 15 * 60 * 1000,
 	});
@@ -128,8 +171,8 @@ export function useMonthWorklogs(
 					currentUserOnly,
 					jqlFilter,
 				),
-				queryFn: ({ signal }) =>
-					fetchMonthWorklogs(
+				queryFn: async ({ signal }) => {
+					const worklogs = await fetchMonthWorklogs(
 						queryConfig,
 						y,
 						m,
@@ -138,7 +181,15 @@ export function useMonthWorklogs(
 							jqlFilter: options?.jqlFilter,
 						},
 						signal,
-					),
+					);
+
+					if (cacheEnabled) {
+						const fingerprint = buildJiraConnectionFingerprint(queryConfig);
+						saveMonthWorklogs(fingerprint, y, m, worklogs).catch(() => {});
+					}
+
+					return worklogs;
+				},
 				staleTime: 15 * 60 * 1000,
 			});
 		}
@@ -154,7 +205,22 @@ export function useMonthWorklogs(
 		jqlFilter,
 		queryClient,
 		options?.jqlFilter,
+		cacheEnabled,
 	]);
 
 	return result;
+}
+
+/**
+ * Clear the IndexedDB worklog cache for the current connection.
+ * Exposed for use in settings / sign-out flows.
+ */
+export async function clearWorklogCacheForConnection(
+	config: Pick<
+		Parameters<typeof buildJiraConnectionFingerprint>[0],
+		'jiraHost' | 'email' | 'apiToken' | 'corsProxy'
+	>,
+): Promise<void> {
+	const fingerprint = buildJiraConnectionFingerprint(config);
+	await clearConnectionCache(fingerprint);
 }

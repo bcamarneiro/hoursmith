@@ -68,6 +68,14 @@ export interface Config {
 	 * compiling — `createDefaultConfig`/`normalizeConfig` always populate it.
 	 */
 	analyticsOptOut?: boolean;
+	/**
+	 * When true, fetched worklogs are persisted in IndexedDB so repeat visits
+	 * can skip full re-fetches (delta sync only). Opt-in (default false) because
+	 * IndexedDB retains Jira data on disk, in tension with "data stays in the
+	 * browser, nothing retained." Scoped per-connection, clearable from
+	 * settings, and wiped on sign-out / connection change.
+	 */
+	worklogCacheEnabled: boolean;
 }
 
 interface ConfigState {
@@ -75,7 +83,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 7;
+export const CONFIG_STORAGE_VERSION = 8;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -187,6 +195,7 @@ export function createDefaultConfig(): Config {
 		includeAbsenceInCsv: true,
 		includeCsvProvenance: false,
 		analyticsOptOut: false,
+		worklogCacheEnabled: false,
 	};
 }
 
@@ -291,6 +300,10 @@ export function normalizeConfig(
 			typeof config?.analyticsOptOut === 'boolean'
 				? config.analyticsOptOut
 				: fallback.analyticsOptOut,
+		worklogCacheEnabled:
+			typeof config?.worklogCacheEnabled === 'boolean'
+				? config.worklogCacheEnabled
+				: fallback.worklogCacheEnabled,
 	};
 }
 
@@ -307,6 +320,9 @@ export function normalizeConfig(
  *        migrate step is a no-op pass-through normaliser.
  *   v7 → added analyticsOptOut (boolean, default false). No shape change;
  *        `normalizeConfig` fills the field for pre-v7 blobs.
+ *   v8 → added worklogCacheEnabled (boolean, default false). Opt-in IndexedDB
+ *        persistence for fetched worklogs. `normalizeConfig` fills the field
+ *        for pre-v8 blobs.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -314,7 +330,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v7(
+function migrateLegacy_v0_to_v8(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -328,7 +344,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v7(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v8(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and
@@ -341,9 +357,29 @@ migrateStorageKey('jira-timesheet-config', 'hoursmith-config');
 
 export const useConfigStore = create<ConfigState>()(
 	persist(
-		(set) => ({
+		(set, get) => ({
 			config: createDefaultConfig(),
-			setConfig: (newConfig) => set({ config: normalizeConfig(newConfig) }),
+			setConfig: (newConfig) => {
+				const normalized = normalizeConfig(newConfig);
+				const oldConfig = get().config;
+				// If the connection fingerprint changed, wipe the IndexedDB
+				// worklog cache so stale data from a different Jira instance
+				// or account never leaks into the new connection.
+				const connectionChanged =
+					oldConfig.jiraHost !== normalized.jiraHost ||
+					oldConfig.email !== normalized.email ||
+					oldConfig.apiToken !== normalized.apiToken ||
+					oldConfig.corsProxy !== normalized.corsProxy;
+				if (connectionChanged) {
+					import('../services/worklogCache')
+						.then(({ clearAllCache }) => clearAllCache())
+						.catch(() => {
+							// Best-effort: if IndexedDB is unavailable or the
+							// clear fails, don't block the config save.
+						});
+				}
+				set({ config: normalized });
+			},
 		}),
 		{
 			name: 'hoursmith-config',
