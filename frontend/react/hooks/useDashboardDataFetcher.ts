@@ -2,6 +2,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import type { RescueTimeDaySummary } from '../../../types/Suggestion';
 import { fetchCalendarSuggestions } from '../../services/calendarService';
+import {
+	fetchGoogleCalendarSuggestions,
+	refreshAccessToken,
+	type GoogleCalendarTokens,
+} from '../../services/googleCalendarService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
 import { fetchJiraActivitySuggestions } from '../../services/jiraActivityService';
 import {
@@ -136,6 +141,11 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const gitlabHost = useConfigStore((s) => s.config.gitlabHost);
 	const rescueTimeApiKey = useConfigStore((s) => s.config.rescueTimeApiKey);
 	const calendarFeeds = useConfigStore((s) => s.config.calendarFeeds);
+	const googleCalendarClientId = useConfigStore((s) => s.config.googleCalendarClientId);
+	const googleCalendarAccessToken = useConfigStore((s) => s.config.googleCalendarAccessToken);
+	const googleCalendarRefreshToken = useConfigStore((s) => s.config.googleCalendarRefreshToken);
+	const googleCalendarExpiresAt = useConfigStore((s) => s.config.googleCalendarExpiresAt);
+	const setConfig = useConfigStore((s) => s.setConfig);
 	const timeRounding = useConfigStore((s) => s.config.timeRounding);
 	const weekStart = useDashboardStore((s) => s.weekStart);
 	const weekEnd = useDashboardStore((s) => s.weekEnd);
@@ -211,9 +221,13 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			const suggestionFeeds = (config.calendarFeeds ?? []).filter(
 				(f) => f.type === 'suggestion',
 			);
-			const hasCalendar = suggestionFeeds.length > 0;
-			if (hasCalendar) setLoading('calendar', true);
-			if (rescueTimeApiKey) setLoading('rescuetime', true);
+		const hasCalendar = suggestionFeeds.length > 0;
+		const hasGoogleCalendar =
+			!!googleCalendarClientId &&
+			!!googleCalendarAccessToken &&
+			!!googleCalendarRefreshToken;
+		if (hasCalendar || hasGoogleCalendar) setLoading('calendar', true);
+		if (rescueTimeApiKey) setLoading('rescuetime', true);
 
 			// Determine which month(s) the week spans
 			const [startYear, startMonthStr] = weekStart.split('-').map(Number);
@@ -241,7 +255,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 				worklogsResult,
 				jiraSuggestions,
 				gitlabSuggestions,
-				calendarSuggestions,
+				icsCalendarSuggestions,
+				googleCalendarSuggestions,
 				rescueTimeData,
 			] = await Promise.all([
 				// Worklogs: fetch from shared month query (cached/deduplicated)
@@ -349,21 +364,82 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 							.finally(() => setLoading('gitlab', false))
 					: Promise.resolve([]),
 
-				hasCalendar
-					? fetchCalendarSuggestions(
-							suggestionFeeds,
-							userConfiguredProxy,
+			hasCalendar
+				? fetchCalendarSuggestions(
+						suggestionFeeds,
+						userConfiguredProxy,
+						weekStart,
+						weekEnd,
+						calendarMappings,
+						signal,
+					)
+						.catch((e) => {
+							if (!signal.aborted) setError('calendar', e.message);
+							return [];
+						})
+				: Promise.resolve([]),
+
+			// Google Calendar: fetch events if OAuth tokens are configured
+			hasGoogleCalendar
+				? (async () => {
+						// Refresh access token if expired
+						let tokens: GoogleCalendarTokens = {
+							accessToken: googleCalendarAccessToken || '',
+							refreshToken: googleCalendarRefreshToken || '',
+							expiresAt: googleCalendarExpiresAt || 0,
+						};
+
+						// Check if token needs refresh (expiresAt is in seconds)
+						const nowSeconds = Math.floor(Date.now() / 1000);
+						if (googleCalendarExpiresAt && nowSeconds >= googleCalendarExpiresAt) {
+							try {
+								tokens = await refreshAccessToken(
+									googleCalendarClientId || '',
+									googleCalendarRefreshToken || '',
+								);
+								// Update config with refreshed tokens
+								const currentConfig = useConfigStore.getState().config;
+								setConfig({
+									...currentConfig,
+									googleCalendarAccessToken: tokens.accessToken,
+									googleCalendarRefreshToken: tokens.refreshToken,
+									googleCalendarExpiresAt: tokens.expiresAt,
+								});
+							} catch (err) {
+								throw new Error(
+									`Google Calendar token refresh failed: ${err instanceof Error ? err.message : String(err)}`,
+								);
+							}
+						}
+
+						const result = await fetchGoogleCalendarSuggestions(
+							googleCalendarClientId || '',
+							tokens,
+							userConfiguredProxy || '',
 							weekStart,
 							weekEnd,
 							calendarMappings,
 							signal,
-						)
-							.catch((e) => {
-								if (!signal.aborted) setError('calendar', e.message);
-								return [];
-							})
-							.finally(() => setLoading('calendar', false))
-					: Promise.resolve([]),
+						);
+
+						// Update tokens if they were refreshed during the fetch
+						if (result.updatedTokens !== tokens) {
+							const currentConfig = useConfigStore.getState().config;
+							setConfig({
+								...currentConfig,
+								googleCalendarAccessToken: result.updatedTokens.accessToken,
+								googleCalendarRefreshToken: result.updatedTokens.refreshToken,
+								googleCalendarExpiresAt: result.updatedTokens.expiresAt,
+							});
+						}
+
+						return result.suggestions;
+					})()
+						.catch((e) => {
+							if (!signal.aborted) setError('calendar', e.message);
+							return [];
+						})
+				: Promise.resolve([]),
 
 				rescueTimeApiKey
 					? fetchRescueTimeData(
@@ -381,9 +457,18 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					: Promise.resolve(new Map<string, RescueTimeDaySummary>()),
 			]);
 
-			if (signal.aborted) return;
+		if (signal.aborted) return;
 
-			const worklogs = worklogsResult.entries;
+		// Calendar loading is done once both ICS and Google Calendar resolve
+		setLoading('calendar', false);
+
+		// Merge ICS and Google Calendar suggestions into a single array
+		const calendarSuggestions = [
+			...icsCalendarSuggestions,
+			...googleCalendarSuggestions,
+		];
+
+		const worklogs = worklogsResult.entries;
 			const weekGhosts = worklogsResult.ghosts;
 
 			// Store worklogs with issueKey for weekly summary export
@@ -429,6 +514,11 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		gitlabHost,
 		rescueTimeApiKey,
 		calendarFeeds,
+		googleCalendarClientId,
+		googleCalendarAccessToken,
+		googleCalendarRefreshToken,
+		googleCalendarExpiresAt,
+		setConfig,
 		timeRounding,
 		weekStart,
 		weekEnd,

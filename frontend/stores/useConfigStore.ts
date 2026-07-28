@@ -68,6 +68,17 @@ export interface Config {
 	 * compiling — `createDefaultConfig`/`normalizeConfig` always populate it.
 	 */
 	analyticsOptOut?: boolean;
+	/**
+	 * Google Calendar OAuth (ADA-406). Public OAuth 2.0 client ID for the
+	 * PKCE SPA flow. Empty string = not configured.
+	 */
+	googleCalendarClientId?: string;
+	/** Google Calendar access token (short-lived, refreshed automatically). */
+	googleCalendarAccessToken?: string;
+	/** Google Calendar refresh token (long-lived, survives sessions). */
+	googleCalendarRefreshToken?: string;
+	/** Unix timestamp (seconds) when the Google Calendar access token expires. */
+	googleCalendarExpiresAt?: number;
 }
 
 interface ConfigState {
@@ -75,7 +86,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 7;
+export const CONFIG_STORAGE_VERSION = 8;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -291,7 +302,34 @@ export function normalizeConfig(
 			typeof config?.analyticsOptOut === 'boolean'
 				? config.analyticsOptOut
 				: fallback.analyticsOptOut,
+		googleCalendarClientId:
+			typeof config?.googleCalendarClientId === 'string'
+				? config.googleCalendarClientId.trim()
+				: fallback.googleCalendarClientId?.trim() || '',
+		googleCalendarAccessToken:
+			typeof config?.googleCalendarAccessToken === 'string'
+				? config.googleCalendarAccessToken.trim()
+				: fallback.googleCalendarAccessToken?.trim() || '',
+		googleCalendarRefreshToken:
+			typeof config?.googleCalendarRefreshToken === 'string'
+				? config.googleCalendarRefreshToken.trim()
+				: fallback.googleCalendarRefreshToken?.trim() || '',
+		googleCalendarExpiresAt:
+			typeof config?.googleCalendarExpiresAt === 'number'
+				? config.googleCalendarExpiresAt
+				: fallback.googleCalendarExpiresAt ?? 0,
 	};
+}
+
+/**
+ * Check if Google Calendar OAuth is configured (client ID + tokens present).
+ */
+export function isGoogleCalendarConfigured(config: Config): boolean {
+	return Boolean(
+		config.googleCalendarClientId &&
+			config.googleCalendarRefreshToken &&
+			config.googleCalendarAccessToken,
+	);
 }
 
 /**
@@ -307,6 +345,9 @@ export function normalizeConfig(
  *        migrate step is a no-op pass-through normaliser.
  *   v7 → added analyticsOptOut (boolean, default false). No shape change;
  *        `normalizeConfig` fills the field for pre-v7 blobs.
+ *   v8 → added googleCalendarClientId, googleCalendarAccessToken,
+ *        googleCalendarRefreshToken, googleCalendarExpiresAt (ADA-406).
+ *        All optional strings/number; `normalizeConfig` fills defaults.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
