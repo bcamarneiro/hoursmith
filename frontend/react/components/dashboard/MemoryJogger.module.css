@@ -1,0 +1,50 @@
+.container {
+	margin-top: 0.75rem;
+	border-top: 1px solid var(--border-color, #e0e0e0);
+	padding-top: 0.5rem;
+}
+
+.toggle {
+	background: none;
+	border: none;
+	color: var(--text-secondary, #666);
+	cursor: pointer;
+	font-size: 0.85rem;
+	padding: 0.25rem 0;
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.toggle:hover {
+	color: var(--text-primary, #333);
+}
+
+.icon {
+	font-size: 0.7rem;
+	width: 0.75rem;
+}
+
+.list {
+	margin: 0.5rem 0 0 0;
+	padding-left: 1.25rem;
+	list-style: disc;
+}
+
+.item {
+	margin-bottom: 0.4rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.question {
+	font-size: 0.85rem;
+	color: var(--text-primary, #333);
+}
+
+.hint {
+	font-size: 0.75rem;
+	color: var(--text-secondary, #666);
+	font-style: italic;
+}
