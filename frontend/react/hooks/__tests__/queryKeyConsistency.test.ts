@@ -39,6 +39,7 @@ describe('monthWorklogs query key consistency', () => {
 				timeRounding: 'off',
 				includeAbsenceInCsv: true,
 				includeCsvProvenance: false,
+	worklogCacheEnabled: false,
 			},
 		});
 	});

@@ -11,6 +11,7 @@ const baseProps = {
 	timeRoundingId: 'round',
 	includeAbsenceInCsvId: 'include-absence',
 	includeCsvProvenance: false,
+	worklogCacheEnabled: false,
 	includeCsvProvenanceId: 'include-csv-provenance',
 	analyticsOptOut: false,
 	analyticsOptOutId: 'analytics-opt-out',
