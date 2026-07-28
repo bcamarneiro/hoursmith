@@ -218,9 +218,13 @@ export const MyWeekPage: React.FC = () => {
 								result.created.map((w) =>
 									deleteWorklog(w.issueKey, w.worklogId),
 								),
-							).then(() => {
-								unmarkMultipleSuggestionsLogged(successIds);
-							});
+							)
+								.then(() => {
+									unmarkMultipleSuggestionsLogged(successIds);
+								})
+								.catch(() => {
+									toast.error('Undo failed');
+								});
 						},
 					},
 				});

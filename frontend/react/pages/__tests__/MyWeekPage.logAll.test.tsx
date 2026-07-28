@@ -4,6 +4,15 @@ import { MyWeekPage } from '../MyWeekPage';
 import { useDashboardStore } from '../../../stores/useDashboardStore';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import type { DaySummary, WorklogSuggestion } from '../../../../types/Suggestion';
+import { toast } from '../../components/ui/Toast';
+
+vi.mock('../../components/ui/Toast', () => ({
+	toast: {
+		success: vi.fn(),
+		error: vi.fn(),
+		info: vi.fn(),
+	},
+}));
 
 // Mock heavy child components to avoid deep dependency chains
 vi.mock('../../components/dashboard/DayCard', () => ({
@@ -299,6 +308,158 @@ describe('MyWeekPage - Log All Suggestions', () => {
 			const state = useDashboardStore.getState();
 			const all = state.daySummaries.flatMap((d) => d.suggestions);
 			expect(all.filter((s) => s.logged).length).toBe(2);
+		});
+	});
+
+	it('shows loading state during batch log', async () => {
+		let resolvePromise: (value: any) => void;
+		const promise = new Promise((resolve) => {
+			resolvePromise = resolve;
+		});
+		mockCreateMultipleWorklogs.mockReturnValue(promise);
+
+		const s1 = makeSuggestion('1', 'PROJ-1', '2024-01-15');
+		useDashboardStore.setState({
+			daySummaries: [makeDay('2024-01-15', [s1])],
+		});
+
+		render(<MyWeekPage />);
+
+		const btn = screen.getByRole('button', { name: /Log All \(1\)/i });
+		fireEvent.click(btn);
+
+		await waitFor(() => {
+			const loadingBtn = screen.getByRole('button', { name: /Logging.../i });
+			expect(loadingBtn).toBeTruthy();
+			expect(loadingBtn.getAttribute('disabled')).not.toBeNull();
+		});
+
+		resolvePromise!({
+			success: 1,
+			failed: [],
+			created: [{ issueKey: 'PROJ-1', worklogId: '100' }],
+		});
+
+		await waitFor(() => {
+			// After success, suggestions are marked logged so button reverts to
+			// "Log All" (no count) and is disabled because nothing left to log.
+			const restoredBtn = screen.getByRole('button', { name: /^Log All$/i });
+			expect(restoredBtn).toBeTruthy();
+		});
+	});
+
+	it('shows error toast on partial failure', async () => {
+		mockCreateMultipleWorklogs.mockResolvedValue({
+			success: 1,
+			failed: ['PROJ-2'],
+			created: [{ issueKey: 'PROJ-1', worklogId: '100' }],
+		});
+
+		const s1 = makeSuggestion('1', 'PROJ-1', '2024-01-15');
+		const s2 = makeSuggestion('2', 'PROJ-2', '2024-01-16');
+		useDashboardStore.setState({
+			daySummaries: [
+				makeDay('2024-01-15', [s1]),
+				makeDay('2024-01-16', [s2]),
+			],
+		});
+
+		render(<MyWeekPage />);
+
+		const btn = screen.getByRole('button', { name: /Log All \(2\)/i });
+		fireEvent.click(btn);
+
+		await waitFor(() => {
+			expect(toast.error).toHaveBeenCalledWith(
+				expect.stringContaining('failed PROJ-2'),
+			);
+		});
+	});
+
+	it('calls deleteWorklog and unmarks suggestions when Undo is clicked', async () => {
+		mockCreateMultipleWorklogs.mockResolvedValue({
+			success: 2,
+			failed: [],
+			created: [
+				{ issueKey: 'PROJ-1', worklogId: '100' },
+				{ issueKey: 'PROJ-2', worklogId: '101' },
+			],
+		});
+		mockDeleteWorklog.mockResolvedValue(undefined);
+
+		const s1 = makeSuggestion('1', 'PROJ-1', '2024-01-15');
+		const s2 = makeSuggestion('2', 'PROJ-2', '2024-01-16');
+		useDashboardStore.setState({
+			daySummaries: [
+				makeDay('2024-01-15', [s1]),
+				makeDay('2024-01-16', [s2]),
+			],
+		});
+
+		render(<MyWeekPage />);
+
+		const btn = screen.getByRole('button', { name: /Log All \(2\)/i });
+		fireEvent.click(btn);
+
+		await waitFor(() => {
+			expect(toast.success).toHaveBeenCalled();
+		});
+
+		const successCall = (toast.success as any).mock.calls[0];
+		const undoAction = successCall[1]?.action;
+		expect(undoAction).toBeTruthy();
+		expect(undoAction.label).toBe('Undo');
+
+		// Verify suggestions are marked as logged
+		let state = useDashboardStore.getState();
+		let all = state.daySummaries.flatMap((d) => d.suggestions);
+		expect(all.filter((s) => s.logged).length).toBe(2);
+
+		// Click Undo
+		undoAction.onClick();
+
+		await waitFor(() => {
+			expect(mockDeleteWorklog).toHaveBeenCalledTimes(2);
+			expect(mockDeleteWorklog).toHaveBeenCalledWith('PROJ-1', '100');
+			expect(mockDeleteWorklog).toHaveBeenCalledWith('PROJ-2', '101');
+		});
+
+		// Verify suggestions are unmarked
+		state = useDashboardStore.getState();
+		all = state.daySummaries.flatMap((d) => d.suggestions);
+		expect(all.filter((s) => s.logged).length).toBe(0);
+	});
+
+	it('shows error toast when Undo fails', async () => {
+		mockCreateMultipleWorklogs.mockResolvedValue({
+			success: 1,
+			failed: [],
+			created: [{ issueKey: 'PROJ-1', worklogId: '100' }],
+		});
+		mockDeleteWorklog.mockRejectedValue(new Error('Delete failed'));
+
+		const s1 = makeSuggestion('1', 'PROJ-1', '2024-01-15');
+		useDashboardStore.setState({
+			daySummaries: [makeDay('2024-01-15', [s1])],
+		});
+
+		render(<MyWeekPage />);
+
+		const btn = screen.getByRole('button', { name: /Log All \(1\)/i });
+		fireEvent.click(btn);
+
+		await waitFor(() => {
+			expect(toast.success).toHaveBeenCalled();
+		});
+
+		const successCall = (toast.success as any).mock.calls[0];
+		const undoAction = successCall[1]?.action;
+
+		// Click Undo
+		undoAction.onClick();
+
+		await waitFor(() => {
+			expect(toast.error).toHaveBeenCalledWith('Undo failed');
 		});
 	});
 });
