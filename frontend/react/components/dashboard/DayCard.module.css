@@ -73,11 +73,31 @@
 }
 
 .gap {
-	font-size: var(--text-sm);
-	font-weight: var(--font-medium);
-	color: var(--color-error);
-	font-family: var(--font-mono);
-	font-variant-numeric: tabular-nums;
+\tfont-size: var(--text-sm);
+\tfont-weight: var(--font-medium);
+\tcolor: var(--color-error);
+\tfont-family: var(--font-mono);
+\tfont-variant-numeric: tabular-nums;
+}
+
+/* Gap chip turned into a clickable button for quick-add. Neutral outline to
+ * match other actions, hover reinforces the action affordance. */
+.gapButton {
+\tbackground: none;
+\tborder: none;
+\tcolor: var(--color-error);
+\tfont-size: var(--text-sm);
+\tfont-weight: var(--font-medium);
+\tfont-family: var(--font-mono);
+\tfont-variant-numeric: tabular-nums;
+\tcursor: pointer;
+\ttransition: all var(--transition-fast);
+\twhite-space: nowrap;
+}
+
+.gapButton:hover {
+\tcolor: var(--color-primary);
+\ttext-decoration: underline;
 }
 
 .timeOff {

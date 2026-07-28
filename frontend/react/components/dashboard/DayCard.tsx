@@ -310,9 +310,17 @@ export const DayCard = memo<Props>(function DayCard({
 						{formatHours(day.loggedSeconds)}
 					</span>
 					{isTimeOff && <span className={styles.timeOff}>{absenceLabel}</span>}
-					{day.gapSeconds > 0 && (
-						<span className={styles.gap}>-{formatHours(day.gapSeconds)}</span>
-					)}
+				{day.gapSeconds > 0 && (
+					<button
+						type="button"
+						className={styles.gapButton}
+						onClick={handleAddOpen}
+						aria-label={`Quick-add worklog for ${DAY_NAMES[day.dayOfWeek]} — short ${formatHours(day.gapSeconds)}`}
+						title={`Quick-add ${formatHours(day.gapSeconds)} to fill this day`}
+					>
+						-{formatHours(day.gapSeconds)}
+					</button>
+				)}
 					{rt && (
 						<span
 							className={styles.rescueTime}
