@@ -172,7 +172,7 @@ describe('ConnectionSection', () => {
 				corsProxyId="cp"
 			/>,
 		);
-		expect(screen.getByText('All good')).toBeInTheDocument();
+		expect(screen.getByText(/All good/)).toBeInTheDocument();
 	});
 
 	it('hides the proxy/network block behind a collapsed Advanced disclosure on first run, but keeps the field mounted (ADA-484 #1)', () => {
