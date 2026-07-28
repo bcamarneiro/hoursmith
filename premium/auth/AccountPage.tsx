@@ -27,6 +27,7 @@ import { trackEvent } from '../../frontend/analytics';
 import { LEAD_TIER_ENABLED } from '../../frontend/featureFlags';
 import { PremiumWaitlistForm } from '../../frontend/react/components/marketing/PremiumWaitlistForm';
 import { useFlags } from '../../frontend/react/hooks/useFlags';
+import { clearAllCache } from '../../frontend/services/worklogCache';
 import * as styles from './AccountPage.module.css';
 import { getSupabase } from './supabaseClient';
 import { useAuth } from './useAuth';
@@ -306,6 +307,7 @@ export function AccountPage(): JSX.Element {
 				throw new Error(
 					`We couldn't delete your account right now. Please try again in a moment — if it keeps failing, email ${CONTACT_EMAIL}.`,
 				);
+			await clearAllCache();
 			await signOut();
 			navigate('/', { replace: true });
 		} catch (err) {
@@ -340,6 +342,7 @@ export function AccountPage(): JSX.Element {
 	}, [session]);
 
 	const handleSignOut = useCallback(async () => {
+		await clearAllCache();
 		await signOut();
 		navigate('/', { replace: true });
 	}, [signOut, navigate]);

@@ -30,6 +30,7 @@ const baseConfig: Config = {
 	timeRounding: 'off',
 	includeAbsenceInCsv: true,
 	includeCsvProvenance: false,
+	worklogCacheEnabled: false,
 };
 
 describe('buildSettingsSetupModel', () => {

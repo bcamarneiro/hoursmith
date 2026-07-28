@@ -12,6 +12,7 @@ import {
 	type JiraGatewayMode,
 	rewriteForHostedProxy,
 } from '../services/jiraGateway';
+import { buildConnectionScope, clearConnectionCache } from '../services/worklogCache';
 import { type Config, normalizeConfig, useConfigStore } from './useConfigStore';
 import { buildJiraConnectionFingerprint, useUIStore } from './useUIStore';
 
@@ -244,6 +245,13 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 		const jiraWasVerified =
 			get().integrationTests.jira.result?.success === true;
 		useConfigStore.getState().setConfig(normalizedConfig);
+
+		// If the Jira connection changed (different host/email), clear the old
+		// connection's IndexedDB cache so stale data doesn't leak across accounts.
+		if (savedFingerprint && savedFingerprint !== nextFingerprint) {
+			const oldScope = buildConnectionScope(savedConfig.jiraHost, savedConfig.email);
+			void clearConnectionCache(oldScope);
+		}
 
 		if (jiraWasVerified && nextFingerprint) {
 			useUIStore.getState().markJiraConnectionEvidence(nextFingerprint, 'test');

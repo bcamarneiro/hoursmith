@@ -36,6 +36,7 @@ const baseConfig = {
 	timeRounding: 'off' as const,
 	includeAbsenceInCsv: true,
 	includeCsvProvenance: false,
+	worklogCacheEnabled: false,
 };
 
 describe('useSettingsFormStore', () => {

@@ -14,6 +14,11 @@ export interface FetchMonthOptions {
 	currentUserOnly?: boolean;
 	jqlFilter?: string;
 	onProgress?: (progress: WorklogFetchProgress) => void;
+	/**
+	 * If set, only fetch issues updated since this ISO timestamp.
+	 * Used for incremental sync — the caller merges results with cached data.
+	 */
+	since?: string;
 }
 
 interface EmbeddedWorklog {
@@ -105,6 +110,11 @@ export async function fetchMonthWorklogs(
 	];
 	if (options?.currentUserOnly) {
 		appClauses.push('worklogAuthor = currentUser()');
+	}
+	// Incremental sync: when `since` is set, only fetch issues updated since
+	// the last sync time. The caller merges these results with cached data.
+	if (options?.since) {
+		appClauses.push(`updated >= "${options.since}"`);
 	}
 	let jql = `(${appClauses.join(') AND (')})`;
 	if (options?.jqlFilter?.trim()) {

@@ -1,10 +1,18 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { WorklogFetchProgress } from '../../../types/worklogLoading';
+import type { EnrichedJiraWorklog } from '../../../types/jira';
 import {
 	fetchMonthWorklogs,
 	type WorklogItem,
 } from '../../services/monthWorklogService';
+import {
+	buildConnectionScope,
+	getCachedWorklogs,
+	mergeWorklogs,
+	storeWorklogs,
+	isIndexedDBAvailable,
+} from '../../services/worklogCache';
 import { useConfigStore } from '../../stores/useConfigStore';
 import {
 	buildJiraConnectionFingerprint,
@@ -53,6 +61,21 @@ export function useMonthWorklogs(
 	const currentUserOnly = options?.currentUserOnly ?? false;
 	const jqlFilter = options?.jqlFilter ?? '';
 	const onProgress = options?.onProgress;
+	const cacheEnabled = config.worklogCacheEnabled === true;
+	const connectionScope = buildConnectionScope(jiraHost, config.email);
+
+	// Track whether we've already seeded from cache for this query key
+	// to avoid re-seeding on every render.
+	const seededKeyRef = useRef<string | null>(null);
+
+	// Build initial data from IndexedDB cache if enabled
+	const cacheQueryKey = `${connectionScope}::${year}-${month}`;
+	const initialData = useMemo(() => {
+		if (!cacheEnabled || !isIndexedDBAvailable()) return undefined;
+		// We can't do async initial data in useMemo, so we use the
+		// queryClient cache as a bridge — see the useEffect below.
+		return undefined;
+	}, [cacheEnabled, connectionScope, year, month]);
 
 	const result = useQuery<WorklogItem[]>({
 		queryKey: monthWorklogsQueryKey(
@@ -63,8 +86,16 @@ export function useMonthWorklogs(
 			currentUserOnly,
 			jqlFilter,
 		),
-		queryFn: ({ signal }) =>
-			fetchMonthWorklogs(
+		queryFn: async ({ signal }) => {
+			// Check for cached data to enable incremental sync
+			let cachedData = null;
+			if (cacheEnabled && isIndexedDBAvailable()) {
+				cachedData = await getCachedWorklogs(connectionScope, year, month);
+			}
+
+			// If we have a recent sync, fetch only the delta (issues updated since last sync)
+			const since = cachedData?.lastSyncTime ?? undefined;
+			const fetchedWorklogs = await fetchMonthWorklogs(
 				config,
 				year,
 				month,
@@ -72,12 +103,80 @@ export function useMonthWorklogs(
 					currentUserOnly,
 					jqlFilter: options?.jqlFilter,
 					onProgress: onProgress ?? undefined,
+					since,
 				},
 				signal,
-			),
+			);
+
+			// Persist to IndexedDB if cache is enabled
+			if (cacheEnabled && isIndexedDBAvailable()) {
+				if (since) {
+					// Delta sync: merge new worklogs with existing cache
+					await mergeWorklogs(connectionScope, year, month, fetchedWorklogs);
+				} else {
+					// Full sync: overwrite cache
+					await storeWorklogs(connectionScope, year, month, fetchedWorklogs);
+				}
+			}
+
+			// If we did a delta sync, merge with cached data for the return value
+			if (since && cachedData) {
+				const mergedMap = new Map<string, WorklogItem>();
+				for (const w of cachedData.worklogs) {
+					mergedMap.set(w.id, w);
+				}
+				for (const w of fetchedWorklogs) {
+					mergedMap.set(w.id, w);
+				}
+				return Array.from(mergedMap.values());
+			}
+
+			return fetchedWorklogs;
+		},
 		enabled: (options?.enabled ?? true) && !!jiraHost && !!apiToken,
 		staleTime: 15 * 60 * 1000,
 	});
+
+	// Seed React Query cache from IndexedDB on mount (when cache enabled)
+	useEffect(() => {
+		if (!cacheEnabled || !isIndexedDBAvailable()) return;
+		if (!jiraHost || !apiToken) return;
+		if (seededKeyRef.current === cacheQueryKey) return;
+
+		// Only seed if React Query doesn't already have fresh data
+		const queryKey = monthWorklogsQueryKey(
+			year,
+			month,
+			jiraHost,
+			corsProxy,
+			currentUserOnly,
+			jqlFilter,
+		);
+		const existing = queryClient.getQueryData(queryKey);
+		if (existing && Array.isArray(existing) && existing.length > 0) {
+			seededKeyRef.current = cacheQueryKey;
+			return;
+		}
+
+		getCachedWorklogs(connectionScope, year, month).then((cached) => {
+			if (cached && cached.worklogs.length > 0) {
+				queryClient.setQueryData(queryKey, cached.worklogs);
+				seededKeyRef.current = cacheQueryKey;
+			}
+		});
+	}, [
+		cacheEnabled,
+		cacheQueryKey,
+		connectionScope,
+		year,
+		month,
+		jiraHost,
+		apiToken,
+		corsProxy,
+		currentUserOnly,
+		jqlFilter,
+		queryClient,
+	]);
 
 	// Prefetch adjacent months in background (opt-in, useful for month navigation)
 	const prefetchAdjacent = options?.prefetchAdjacent ?? false;
@@ -128,8 +227,8 @@ export function useMonthWorklogs(
 					currentUserOnly,
 					jqlFilter,
 				),
-				queryFn: ({ signal }) =>
-					fetchMonthWorklogs(
+				queryFn: async ({ signal }) => {
+					const worklogs = await fetchMonthWorklogs(
 						queryConfig,
 						y,
 						m,
@@ -138,7 +237,12 @@ export function useMonthWorklogs(
 							jqlFilter: options?.jqlFilter,
 						},
 						signal,
-					),
+					);
+					if (cacheEnabled && isIndexedDBAvailable()) {
+						await storeWorklogs(buildConnectionScope(jiraHost, config.email), y, m, worklogs);
+					}
+					return worklogs;
+				},
 				staleTime: 15 * 60 * 1000,
 			});
 		}
@@ -154,6 +258,8 @@ export function useMonthWorklogs(
 		jqlFilter,
 		queryClient,
 		options?.jqlFilter,
+		cacheEnabled,
+		config.email,
 	]);
 
 	return result;
