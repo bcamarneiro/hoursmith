@@ -461,7 +461,7 @@ export const ReportsPage: React.FC = () => {
 		}
 	}, []);
 
-	const buildSnapshotInput = () =>
+	const buildSnapshotInput = useCallback(() =>
 		viewMode === 'weekly'
 			? {
 					viewMode: 'weekly' as const,
@@ -487,7 +487,7 @@ export const ReportsPage: React.FC = () => {
 					searchQuery,
 					selectedUser,
 					entries: filteredVisibleEntries,
-				};
+				}, [viewMode, jiraDomain, weekStart, weekEnd, searchQuery, onlyAttentionNeeded, managerMode, trendWeeks, sortField, sortDirection, sortedMembers, validationState, trendModel, currentYear, currentMonth, selectedUser, filteredVisibleEntries]);
 
 	const handleExportSnapshotHtml = useCallback(() => {
 		const html = buildReportsSnapshotHtml(buildSnapshotInput());
@@ -497,8 +497,7 @@ export const ReportsPage: React.FC = () => {
 				: `reports-snapshot-month-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.html`;
 		downloadAsFile(html, filename, 'text/html;charset=utf-8');
 		toast.success('Read-only HTML snapshot exported');
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [viewMode, weekStart, currentYear, currentMonth]);
+	}, [buildSnapshotInput, viewMode, weekStart, currentYear, currentMonth]);
 
 	const handleExportSnapshotMarkdown = useCallback(() => {
 		const markdown = buildReportsSnapshotMarkdown(buildSnapshotInput());
@@ -508,8 +507,7 @@ export const ReportsPage: React.FC = () => {
 				: `reports-snapshot-month-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.md`;
 		downloadAsFile(markdown, filename, 'text/markdown;charset=utf-8');
 		toast.success('Read-only Markdown snapshot exported');
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [viewMode, weekStart, currentYear, currentMonth]);
+	}, [buildSnapshotInput, viewMode, weekStart, currentYear, currentMonth]);
 
 	const handleValidateConsistency = useCallback(async () => {
 		if (viewMode !== 'weekly') {
@@ -591,8 +589,7 @@ export const ReportsPage: React.FC = () => {
 			});
 			toast.error(message);
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [viewMode, weekStart, weekEnd, config, queryClient, teamMembers, allowedUsers]);
+	}, [viewMode, weekStart, weekEnd, config, queryClient, teamMembers, allowedUsers, fetchMonthWorklogs, validateReportsConsistency, monthWorklogsQueryKey]);
 
 	const hasNoData = !isLoading && !!data && allMonthlyEntries.length === 0;
 	const hasNoFilteredMonthlyResults =
