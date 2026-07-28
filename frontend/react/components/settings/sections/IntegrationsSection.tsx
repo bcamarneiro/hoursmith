@@ -200,7 +200,10 @@ export const IntegrationsSection: React.FC<Props> = ({
 						<div className={styles.serviceFeedback}>
 							<p
 								className={`${styles.testResult} ${integrationTests.gitlab.result.success ? styles.testSuccess : styles.testError}`}
+								role="status"
+								aria-live="polite"
 							>
+								{integrationTests.gitlab.result.success ? '✓ Success: ' : '✗ Error: '}
 								{integrationTests.gitlab.result.message}
 							</p>
 							{gitlabTroubleshooting ? (
@@ -259,7 +262,10 @@ export const IntegrationsSection: React.FC<Props> = ({
 					{integrationTests.rescuetime.result ? (
 						<p
 							className={`${styles.testResult} ${integrationTests.rescuetime.result.success ? styles.testSuccess : styles.testError}`}
+							role="status"
+							aria-live="polite"
 						>
+							{integrationTests.rescuetime.result.success ? '✓ Success: ' : '✗ Error: '}
 							{integrationTests.rescuetime.result.message}
 						</p>
 					) : (
@@ -633,10 +639,13 @@ export const IntegrationsSection: React.FC<Props> = ({
 							: 'Test calendars'}
 					</Button>
 				</div>
-				{integrationTests.calendar.result ? (
+					{integrationTests.calendar.result ? (
 					<p
 						className={`${styles.testResult} ${integrationTests.calendar.result.success ? styles.testSuccess : styles.testError}`}
+						role="status"
+						aria-live="polite"
 					>
+						{integrationTests.calendar.result.success ? '✓ Success: ' : '✗ Error: '}
 						{integrationTests.calendar.result.message}
 					</p>
 				) : (

@@ -164,6 +164,6 @@ describe('ConnectionSection', () => {
 				corsProxyId="cp"
 			/>,
 		);
-		expect(screen.getByText('All good')).toBeInTheDocument();
+		expect(screen.getByText(/All good/)).toBeInTheDocument();
 	});
 });

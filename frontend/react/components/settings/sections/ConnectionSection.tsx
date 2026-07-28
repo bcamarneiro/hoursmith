@@ -69,7 +69,10 @@ export const ConnectionSection: React.FC<Props> = ({
 			{integrationTest.result && (
 				<p
 					className={`${styles.testResult} ${integrationTest.result.success ? styles.testSuccess : styles.testError}`}
+					role="status"
+					aria-live="polite"
 				>
+					{integrationTest.result.success ? '✓ Success: ' : '✗ Error: '}
 					{integrationTest.result.message}
 				</p>
 			)}
