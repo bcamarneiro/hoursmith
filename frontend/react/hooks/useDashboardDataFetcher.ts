@@ -190,7 +190,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		queryKey: jiraActivityQueryKey(weekStart, weekEnd, jiraHost, corsProxy),
 		queryFn: ({ signal }) =>
 			fetchJiraActivitySuggestions(
-				{ jiraHost, apiToken, corsProxy } as any,
+				{ jiraHost, apiToken, corsProxy, email },
 				weekStart,
 				weekEnd,
 				signal,
@@ -209,10 +209,14 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					? jiraActivityQuery.error.message
 					: 'Failed to fetch Jira activity',
 			);
+		} else if (jiraActivityQuery.isSuccess) {
+			// Clear error on success (ADA-420 review fix)
+			setError('jira', null);
 		}
 	}, [
 		jiraActivityQuery.isFetching,
 		jiraActivityQuery.error,
+		jiraActivityQuery.isSuccess,
 		setLoading,
 		setError,
 	]);
