@@ -1,5 +1,5 @@
 import type { WorklogSuggestion } from '../../types/Suggestion';
-import type { Config } from '../stores/useConfigStore';
+import type { JiraSearchConfig } from './jiraSearch';
 import { fetchSearchPage } from './jiraSearch';
 
 const JIRA_KEY_RE = /([A-Z][A-Z0-9]+-\d+)/;
@@ -27,7 +27,7 @@ function dateOnly(iso: string): string {
  * then analyze changelogs to produce worklog suggestions.
  */
 export async function fetchJiraActivitySuggestions(
-	config: Config,
+	config: JiraSearchConfig,
 	weekStart: string,
 	weekEnd: string,
 	signal?: AbortSignal,

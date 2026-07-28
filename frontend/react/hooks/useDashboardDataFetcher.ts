@@ -1,6 +1,7 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RescueTimeDaySummary } from '../../../types/Suggestion';
+import type { WorklogSuggestion } from '../../../types/Suggestion';
 import { fetchCalendarSuggestions } from '../../services/calendarService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
 import { fetchJiraActivitySuggestions } from '../../services/jiraActivityService';
@@ -120,6 +121,16 @@ export interface DashboardFetchStatus {
 	filteredOutEmpty: { rawCount: number; email: string } | null;
 }
 
+/** Build a query key for jiraActivity suggestions (for use with useQuery / queryClient) */
+export function jiraActivityQueryKey(
+	weekStart: string,
+	weekEnd: string,
+	jiraHost: string,
+	corsProxy: string,
+) {
+	return ['jiraActivity', weekStart, weekEnd, jiraHost, corsProxy];
+}
+
 export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const jiraHost = useConfigStore((s) => s.config.jiraHost);
 	const email = useConfigStore((s) => s.config.email);
@@ -155,6 +166,15 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		rawCount: number;
 		email: string;
 	} | null>(null);
+	// State for fetched data, split from derive deps (ADA-420)
+	const [fetchedData, setFetchedData] = useState<{
+		worklogs: WorklogEntry[];
+		weekGhosts: import('../../types').GhostEntry[];
+		jiraSuggestions: WorklogSuggestion[];
+		gitlabSuggestions: WorklogSuggestion[];
+		calendarSuggestions: WorklogSuggestion[];
+		rescueTimeData: Map<string, RescueTimeDaySummary>;
+	} | null>(null);
 	const hasAbsenceFeeds = (calendarFeeds ?? []).some(
 		(feed) =>
 			(feed.type === 'absence' || feed.type === 'holiday') && feed.url.trim(),
@@ -162,6 +182,44 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const { data: absenceDays } = useAbsenceDays(weekStart, weekEnd, {
 		enabled: hasAbsenceFeeds,
 	});
+
+	// Cache Jira-activity suggestions via React Query — deduplicates concurrent
+	// requests and survives navigation (15-min staleTime). Keyed on connection +
+	// week range so it invalidates when either changes. (ADA-420)
+	const jiraActivityQuery = useQuery<WorklogSuggestion[]>({
+		queryKey: jiraActivityQueryKey(weekStart, weekEnd, jiraHost, corsProxy),
+		queryFn: ({ signal }) =>
+			fetchJiraActivitySuggestions(
+				{ jiraHost, apiToken, corsProxy, email },
+				weekStart,
+				weekEnd,
+				signal,
+			),
+		staleTime: 15 * 60 * 1000, // 15 minutes (ADA-420)
+		enabled: !!jiraHost && !!apiToken,
+	});
+
+	// Sync jira loading/error state from the useQuery (ADA-420)
+	useEffect(() => {
+		setLoading('jira', jiraActivityQuery.isFetching);
+		if (jiraActivityQuery.error) {
+			setError(
+				'jira',
+				jiraActivityQuery.error instanceof Error
+					? jiraActivityQuery.error.message
+					: 'Failed to fetch Jira activity',
+			);
+		} else if (jiraActivityQuery.isSuccess) {
+			// Clear error on success (ADA-420 review fix)
+			setError('jira', null);
+		}
+	}, [
+		jiraActivityQuery.isFetching,
+		jiraActivityQuery.error,
+		jiraActivityQuery.isSuccess,
+		setLoading,
+		setError,
+	]);
 
 	useEffect(() => {
 		// Reference refetchNonce so the effect re-runs when `refetch()` bumps it
@@ -198,16 +256,16 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			setError('calendar', null);
 			setError('rescuetime', null);
 
-			// Set loading states
-			setLoading('worklogs', true);
-			setWorklogsLoadingProgress({
-				phase: 'searching',
-				percent: 8,
-				message: 'Preparing weekly worklog fetch',
-				detail: `${weekStart} to ${weekEnd}`,
-			});
-			setLoading('jira', true);
-			if (gitlabToken && gitlabHost) setLoading('gitlab', true);
+		// Set loading states
+		setLoading('worklogs', true);
+		setWorklogsLoadingProgress({
+			phase: 'searching',
+			percent: 8,
+			message: 'Preparing weekly worklog fetch',
+			detail: `${weekStart} to ${weekEnd}`,
+		});
+		// Jira loading state is driven by the jiraActivityQuery useQuery (ADA-420)
+		if (gitlabToken && gitlabHost) setLoading('gitlab', true);
 			const suggestionFeeds = (config.calendarFeeds ?? []).filter(
 				(f) => f.type === 'suggestion',
 			);
@@ -326,12 +384,9 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					}
 				})(),
 
-				fetchJiraActivitySuggestions(config, weekStart, weekEnd, signal)
-					.catch((e) => {
-						if (!signal.aborted) setError('jira', e.message);
-						return [];
-					})
-					.finally(() => setLoading('jira', false)),
+			// Jira activity suggestions are now served from the React Query cache
+			// (ADA-420) — no raw fetch here. Use the cached data directly.
+			Promise.resolve(jiraActivityQuery.data ?? []),
 
 				gitlabToken && gitlabHost
 					? fetchGitlabSuggestions(
@@ -386,32 +441,14 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			const worklogs = worklogsResult.entries;
 			const weekGhosts = worklogsResult.ghosts;
 
-			// Store worklogs with issueKey for weekly summary export
-			const worklogsWithKey = worklogs.filter(
-				(w): w is WorklogEntry & { issueKey: string } => !!w.issueKey,
-			);
-
-			const summaries = mergeSuggestions({
-				weekStart,
+			// Store fetched data for the derive effect (ADA-420)
+			setFetchedData({
+				worklogs,
+				weekGhosts,
 				jiraSuggestions,
 				gitlabSuggestions,
 				calendarSuggestions,
 				rescueTimeData,
-				existingWorklogs: worklogs,
-				favorites,
-				templates,
-				timeRounding,
-				absenceDays,
-			});
-
-			// Batch all store updates together to avoid cascading re-renders.
-			// `weekGhosts` is a separate field — gap calculations run off
-			// `loggedSeconds` only, so ghosts never affect day/week totals.
-			useDashboardStore.setState({
-				weekWorklogs: worklogsWithKey,
-				weekGhosts,
-				daySummaries: summaries,
-				lastFetchedAt: new Date().toISOString(),
 			});
 		}
 
@@ -429,18 +466,64 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		gitlabHost,
 		rescueTimeApiKey,
 		calendarFeeds,
-		timeRounding,
 		weekStart,
 		weekEnd,
-		absenceDays,
 		setLoading,
 		setError,
 		setWorklogsLoadingProgress,
+		queryClient,
+		refetchNonce,
+		jiraActivityQuery.data,
+	]);
+
+	// Derive effect: recompute summaries when favorites/templates/calendarMappings change (ADA-420)
+	useEffect(() => {
+		if (!fetchedData) return;
+
+		const {
+			worklogs,
+			weekGhosts,
+			jiraSuggestions,
+			gitlabSuggestions,
+			calendarSuggestions,
+			rescueTimeData,
+		} = fetchedData;
+
+		// Store worklogs with issueKey for weekly summary export
+		const worklogsWithKey = worklogs.filter(
+			(w): w is WorklogEntry & { issueKey: string } => !!w.issueKey,
+		);
+
+		const summaries = mergeSuggestions({
+			weekStart,
+			jiraSuggestions,
+			gitlabSuggestions,
+			calendarSuggestions,
+			rescueTimeData,
+			existingWorklogs: worklogs,
+			favorites,
+			templates,
+			timeRounding,
+			absenceDays,
+		});
+
+		// Batch all store updates together to avoid cascading re-renders.
+		// `weekGhosts` is a separate field — gap calculations run off
+		// `loggedSeconds` only, so ghosts never affect day/week totals.
+		useDashboardStore.setState({
+			weekWorklogs: worklogsWithKey,
+			weekGhosts,
+			daySummaries: summaries,
+			lastFetchedAt: new Date().toISOString(),
+		});
+	}, [
+		fetchedData,
 		favorites,
 		templates,
 		calendarMappings,
-		queryClient,
-		refetchNonce,
+		weekStart,
+		timeRounding,
+		absenceDays,
 	]);
 
 	return { refetch, filteredOutEmpty };
