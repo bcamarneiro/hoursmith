@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-	isDayMet,
-	toWeekdayMetInfo,
 	computeCurrentDayStreak,
-	isWeekComplete,
 	computeCurrentWeekStreak,
 	groupByWeek,
+	isDayMet,
+	isWeekComplete,
 	type StreakDayInput,
+	toWeekdayMetInfo,
 } from '../streaks';
 
 // Helper to build a StreakDayInput quickly

@@ -1,5 +1,5 @@
-import { useStreaks } from '../../hooks/useStreaks';
 import type { DaySummary } from '../../../types/Suggestion';
+import { useStreaks } from '../../hooks/useStreaks';
 import * as styles from './StreakBadge.module.css';
 
 interface StreakBadgeProps {
@@ -27,7 +27,7 @@ export function StreakBadge({ daySummaries }: StreakBadgeProps) {
 	const isNewBest = dayStreak >= bestDayStreak && bestDayStreak > 1;
 
 	return (
-		<div className={styles.container} role="status" aria-live="polite">
+		<output className={styles.container} aria-live="polite">
 			<div className={styles.primary}>
 				<span className={styles.flame} aria-hidden="true">
 					🔥
@@ -54,6 +54,6 @@ export function StreakBadge({ daySummaries }: StreakBadgeProps) {
 					</span>
 				)}
 			</div>
-		</div>
+		</output>
 	);
 }

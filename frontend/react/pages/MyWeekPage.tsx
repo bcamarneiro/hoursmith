@@ -11,10 +11,10 @@ import { KeyboardShortcutsHelp } from '../components/dashboard/KeyboardShortcuts
 import { MonthHeatmap } from '../components/dashboard/MonthHeatmap';
 import { OfflineIndicator } from '../components/dashboard/OfflineIndicator';
 import { SourceStatusBar } from '../components/dashboard/SourceStatusBar';
+import { StreakBadge } from '../components/dashboard/StreakBadge';
 import { TemplatesManager } from '../components/dashboard/TemplatesManager';
 import { WeeklyCloseAssistant } from '../components/dashboard/WeeklyCloseAssistant';
 import { WeekNavigator } from '../components/dashboard/WeekNavigator';
-import { StreakBadge } from '../components/dashboard/StreakBadge';
 import { WeekOverview } from '../components/dashboard/WeekOverview';
 import { Button } from '../components/ui/Button';
 import { Spinner } from '../components/ui/Spinner';

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DaySummary } from '../../../types/Suggestion';
+import { migrateStorageKey } from '../../stores/migrateStorageKeys';
 import {
 	computeCurrentDayStreak,
 	computeCurrentWeekStreak,
-	toWeekdayMetInfo,
 	type StreakDayInput,
+	toWeekdayMetInfo,
 } from '../utils/streaks';
-import { migrateStorageKey } from '../../stores/migrateStorageKeys';
 
 /**
  * localStorage keys for streak persistence.

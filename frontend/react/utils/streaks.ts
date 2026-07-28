@@ -66,7 +66,7 @@ export function computeCurrentDayStreak(
 	const metByDate = new Map(weekdays.map((d) => [d.date, d.met]));
 
 	let streak = 0;
-	const d = new Date(today + 'T12:00:00');
+	const d = new Date(`${today}T12:00:00`);
 
 	// Walk backwards up to 365 days (safety limit)
 	for (let i = 0; i < 365; i++) {
@@ -119,7 +119,7 @@ export function groupByWeek(weekdays: DayMetInfo[]): Map<string, DayMetInfo[]> {
 	const weeks = new Map<string, DayMetInfo[]>();
 
 	for (const day of weekdays) {
-		const d = new Date(day.date + 'T12:00:00');
+		const d = new Date(`${day.date}T12:00:00`);
 		// Find the Monday of this week (ISO weeks start on Monday)
 		const dayOfWeek = d.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
 		const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
@@ -153,7 +153,7 @@ export function computeCurrentWeekStreak(
 	if (weeks.size === 0) return 0;
 
 	// Get current week key (Monday of this week)
-	const todayDate = new Date(today + 'T12:00:00');
+	const todayDate = new Date(`${today}T12:00:00`);
 	const todayDow = todayDate.getDay();
 	const daysFromMonday = todayDow === 0 ? 6 : todayDow - 1;
 	const currentMonday = new Date(todayDate);
@@ -169,7 +169,8 @@ export function computeCurrentWeekStreak(
 		// Skip future weeks
 		if (weekKey > currentWeekKey) continue;
 
-		const weekDays = weeks.get(weekKey)!;
+		const weekDays = weeks.get(weekKey);
+		if (!weekDays) continue;
 
 		// Check if this week is complete
 		if (isWeekComplete(weekDays)) {
