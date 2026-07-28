@@ -28,7 +28,10 @@ export interface DayMetInfo {
  * Check if a single day met its target.
  * Weekends should be filtered out before calling this.
  */
-export function isDayMet(loggedSeconds: number, targetSeconds: number): boolean {
+export function isDayMet(
+	loggedSeconds: number,
+	targetSeconds: number,
+): boolean {
 	return loggedSeconds >= targetSeconds;
 }
 
@@ -112,9 +115,7 @@ export function isWeekComplete(weekdays: DayMetInfo[]): boolean {
  * Group weekdays into ISO weeks (by Monday anchoring).
  * Returns a map of ISO week string -> DayMetInfo[] for that week.
  */
-export function groupByWeek(
-	weekdays: DayMetInfo[],
-): Map<string, DayMetInfo[]> {
+export function groupByWeek(weekdays: DayMetInfo[]): Map<string, DayMetInfo[]> {
 	const weeks = new Map<string, DayMetInfo[]>();
 
 	for (const day of weekdays) {
@@ -124,7 +125,7 @@ export function groupByWeek(
 		const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 		const monday = new Date(d);
 		monday.setDate(d.getDate() - daysFromMonday);
-		
+
 		// Week key is based on the Monday's date
 		const weekKey = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
 

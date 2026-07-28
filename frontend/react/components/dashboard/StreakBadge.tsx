@@ -1,6 +1,6 @@
 import { useStreaks } from '../../hooks/useStreaks';
 import type { DaySummary } from '../../../types/Suggestion';
-import styles from './StreakBadge.module.css';
+import * as styles from './StreakBadge.module.css';
 
 interface StreakBadgeProps {
 	daySummaries: DaySummary[];
@@ -42,19 +42,14 @@ export function StreakBadge({ daySummaries }: StreakBadgeProps) {
 			<div className={styles.secondary}>
 				{bestDayStreak > 0 && (
 					<span className={styles.stat}>
-						best:{' '}
-						<span className={styles.statValue}>{bestDayStreak}d</span>
+						best: <span className={styles.statValue}>{bestDayStreak}d</span>
 					</span>
 				)}
 				{weekStreak > 0 && (
 					<span className={styles.stat}>
-						weeks:{' '}
-						<span className={styles.statValue}>{weekStreak}w</span>
+						weeks: <span className={styles.statValue}>{weekStreak}w</span>
 						{bestWeekStreak > weekStreak && (
-							<span className={styles.statDim}>
-								{' '}
-								/ {bestWeekStreak}w best
-							</span>
+							<span className={styles.statDim}> / {bestWeekStreak}w best</span>
 						)}
 					</span>
 				)}

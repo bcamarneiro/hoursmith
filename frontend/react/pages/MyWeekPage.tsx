@@ -369,7 +369,7 @@ export const MyWeekPage: React.FC = () => {
 
 					<WeekOverview days={daySummaries} />
 
-				<StreakBadge daySummaries={daySummaries} />
+					<StreakBadge daySummaries={daySummaries} />
 
 					{orderedWeekdays.length > 0 && (
 						<div id={GAP_DAYS_SECTION_ID} className={styles.daysSection}>
