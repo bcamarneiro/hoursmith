@@ -6,7 +6,7 @@ import {
 	toWeekdayMetInfo,
 	type StreakDayInput,
 } from '../utils/streaks';
-import { migrateStorageKey } from '../stores/migrateStorageKeys';
+import { migrateStorageKey } from '../../stores/migrateStorageKeys';
 
 /**
  * localStorage keys for streak persistence.
@@ -172,8 +172,12 @@ export function useStreaks(daySummaries: DaySummary[]): StreakState {
 	);
 
 	// Best streaks - read initial values, update via useEffect
-	const [bestDayStreak, setBestDayStreak] = useState(() => readBest(STORAGE_KEY_BEST_DAY));
-	const [bestWeekStreak, setBestWeekStreak] = useState(() => readBest(STORAGE_KEY_BEST_WEEK));
+	const [bestDayStreak, setBestDayStreak] = useState(() =>
+		readBest(STORAGE_KEY_BEST_DAY),
+	);
+	const [bestWeekStreak, setBestWeekStreak] = useState(() =>
+		readBest(STORAGE_KEY_BEST_WEEK),
+	);
 
 	// Persist best streaks when current streaks exceed them
 	useEffect(() => {

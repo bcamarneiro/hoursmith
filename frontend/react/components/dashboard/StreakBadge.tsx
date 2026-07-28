@@ -33,9 +33,9 @@ export function StreakBadge({ daySummaries }: StreakBadgeProps) {
 					🔥
 				</span>
 				<span className={styles.count}>{dayStreak}</span>
-			<span className={styles.label}>
-				{dayStreak === 1 ? 'day streak' : 'day streaks'}
-			</span>
+				<span className={styles.label}>
+					{dayStreak === 1 ? 'day streak' : 'day streaks'}
+				</span>
 				{isNewBest && <span className={styles.bestBadge}>new best!</span>}
 			</div>
 
