@@ -13,6 +13,7 @@ import {
 	defaultSupabaseAdmin,
 	type SupabaseAdminClient,
 } from '../_lib/supabaseAdmin.js';
+import type { TeamRole } from '../../../types/team.js';
 
 export const config = {
 	runtime: 'edge',
@@ -56,6 +57,24 @@ export async function handleTeam(
 	if (!userId) {
 		logEvent({ userId: null, status: 401, note: 'invalid_token' });
 		return jsonResponse(401, { error: 'invalid_token' });
+	}
+
+	const url = new URL(request.url);
+	const path = url.pathname;
+
+	// Membership management routes (ADA-489 review: expose removeTeamMember/updateMemberRole/deleteTeam)
+	if (path.match(/\/members\/[^/]+\/role$/) && request.method === 'PATCH') {
+		const targetUserId = path.split('/').slice(-2, -1)[0];
+		return handleUpdateMemberRole(request, userId, admin, targetUserId);
+	}
+
+	if (path.match(/\/members\/[^/]+$/) && request.method === 'DELETE') {
+		const targetUserId = path.split('/').pop()!;
+		return handleRemoveMember(request, userId, admin, targetUserId);
+	}
+
+	if (request.method === 'DELETE' && !path.includes('/members')) {
+		return handleDeleteTeam(request, userId, admin);
 	}
 
 	if (request.method === 'POST') {
@@ -114,8 +133,18 @@ async function handleCreateTeam(
 			seatLimit,
 		});
 
-		// Add the owner as the first member
-		await admin.addTeamMember(teamId, userId, 'owner');
+		// Add the owner as the first member. If this fails, clean up the
+		// orphaned team row to avoid a team with no members (ADA-489 review).
+		try {
+			await admin.addTeamMember(teamId, userId, 'owner');
+		} catch (memberErr) {
+			try {
+				await admin.deleteTeam(teamId);
+			} catch {
+				// Swallow cleanup errors — the original error is what matters
+			}
+			throw memberErr;
+		}
 
 		logEvent({ userId, status: 201, note: 'team_created' });
 		return jsonResponse(201, { team });
@@ -163,6 +192,112 @@ async function handleGetTeam(
 			note: `get_team_failed:${(err as Error).message}`,
 		});
 		return jsonResponse(500, { error: 'get_team_failed' });
+	}
+}
+
+async function handleRemoveMember(
+	_request: Request,
+	userId: string,
+	admin: SupabaseAdminClient,
+	targetUserId: string,
+): Promise<Response> {
+	const membership = await admin.getUserTeamMembership(userId);
+	if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
+		logEvent({ userId, status: 403, note: 'not_authorized' });
+		return jsonResponse(403, { error: 'not_authorized' });
+	}
+
+	// Can't remove the owner
+	const targetMembership = await admin.getTeamMembership(membership.team_id, targetUserId);
+	if (!targetMembership) {
+		return jsonResponse(404, { error: 'member_not_found' });
+	}
+	if (targetMembership.role === 'owner') {
+		return jsonResponse(403, { error: 'cannot_remove_owner' });
+	}
+
+	// Admins can't remove other admins
+	if (membership.role === 'admin' && targetMembership.role === 'admin') {
+		return jsonResponse(403, { error: 'not_authorized' });
+	}
+
+	try {
+		await admin.removeTeamMember(membership.team_id, targetUserId);
+		logEvent({ userId, status: 200, note: 'member_removed' });
+		return jsonResponse(200, { ok: true });
+	} catch (err) {
+		logEvent({ userId, status: 500, note: `remove_member_failed:${(err as Error).message}` });
+		return jsonResponse(500, { error: 'remove_member_failed' });
+	}
+}
+
+async function handleUpdateMemberRole(
+	request: Request,
+	userId: string,
+	admin: SupabaseAdminClient,
+	targetUserId: string,
+): Promise<Response> {
+	const membership = await admin.getUserTeamMembership(userId);
+	if (!membership || membership.role !== 'owner') {
+		logEvent({ userId, status: 403, note: 'not_authorized' });
+		return jsonResponse(403, { error: 'not_authorized' });
+	}
+
+	const targetMembership = await admin.getTeamMembership(membership.team_id, targetUserId);
+	if (!targetMembership) {
+		return jsonResponse(404, { error: 'member_not_found' });
+	}
+
+	let body: { role?: TeamRole };
+	try {
+		body = await request.json();
+	} catch {
+		return jsonResponse(400, { error: 'invalid_json' });
+	}
+
+	const role = body.role;
+	if (!role || !['admin', 'member'].includes(role)) {
+		return jsonResponse(400, { error: 'invalid_role' });
+	}
+
+	// Can't change the owner's role
+	if (targetMembership.role === 'owner') {
+		return jsonResponse(403, { error: 'cannot_change_owner_role' });
+	}
+
+	try {
+		await admin.updateMemberRole(membership.team_id, targetUserId, role);
+		logEvent({ userId, status: 200, note: 'role_updated' });
+		return jsonResponse(200, { ok: true });
+	} catch (err) {
+		logEvent({ userId, status: 500, note: `update_role_failed:${(err as Error).message}` });
+		return jsonResponse(500, { error: 'update_role_failed' });
+	}
+}
+
+async function handleDeleteTeam(
+	_request: Request,
+	userId: string,
+	admin: SupabaseAdminClient,
+): Promise<Response> {
+	const team = await admin.getTeamByOwner(userId);
+	if (!team) {
+		logEvent({ userId, status: 403, note: 'not_owner' });
+		return jsonResponse(403, { error: 'not_owner' });
+	}
+
+	try {
+		// Remove all members first, then delete the team
+		const members = await admin.getTeamMembers(team.id);
+		for (const m of members) {
+			await admin.removeTeamMember(team.id, m.user_id);
+		}
+		await admin.deleteTeam(team.id);
+		logEvent({ userId, status: 200, note: 'team_deleted' });
+		return jsonResponse(200, { ok: true });
+	} catch (err) {
+		logEvent({ userId, status: 500, note: `delete_team_failed:${(err as Error).message}` });
+		return jsonResponse(500, { error: 'delete_team_failed' });
 	}
 }
 

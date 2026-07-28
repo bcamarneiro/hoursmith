@@ -235,7 +235,7 @@ describe('GET /api/team', () => {
 
 	it('returns 405 for unsupported methods', async () => {
 		const admin = makeAdmin();
-		const res = await handleTeam(makeRequest('DELETE', { authorization: 'Bearer ok' }), {
+		const res = await handleTeam(makeRequest('PUT', { authorization: 'Bearer ok' }), {
 			admin,
 			verifyJwt: vi.fn().mockResolvedValue('user-1'),
 		});

@@ -87,7 +87,15 @@ async function handleCreateInvite(
 	}
 
 	const members = await admin.getTeamMembers(team.id);
-	if (members.length >= team.seat_limit) {
+
+	// Count pending invites toward the seat limit to reduce the
+	// check-then-act race window (ADA-489 review).
+	const allInvites = await admin.getTeamInvites(team.id);
+	const pendingInviteCount = allInvites.filter(
+		(i) => !i.accepted_at && new Date(i.expires_at) > new Date(),
+	).length;
+
+	if (members.length + pendingInviteCount >= team.seat_limit) {
 		return jsonResponse(402, { error: 'seat_limit_reached' });
 	}
 
@@ -139,9 +147,15 @@ async function handleCreateInvite(
 			token: inviteToken,
 			invitedBy: userId,
 			expiresAt,
-		});
+	});
 
-		return jsonResponse(201, { invite });
+		// Build a shareable invite URL. The caller (frontend) is responsible
+		// for delivering it to the invitee — via email, chat, etc.
+		// TODO(ADA-489 follow-up): server-side email delivery via Resend/SendGrid.
+		const appUrl = process.env.APP_URL ?? 'https://hoursmith.app';
+		const inviteUrl = `${appUrl}/accept-invite?token=${inviteToken}`;
+
+		return jsonResponse(201, { invite, invite_url: inviteUrl });
 	} catch {
 		return jsonResponse(500, { error: 'create_invite_failed' });
 	}
@@ -183,7 +197,9 @@ async function handleAcceptInvite(
 		return jsonResponse(403, { error: 'email_mismatch' });
 	}
 
-	// Check seat limit
+	// Check seat limit. Note: this check-then-act has a race window where
+	// concurrent accepts could both pass. A DB-level CHECK constraint on
+	// team_memberships COUNT per team would be the proper fix (ADA-489 review).
 	const team = await admin.getTeamById(invite.team_id);
 	if (!team) {
 		return jsonResponse(404, { error: 'team_not_found' });

@@ -439,16 +439,30 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 			throw new Error(`supabaseAdmin.getTeamMembers failed: ${res.status}`);
 		}
 		const memberships = (await res.json()) as TeamMembershipRow[];
+		if (memberships.length === 0) return [];
 
-		// Fetch emails for each member
-		const membersWithEmail = await Promise.all(
-			memberships.map(async (m) => {
-				const profile = await this.getProfile(m.user_id);
-				return { ...m, email: profile?.email ?? 'unknown' };
-			}),
+		// Batch-fetch all profiles in a single query (ADA-489 review: was N+1).
+		const userIds = memberships.map((m) => m.user_id);
+		const profileParams = new URLSearchParams({
+			id: `in.(${userIds.join(',')})`,
+			select: 'id,email',
+		});
+		const profileRes = await fetch(
+			`${this.url}/rest/v1/profiles?${profileParams.toString()}`,
+			{ headers: this.headers() },
 		);
+		const emailMap = new Map<string, string>();
+		if (profileRes.ok) {
+			const profiles = (await profileRes.json()) as Array<{ id: string; email: string }>;
+			for (const p of profiles) {
+				emailMap.set(p.id, p.email);
+			}
+		}
 
-		return membersWithEmail;
+		return memberships.map((m) => ({
+			...m,
+			email: emailMap.get(m.user_id) ?? 'unknown',
+		}));
 	}
 
 	async getTeamMembership(teamId: string, userId: string): Promise<TeamMembershipRow | null> {
