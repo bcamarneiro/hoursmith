@@ -1,9 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { WorklogFetchProgress } from '../../../types/worklogLoading';
+import type { TeamMemberSummary } from '../../services/teamService';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { buildTeamSummaries } from '../utils/teamReports';
 import { useAbsenceDaysByUser } from './useAbsenceDays';
 import { useMonthWorklogs } from './useMonthWorklogs';
+import {
+	isProcessingWorkerSupported,
+	postToWorker,
+} from '../../workers/processingWorkerClient';
+import {
+	serializeUserAbsenceDays,
+	deserializeTeamSummaries,
+	type SerializableTeamMemberSummary,
+} from '../../workers/processingWorker.types';
 
 export function useTeamData(
 	weekStart: string,
@@ -65,35 +75,97 @@ export function useTeamData(
 		return month1Progress ?? month2Progress;
 	}, [spansMonths, month1Progress, month2Progress]);
 
-	const teamMembers = useMemo(() => {
-		const allWorklogs = [
+	// Merge worklogs from both months
+	const allWorklogs = useMemo(() => {
+		const merged = [
 			...(month1.data ?? []),
 			...(spansMonths ? (month2.data ?? []) : []),
 		];
-		if (allWorklogs.length === 0 && !isLoading) return [];
-		if (allWorklogs.length === 0) return [];
+		return merged;
+	}, [month1.data, month2.data, spansMonths]);
 
-		return buildTeamSummaries(
-			allWorklogs,
-			weekStart,
-			weekEnd,
-			config.allowedUsers,
-			absenceDaysByUser,
-		);
-	}, [
-		month1.data,
-		month2.data,
-		spansMonths,
-		weekStart,
-		weekEnd,
-		config.allowedUsers,
-		absenceDaysByUser,
-		isLoading,
-	]);
+	// Worker-based async team summary computation with sync fallback
+	const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([]);
+	const [summariesLoading, setSummariesLoading] = useState(false);
+	const requestId = useRef(0);
+
+	useEffect(() => {
+		if (allWorklogs.length === 0 && !isLoading) {
+			setTeamMembers([]);
+			return;
+		}
+		if (allWorklogs.length === 0) {
+			setTeamMembers([]);
+			return;
+		}
+
+		const thisRequest = ++requestId.current;
+
+		// If worker is not available, compute synchronously
+		if (!isProcessingWorkerSupported()) {
+			setTeamMembers(
+				buildTeamSummaries(
+					allWorklogs,
+					weekStart,
+					weekEnd,
+					config.allowedUsers,
+					absenceDaysByUser,
+				),
+			);
+			return;
+		}
+
+		setSummariesLoading(true);
+
+		postToWorker({
+			type: 'buildTeamSummaries',
+			payload: {
+				worklogs: allWorklogs,
+				weekStart,
+				weekEnd,
+				allowedUsers: config.allowedUsers,
+				absenceDaysByUser: serializeUserAbsenceDays(absenceDaysByUser),
+			},
+		})
+			.then((response) => {
+				if (thisRequest !== requestId.current) return;
+				if (response.type === 'buildTeamSummaries') {
+					const items = response.result as SerializableTeamMemberSummary[];
+					setTeamMembers(deserializeTeamSummaries(items));
+				} else {
+					// Error — fall back to sync
+					setTeamMembers(
+						buildTeamSummaries(
+							allWorklogs,
+							weekStart,
+							weekEnd,
+							config.allowedUsers,
+							absenceDaysByUser,
+						),
+					);
+				}
+			})
+			.catch(() => {
+				if (thisRequest !== requestId.current) return;
+				setTeamMembers(
+					buildTeamSummaries(
+						allWorklogs,
+						weekStart,
+						weekEnd,
+						config.allowedUsers,
+						absenceDaysByUser,
+					),
+				);
+			})
+			.finally(() => {
+				if (thisRequest !== requestId.current) return;
+				setSummariesLoading(false);
+			});
+	}, [allWorklogs, weekStart, weekEnd, config.allowedUsers, absenceDaysByUser, isLoading]);
 
 	return {
 		data: teamMembers,
-		isLoading,
+		isLoading: isLoading || summariesLoading,
 		isFetching,
 		error,
 		lastUpdatedAt: lastUpdatedAt > 0 ? lastUpdatedAt : null,

@@ -1,10 +1,15 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import type { EnrichedJiraWorklog } from '../../../types/jira';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import { getWeekMonthAnchor } from '../utils/date';
 import { classifyWorklog } from '../utils/worklogClassifier';
 import { useMonthWorklogs } from './useMonthWorklogs';
+import {
+	isProcessingWorkerSupported,
+	postToWorker,
+} from '../../workers/processingWorkerClient';
+import type { HeatmapResult } from '../../workers/processingWorker.types';
 
 interface MonthHeatmapBuckets {
 	data: Map<string, number>;
@@ -66,15 +71,63 @@ export function useMonthHeatmapData(): MonthHeatmapResult {
 	// Monday is still in the previous month shows the wrong month (ADA-457/463).
 	const { year, month } = getWeekMonthAnchor(weekStart);
 
-	const { data: worklogs, isLoading } = useMonthWorklogs(year, month, {
+	const { data: worklogs, isLoading: fetchLoading } = useMonthWorklogs(year, month, {
 		jqlFilter: jqlFilter?.trim() || undefined,
 		prefetchAdjacent: true,
 	});
 
-	const { data, backdatedSeconds } = useMemo(
-		() => buildMonthHeatmapBuckets(worklogs, email),
-		[worklogs, email],
-	);
+	// Worker-based async computation with sync fallback
+	const [buckets, setBuckets] = useState<MonthHeatmapBuckets>(() => ({
+		data: new Map(),
+		backdatedSeconds: new Map(),
+	}));
+	const [workerLoading, setWorkerLoading] = useState(false);
+	const requestId = useRef(0);
 
-	return { data, backdatedSeconds, isLoading, month, year };
+	useEffect(() => {
+		if (!worklogs) {
+			setBuckets({ data: new Map(), backdatedSeconds: new Map() });
+			return;
+		}
+
+		const thisRequest = ++requestId.current;
+
+		// If worker is not available, compute synchronously
+		if (!isProcessingWorkerSupported()) {
+			setBuckets(buildMonthHeatmapBuckets(worklogs, email));
+			return;
+		}
+
+		setWorkerLoading(true);
+
+		postToWorker({
+			type: 'buildHeatmap',
+			payload: { worklogs, email },
+		})
+			.then((response) => {
+				if (thisRequest !== requestId.current) return;
+				if (response.type === 'buildHeatmap') {
+					const hr = response.result as HeatmapResult;
+					setBuckets({
+						data: new Map(Object.entries(hr.data)),
+						backdatedSeconds: new Map(Object.entries(hr.backdatedSeconds)),
+					});
+				} else {
+					// Error response — fall back to sync
+					setBuckets(buildMonthHeatmapBuckets(worklogs, email));
+				}
+			})
+			.catch(() => {
+				if (thisRequest !== requestId.current) return;
+				setBuckets(buildMonthHeatmapBuckets(worklogs, email));
+			})
+			.finally(() => {
+				if (thisRequest !== requestId.current) return;
+				setWorkerLoading(false);
+			});
+	}, [worklogs, email]);
+
+	const isLoading = fetchLoading || workerLoading;
+
+	return { data: buckets.data, backdatedSeconds: buckets.backdatedSeconds, isLoading, month, year };
 }
