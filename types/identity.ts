@@ -39,7 +39,6 @@ export interface MatchResult {
 export type MatchMethod =
 	| 'email-exact'
 	| 'account-id-exact'
-	| 'email-fuzzy'
 	| 'name-exact'
 	| 'name-fuzzy'
 	| 'name-subset'
@@ -57,9 +56,7 @@ export interface IdentityResolutionResult {
 
 /** Validation error codes. */
 export type ValidationCode =
-	| 'missing-email'
 	| 'invalid-email'
-	| 'missing-display-name'
 	| 'missing-source'
 	| 'empty-profile';
 

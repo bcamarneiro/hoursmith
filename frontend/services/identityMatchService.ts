@@ -255,7 +255,7 @@ export function jaroWinklerSimilarity(a: string, b: string): number {
  * Tokenise a display name into alphabetic tokens.  Strips punctuation and
  * splits on whitespace/hyphens; discards tokens shorter than 2 characters.
  *
- *   tokenizeName("Bruno C")        → ["bruno", "c"]
+ *   tokenizeName("Bruno C")        → ["bruno"]
  *   tokenizeName("João Silva")     → ["joão", "silva"]
  *   tokenizeName("")               → []
  */
