@@ -106,6 +106,26 @@ export const DayCard = memo<Props>(function DayCard({
 		started: string;
 	} | null>(null);
 
+	// Recent activities = logged suggestions with issueKeys, deduplicated by
+	// issueKey, so the user can click one to fill the Add Worklog form.
+	const recentActivities = useMemo(() => {
+		const seen = new Set<string>();
+		return day.suggestions
+			.filter((s) => s.logged && !!s.issueKey && !seen.has(s.issueKey))
+			.filter((s) => {
+				const key = s.issueKey!;
+				if (seen.has(key)) return false;
+				seen.add(key);
+				return true;
+			})
+			.map((s) => ({
+				issueKey: s.issueKey!,
+				issueSummary: s.issueSummary,
+				timeSpent: s.suggestedTimeSpent,
+				started: formatDateTimeLocalValue(new Date(`${s.date}T09:00`)),
+			}));
+	}, [day.suggestions]);
+
 	// Open a blank worklog form prefilled with this day's date (09:00) and the
 	// remaining gap as the suggested duration, so a user with no suggestions can
 	// still log time manually from My Week.
@@ -560,6 +580,7 @@ export const DayCard = memo<Props>(function DayCard({
 						onSubmit={handleAddSubmit}
 						onCancel={() => setAddingWorklog(null)}
 						isLoading={isWorklogOpLoading}
+						recentActivities={recentActivities}
 					/>
 				</Modal>
 			)}
