@@ -1,3 +1,4 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type React from 'react';
 import type { AbsenceDay } from '../../../services/absenceService';
 import { getAbsenceKindLabel } from '../../utils/absence';
@@ -108,6 +109,53 @@ export const MonthHeatmap: React.FC<Props> = ({
 		(seconds) => seconds > 0,
 	).length;
 
+	// Accessibility: disclosure popover for keyboard/touch users
+	const [activePopover, setActivePopover] = useState<string | null>(null);
+	const popoverRef = useRef<HTMLDivElement>(null);
+
+	const togglePopover = useCallback((key: string) => {
+		setActivePopover((prev) => (prev === key ? null : key));
+	}, []);
+
+	const closePopover = useCallback(() => {
+		setActivePopover(null);
+	}, []);
+
+	// Close popover on Escape
+	useEffect(() => {
+		if (!activePopover) return;
+		const handleKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') closePopover();
+		};
+		document.addEventListener('keydown', handleKey);
+		return () => document.removeEventListener('keydown', handleKey);
+	}, [activePopover, closePopover]);
+
+	// Close popover on outside click
+	useEffect(() => {
+		if (!activePopover) return;
+		const handleClick = (e: MouseEvent) => {
+			if (
+				popoverRef.current &&
+				!popoverRef.current.contains(e.target as Node)
+			) {
+				closePopover();
+			}
+		};
+		// Delay to avoid immediate close from the toggle click
+		const timer = setTimeout(() => {
+			document.addEventListener('mousedown', handleClick);
+		}, 0);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener('mousedown', handleClick);
+		};
+	}, [activePopover, closePopover]);
+
+	const activeCell = activePopover
+		? cells.find((c) => c.dateStr === activePopover && !c.isPlaceholder)
+		: null;
+
 	return (
 		<div className={styles.container}>
 			<div className={styles.header}>{monthLabel(year, month)}</div>
@@ -171,15 +219,62 @@ export const MonthHeatmap: React.FC<Props> = ({
 					return (
 						<li
 							key={cell.dateStr}
+							tabIndex={0}
+							role="button"
+							aria-expanded={activePopover === cell.dateStr}
+							aria-describedby={
+								activePopover === cell.dateStr
+									? `heatmap-popover-${cell.dateStr}`
+									: undefined
+							}
 							className={`${styles.cell} ${levelClass} ${weekendClass} ${hasBackdated ? styles.cellBackdated : ''} ${workedOnPto ? styles.cellWorkedOnPto : ''}`}
 							title={title}
 							aria-label={title}
+							onClick={() => togglePopover(cell.dateStr)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									togglePopover(cell.dateStr);
+								}
+							}}
 						>
 							{cell.day}
 						</li>
 					);
 				})}
 			</ul>
+
+			{activeCell && activePopover && (() => {
+				const absDay = absenceDays?.get(activeCell.dateStr);
+				const isTimeOff = !!absDay;
+				const hours = activeCell.seconds / 3600;
+				const workedOnPto = isTimeOff && activeCell.seconds > 0;
+				const backdated = backdatedSeconds?.get(activeCell.dateStr) ?? 0;
+				const hasBackdated = backdated > 0 && !isTimeOff;
+				let popoverText: string;
+				if (workedOnPto) {
+					popoverText = `${activeCell.dateStr}: ${formatHours(activeCell.seconds)} logged on ${getAbsenceKindLabel(absDay!.kind)} ⚠`;
+				} else if (isTimeOff) {
+					popoverText = `${activeCell.dateStr}: ${getAbsenceKindLabel(absDay!.kind)}`;
+				} else if (hours > 0) {
+					popoverText = `${activeCell.dateStr}: ${formatHours(activeCell.seconds)}`;
+				} else {
+					popoverText = `${activeCell.dateStr}: no time logged`;
+				}
+				if (hasBackdated) {
+					popoverText += ` (+ ${formatHours(backdated)} backdated, not counted)`;
+				}
+				return (
+					<div
+						id={`heatmap-popover-${activeCell.dateStr}`}
+						ref={popoverRef}
+						className={styles.popover}
+						role="tooltip"
+					>
+						{popoverText}
+					</div>
+				);
+			})()}
 
 			<div className={styles.footer}>
 				{showAbsenceLegend && (
