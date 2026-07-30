@@ -169,7 +169,6 @@ const BLOCKING_PATTERNS = [
 	'invalid token',
 	'unauthorized',
 	'forbidden',
-	'not found', // host unreachable or misconfigured
 	'networkerror',
 	'failed to fetch',
 	'cors',

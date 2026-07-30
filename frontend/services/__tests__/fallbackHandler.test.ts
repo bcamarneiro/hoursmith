@@ -50,6 +50,21 @@ describe('evaluateFallbackState', () => {
 		expect(state.availableActions.addManualEntry).toBe(true);
 	});
 
+	it('returns manual-entry (not offline) for "not found" worklog errors (regression — too broad a blocking pattern)', () => {
+		// "not found" can match legitimate Jira 404s (e.g. "Issue not found"),
+		// not just connectivity failures. It must NOT trigger offline mode.
+		const state = evaluateFallbackState([
+			{
+				source: 'worklogs',
+				hasError: true,
+				errorMessage: 'Issue not found',
+			},
+		]);
+		expect(state.mode).toBe('manual-entry');
+		expect(state.availableActions.exportData).toBe(false);
+		expect(state.availableActions.addManualEntry).toBe(true);
+	});
+
 	it('returns offline mode when a blocking error is detected', () => {
 		const state = evaluateFallbackState([
 			{
