@@ -8,7 +8,11 @@
  */
 
 import { logger } from '../react/utils/logger';
-import { fromHttpResponse, fromNetworkError } from './serviceErrors';
+import {
+	fromHttpResponse,
+	fromNetworkError,
+	ServiceError,
+} from './serviceErrors';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,7 +67,11 @@ function cacheGet(countryCode: string, year: number): NagerHoliday[] | null {
 	return entry.data;
 }
 
-function cacheSet(countryCode: string, year: number, data: NagerHoliday[]): void {
+function cacheSet(
+	countryCode: string,
+	year: number,
+	data: NagerHoliday[],
+): void {
 	const key = cacheKey(countryCode, year);
 	cache.set(key, { data, expiresAt: Date.now() + cacheTTL });
 }
@@ -78,7 +86,10 @@ export function clearHolidayCache(): void {
 /**
  * Invalidate a specific country/year entry.
  */
-export function invalidateHolidayCache(countryCode: string, year: number): void {
+export function invalidateHolidayCache(
+	countryCode: string,
+	year: number,
+): void {
 	cache.delete(cacheKey(countryCode, year));
 }
 
@@ -109,10 +120,18 @@ export async function fetchPublicHolidays(
 ): Promise<NagerHoliday[]> {
 	const code = countryCode.trim().toUpperCase();
 	if (!code || code.length !== 2) {
-		throw new Error(`Invalid country code: "${countryCode}". Expected ISO 3166-1 alpha-2.`);
+		throw new ServiceError({
+			kind: 'unknown',
+			source: 'Nager.Date',
+			message: `Invalid country code: "${countryCode}". Expected ISO 3166-1 alpha-2.`,
+		});
 	}
 	if (!Number.isInteger(year) || year < 1900 || year > 2100) {
-		throw new Error(`Invalid year: ${year}. Must be an integer between 1900 and 2100.`);
+		throw new ServiceError({
+			kind: 'unknown',
+			source: 'Nager.Date',
+			message: `Invalid year: ${year}. Must be an integer between 1900 and 2100.`,
+		});
 	}
 
 	// Check cache first
@@ -143,7 +162,11 @@ export async function fetchPublicHolidays(
 	try {
 		data = (await res.json()) as NagerHoliday[];
 	} catch {
-		throw new Error('Nager.Date: invalid JSON response');
+		throw new ServiceError({
+			kind: 'unknown',
+			source: 'Nager.Date',
+			message: 'Nager.Date: invalid JSON response',
+		});
 	}
 
 	cacheSet(code, year, data);

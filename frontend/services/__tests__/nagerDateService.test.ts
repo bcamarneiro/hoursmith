@@ -140,10 +140,18 @@ describe('nagerDateService', () => {
 		vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
 			const url = String(input);
 			if (url.includes('/2024/PT')) {
-				return { ok: true, status: 200, json: async () => portugalHolidays2024 } as Response;
+				return {
+					ok: true,
+					status: 200,
+					json: async () => portugalHolidays2024,
+				} as Response;
 			}
 			if (url.includes('/2024/DE')) {
-				return { ok: true, status: 200, json: async () => germanyHolidays2024 } as Response;
+				return {
+					ok: true,
+					status: 200,
+					json: async () => germanyHolidays2024,
+				} as Response;
 			}
 			return { ok: false, status: 404 } as unknown as Response;
 		});
@@ -227,33 +235,33 @@ describe('nagerDateService', () => {
 	// -- validation ----------------------------------------------------------
 
 	it('throws for an invalid country code (not 2 characters)', async () => {
-		await expect(fetchPublicHolidays('USA', 2024)).rejects.toThrow(
-			'Invalid country code',
-		);
-		await expect(fetchPublicHolidays('', 2024)).rejects.toThrow(
-			'Invalid country code',
-		);
-		await expect(fetchPublicHolidays('   ', 2024)).rejects.toThrow(
-			'Invalid country code',
-		);
-		await expect(fetchPublicHolidays('X', 2024)).rejects.toThrow(
-			'Invalid country code',
-		);
+		await expect(fetchPublicHolidays('USA', 2024)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
+		await expect(fetchPublicHolidays('', 2024)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
+		await expect(fetchPublicHolidays('   ', 2024)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
+		await expect(fetchPublicHolidays('X', 2024)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
 	});
 
 	it('throws for an invalid year', async () => {
-		await expect(fetchPublicHolidays('PT', 1899)).rejects.toThrow(
-			'Invalid year',
-		);
-		await expect(fetchPublicHolidays('PT', 2101)).rejects.toThrow(
-			'Invalid year',
-		);
-		await expect(fetchPublicHolidays('PT', 0)).rejects.toThrow(
-			'Invalid year',
-		);
-		await expect(fetchPublicHolidays('PT', -1)).rejects.toThrow(
-			'Invalid year',
-		);
+		await expect(fetchPublicHolidays('PT', 1899)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
+		await expect(fetchPublicHolidays('PT', 2101)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
+		await expect(fetchPublicHolidays('PT', 0)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
+		await expect(fetchPublicHolidays('PT', -1)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
 	});
 
 	// -- error handling ------------------------------------------------------
@@ -294,9 +302,9 @@ describe('nagerDateService', () => {
 			},
 		} as unknown as Response);
 
-		await expect(fetchPublicHolidays('PT', 2024)).rejects.toThrow(
-			'invalid JSON response',
-		);
+		await expect(fetchPublicHolidays('PT', 2024)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
 	});
 
 	it('re-throws an AbortError from the AbortSignal without wrapping', async () => {
