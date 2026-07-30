@@ -176,6 +176,7 @@ describe('validateSession', () => {
 			// Ensure env is clean.
 			delete process.env.SUPABASE_URL;
 			delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			const result = await validateSession(
 				makeRequest({ authorization: 'Bearer valid-jwt' }),
 				{ verifyJwtFn: validVerifyJwt() },
@@ -186,9 +187,15 @@ describe('validateSession', () => {
 			if (result.ok) return;
 			expect(result.status).toBe(500);
 			expect(result.code).toBe('server_misconfigured');
+			expect(warnSpy).toHaveBeenCalledWith(
+				'[session] Failed to resolve Supabase admin client:',
+				expect.any(String),
+			);
+			warnSpy.mockRestore();
 		});
 
 		it('returns 500 / server_misconfigured when the store lookup fails', async () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 			const result = await validateSession(
 				makeRequest({ authorization: 'Bearer valid-jwt' }),
 				{ verifyJwtFn: validVerifyJwt(), store: brokenStore() },
@@ -197,6 +204,13 @@ describe('validateSession', () => {
 			if (result.ok) return;
 			expect(result.status).toBe(500);
 			expect(result.code).toBe('server_misconfigured');
+			expect(warnSpy).toHaveBeenCalledWith(
+				'[session] DB lookup failed for user',
+				'user-abc',
+				':',
+				expect.any(String),
+			);
+			warnSpy.mockRestore();
 		});
 	});
 

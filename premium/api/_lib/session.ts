@@ -118,6 +118,7 @@ export async function validateSession(
 	try {
 		store = options.store ?? toSessionStore(defaultSupabaseAdmin());
 	} catch (err) {
+		console.warn('[session] Failed to resolve Supabase admin client:', (err as Error).message);
 		return {
 			ok: false,
 			status: 500,
@@ -135,6 +136,7 @@ export async function validateSession(
 			store.getSubscription(verified.userId),
 		]);
 	} catch (err) {
+		console.warn('[session] DB lookup failed for user', verified.userId, ':', (err as Error).message);
 		return {
 			ok: false,
 			status: 500,
