@@ -59,10 +59,6 @@ create policy "commits_select_associated"
 create index commits_source_authored_at_idx
     on public.commits (source, authored_at desc);
 
--- Index for dedup / lookup by repository + sha.
-create index commits_repository_sha_idx
-    on public.commits (repository, sha);
-
 -- ---------------------------------------------------------------------------
 -- profile_commits: many-to-many join between profiles and commits.
 --
