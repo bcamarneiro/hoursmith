@@ -32,6 +32,18 @@ export interface SubscriptionRow {
 	updated_at: string;
 }
 
+export interface RawCommitRow {
+	id?: number;
+	project_id: number;
+	user_username: string;
+	ref: string;
+	commit_count: number;
+	pushed_at: string;
+	payload: Record<string, unknown>;
+	status: string;
+	created_at?: string;
+}
+
 export interface SubscriptionUpsert {
 	user_id: string;
 	stripe_customer_id: string;
@@ -74,6 +86,7 @@ export interface SupabaseAdminClient {
 	 * already seen (a duplicate delivery that must not be reprocessed).
 	 */
 	recordBillingEvent(eventId: string): Promise<boolean>;
+	insertRawCommit(row: Omit<RawCommitRow, 'id' | 'created_at'>): Promise<{ id: number }>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -277,22 +290,40 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		}
 	}
 
-	async recordBillingEvent(eventId: string): Promise<boolean> {
-		// INSERT ... ON CONFLICT DO NOTHING via PostgREST. With
-		// `return=representation` the body holds the inserted rows — empty when
-		// the id already existed, which is exactly our duplicate signal.
-		const res = await fetch(`${this.url}/rest/v1/billing_event_log`, {
-			method: 'POST',
-			headers: this.headers({
-				'content-type': 'application/json',
-				prefer: 'resolution=ignore-duplicates,return=representation',
-			}),
-			body: JSON.stringify({ event_id: eventId }),
-		});
-		if (!res.ok) {
-			throw new Error(`supabaseAdmin.recordBillingEvent failed: ${res.status}`);
-		}
-		const rows = (await res.json()) as unknown[];
-		return Array.isArray(rows) && rows.length > 0;
-	}
+  async recordBillingEvent(eventId: string): Promise<boolean> {
+    // INSERT ... ON CONFLICT DO NOTHING via PostgREST. With
+    // `return=representation` the body holds the inserted rows — empty when
+    // the id already existed, which is exactly our duplicate signal.
+    const res = await fetch(`${this.url}/rest/v1/billing_event_log`, {
+      method: 'POST',
+      headers: this.headers({
+        'content-type': 'application/json',
+        prefer: 'resolution=ignore-duplicates,return=representation',
+      }),
+      body: JSON.stringify({ event_id: eventId }),
+    });
+    if (!res.ok) {
+      throw new Error(`supabaseAdmin.recordBillingEvent failed: ${res.status}`);
+    }
+    const rows = (await res.json()) as unknown[];
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  async insertRawCommit(
+    row: Omit<RawCommitRow, 'id' | 'created_at'>,
+  ): Promise<{ id: number }> {
+    const res = await fetch(`${this.url}/rest/v1/raw_commits`, {
+      method: 'POST',
+      headers: this.headers({
+        'content-type': 'application/json',
+        prefer: 'return=representation',
+      }),
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) {
+      throw new Error(`supabaseAdmin.insertRawCommit failed: ${res.status}`);
+    }
+    const [inserted] = (await res.json()) as RawCommitRow[];
+    return { id: inserted.id! };
+  }
 }
