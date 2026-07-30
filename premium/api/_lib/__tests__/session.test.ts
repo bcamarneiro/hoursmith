@@ -312,6 +312,8 @@ describe("validateSession", () => {
         new Error("DB down"),
       );
 
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
       const r = await validateSession(reqWithBearer("valid-token"), {
         supabaseAdmin: mockAdmin,
         verifyToken,
@@ -324,6 +326,14 @@ describe("validateSession", () => {
         expect(r.session.subscriptionActive).toBe(false);
         expect(r.session.userId).toBe("user-1");
       }
+
+      // Should log a warning so ops can detect subscription lookup failures
+      expect(warnSpy).toHaveBeenCalledWith(
+        "Session: subscription lookup failed for user user-1",
+        "DB down",
+      );
+
+      warnSpy.mockRestore();
     });
 
     it("returns null currentPeriodEnd when column is null", async () => {

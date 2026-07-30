@@ -200,9 +200,13 @@ export async function validateSession(
   if (supabaseAdmin) {
     try {
       sub = await supabaseAdmin.getSubscription(userId);
-    } catch {
+    } catch (err) {
       // Subscription lookup is non-blocking. If it fails, we still have a
       // valid session; the caller can decide what to do.
+      console.warn(
+        `Session: subscription lookup failed for user ${userId}`,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 
