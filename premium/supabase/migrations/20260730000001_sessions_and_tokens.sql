@@ -32,8 +32,8 @@ create index sessions_user_id_idx on public.sessions (user_id);
 -- Efficient cleanup of expired sessions (background sweep or maintenance task).
 create index sessions_expires_at_idx on public.sessions (expires_at);
 
--- Keep updated_at fresh on session writes.
-create or replace function public.set_sessions_updated_at()
+-- Keep updated_at fresh on writes.
+create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
 as $$
@@ -45,7 +45,7 @@ $$;
 
 create trigger sessions_set_updated_at
     before update on public.sessions
-    for each row execute function public.set_sessions_updated_at();
+    for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
 -- refresh_tokens: one row per issued refresh token.
@@ -79,4 +79,4 @@ create index refresh_tokens_expires_at_idx on public.refresh_tokens (expires_at)
 -- Keep updated_at fresh on token writes.
 create trigger refresh_tokens_set_updated_at
     before update on public.refresh_tokens
-    for each row execute function public.set_sessions_updated_at();
+    for each row execute function public.set_updated_at();
