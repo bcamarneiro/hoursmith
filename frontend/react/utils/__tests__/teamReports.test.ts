@@ -440,8 +440,8 @@ describe('buildManagerTrendModel', () => {
 						'2026-03-04',
 						{
 							date: '2026-03-04',
-							reasons: ['[Team PTO] Vacation - Alice'],
-							kind: 'vacation' as const,
+							reasons: ['[Team Calendar] Sick - Alice'],
+							kind: 'sick' as const,
 						},
 					],
 				]),
@@ -485,7 +485,7 @@ describe('buildManagerTrendModel', () => {
 	});
 
 	it('partial-day absence: target tracks logged hours (100% compliant)', () => {
-		// New per-day target rule: Bob worked 4h on his absence day. Target
+		// New per-day target rule: Bob worked 4h on his sick day. Target
 		// for that day = min(logged, 8h) = 4h. Other 4 workdays unworked
 		// (would be missing). Total target = 4*8 + 4 = 36h. Bob logged 4h,
 		// so gap = 32h.
@@ -497,8 +497,8 @@ describe('buildManagerTrendModel', () => {
 						'2026-03-11',
 						{
 							date: '2026-03-11',
-							reasons: ['[Team PTO] Vacation - Bob'],
-							kind: 'vacation' as const,
+							reasons: ['[Team Calendar] Sick - Bob'],
+							kind: 'sick' as const,
 						},
 					],
 				]),

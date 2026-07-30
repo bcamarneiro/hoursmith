@@ -9,7 +9,7 @@ import {
 	isWeekend,
 	parseIsoDateLocal,
 } from '../react/utils/date';
-import { computeDayTargetSeconds } from '../react/utils/dayTarget';
+import { computeDayTargetSeconds, isFlaggedDate } from '../react/utils/dayTarget';
 import type {
 	FavoriteIssue,
 	RecurringTemplate,
@@ -265,7 +265,11 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 		const day = wl.date.slice(0, 10);
 		// Backdated entries don't contribute to the day's logged total —
 		// they only feed the Dashboard ghost / side-note UI.
-		if (!wl.isBackdated) {
+		// Holiday/PTO entries are also excluded — worklogs on flagged dates
+		// do not count toward logged totals.
+		const absenceDay = absenceDays?.get(day);
+		const isHolidayOrPto = absenceDay ? isFlaggedDate(absenceDay.kind) : false;
+		if (!wl.isBackdated && !isHolidayOrPto) {
 			loggedByDay.set(day, (loggedByDay.get(day) || 0) + wl.timeSpentSeconds);
 			if (wl.issueKey && wl.worklogId) {
 				const list = loggedWorklogsByDay.get(day) ?? [];

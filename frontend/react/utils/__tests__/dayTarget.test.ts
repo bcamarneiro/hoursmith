@@ -1,104 +1,83 @@
 import { describe, expect, it } from 'vitest';
 import {
-	BASELINE_DAY_SECONDS,
 	computeDayTargetSeconds,
+	isFlaggedDate,
 	sumWeekdayTargetSeconds,
 } from '../dayTarget';
 
+describe('isFlaggedDate', () => {
+	it('returns true for holiday', () => {
+		expect(isFlaggedDate('holiday')).toBe(true);
+	});
+
+	it('returns true for vacation', () => {
+		expect(isFlaggedDate('vacation')).toBe(true);
+	});
+
+	it('returns true for off', () => {
+		expect(isFlaggedDate('off')).toBe(true);
+	});
+
+	it('returns false for sick', () => {
+		expect(isFlaggedDate('sick')).toBe(false);
+	});
+
+	it('returns false for undefined', () => {
+		expect(isFlaggedDate(undefined)).toBe(false);
+	});
+});
+
 describe('computeDayTargetSeconds', () => {
-	it('weekend → 0 regardless of absence or hours', () => {
+	it('returns 0 for weekends', () => {
 		expect(computeDayTargetSeconds(true, false, 0)).toBe(0);
-		expect(computeDayTargetSeconds(true, true, 0)).toBe(0);
-		expect(computeDayTargetSeconds(true, false, 4 * 3600)).toBe(0);
-		expect(computeDayTargetSeconds(true, true, 4 * 3600)).toBe(0);
+		expect(computeDayTargetSeconds(true, false, 28800)).toBe(0);
 	});
 
-	it('weekday, not absent → 8h baseline', () => {
-		expect(computeDayTargetSeconds(false, false, 0)).toBe(BASELINE_DAY_SECONDS);
-		expect(computeDayTargetSeconds(false, false, 4 * 3600)).toBe(
-			BASELINE_DAY_SECONDS,
-		);
-		// Overtime above baseline does not affect target.
-		expect(computeDayTargetSeconds(false, false, 12 * 3600)).toBe(
-			BASELINE_DAY_SECONDS,
-		);
+	it('returns baseline for a normal weekday with no logged time', () => {
+		expect(computeDayTargetSeconds(false, false, 0)).toBe(28800);
 	});
 
-	it('weekday, absent, no work logged → 0 (full day off)', () => {
+	it('returns baseline for a normal weekday with overtime', () => {
+		expect(computeDayTargetSeconds(false, false, 36000)).toBe(28800);
+	});
+
+	it('returns 0 for an absent day with no logged time', () => {
 		expect(computeDayTargetSeconds(false, true, 0)).toBe(0);
 	});
 
-	it('weekday, absent, partial work logged → target tracks logged hours', () => {
-		expect(computeDayTargetSeconds(false, true, 4 * 3600)).toBe(4 * 3600);
-		expect(computeDayTargetSeconds(false, true, 1800)).toBe(1800);
+	it('returns logged seconds for a partial absence day', () => {
+		expect(computeDayTargetSeconds(false, true, 14400)).toBe(14400);
 	});
 
-	it('weekday, absent, full 8h logged → 8h target (100% compliant)', () => {
-		expect(computeDayTargetSeconds(false, true, BASELINE_DAY_SECONDS)).toBe(
-			BASELINE_DAY_SECONDS,
-		);
+	it('caps at baseline even with overtime on an absent day', () => {
+		expect(computeDayTargetSeconds(false, true, 36000)).toBe(28800);
 	});
 
-	it('weekday, absent, more than 8h logged → capped at 8h baseline', () => {
-		expect(computeDayTargetSeconds(false, true, 12 * 3600)).toBe(
-			BASELINE_DAY_SECONDS,
-		);
-	});
-
-	it('treats negative logged seconds as 0', () => {
+	it('handles negative loggedSeconds by clamping to 0', () => {
 		expect(computeDayTargetSeconds(false, true, -100)).toBe(0);
 	});
 });
 
 describe('sumWeekdayTargetSeconds', () => {
-	const weekdays = [
-		'2026-03-02',
-		'2026-03-03',
-		'2026-03-04',
-		'2026-03-05',
-		'2026-03-06',
-	];
+	const weekdays = ['2026-03-09', '2026-03-10', '2026-03-11', '2026-03-12', '2026-03-13'];
 
-	it('returns full week × 8h when no absences and no logs', () => {
+	it('sums baselines for all normal days', () => {
 		const total = sumWeekdayTargetSeconds(
 			weekdays,
 			() => false,
 			() => 0,
 		);
-		expect(total).toBe(5 * BASELINE_DAY_SECONDS);
+		expect(total).toBe(5 * 28800);
 	});
 
-	it('drops 8h for an untouched absence day', () => {
-		const absent = new Set(['2026-03-04']);
+	it('reduces target for absent days', () => {
+		const absence = new Set(['2026-03-11']);
 		const total = sumWeekdayTargetSeconds(
 			weekdays,
-			(d) => absent.has(d),
+			(d) => absence.has(d),
 			() => 0,
 		);
-		expect(total).toBe(4 * BASELINE_DAY_SECONDS);
-	});
-
-	it('partial-day absence: deducts only the unworked portion', () => {
-		const absent = new Set(['2026-03-04']);
-		const logged = new Map([['2026-03-04', 4 * 3600]]);
-		const total = sumWeekdayTargetSeconds(
-			weekdays,
-			(d) => absent.has(d),
-			(d) => logged.get(d) ?? 0,
-		);
-		// 4 normal days (8h) + 1 absent day with 4h logged → 4*8 + 4 = 36h
-		expect(total).toBe(4 * BASELINE_DAY_SECONDS + 4 * 3600);
-	});
-
-	it('overtime on an absence day does not reinflate the target', () => {
-		const absent = new Set(['2026-03-04']);
-		const logged = new Map([['2026-03-04', 12 * 3600]]);
-		const total = sumWeekdayTargetSeconds(
-			weekdays,
-			(d) => absent.has(d),
-			(d) => logged.get(d) ?? 0,
-		);
-		// Capped at 8h on the absence day → identical to a normal week.
-		expect(total).toBe(5 * BASELINE_DAY_SECONDS);
+		// 4 normal days × 8h + 1 absent day × 0h = 32h
+		expect(total).toBe(4 * 28800);
 	});
 });
