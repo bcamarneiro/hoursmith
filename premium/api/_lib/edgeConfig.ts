@@ -86,33 +86,3 @@ export async function writeEdgeConfig(
 		return false;
 	}
 }
-
-/**
- * Delete a single item from Vercel Edge Config via the Vercel REST API.
- *
- * Same auth and error-handling contract as {@link writeEdgeConfig}.
- * Returns `true` on success, `false` on failure.
- */
-export async function deleteEdgeConfigItem(key: string): Promise<boolean> {
-	const ecfgId = edgeConfigId();
-	const token = process.env.VERCEL_API_TOKEN;
-	if (!ecfgId || !token) return false;
-	try {
-		const res = await fetch(
-			`https://api.vercel.com/v1/edge-config/${ecfgId}/items`,
-			{
-				method: 'PATCH',
-				headers: {
-					authorization: `Bearer ${token}`,
-					'content-type': 'application/json',
-				},
-				body: JSON.stringify({
-					items: [{ operation: 'delete', key }],
-				}),
-			},
-		);
-		return res.ok;
-	} catch {
-		return false;
-	}
-}
