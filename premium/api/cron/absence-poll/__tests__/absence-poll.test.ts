@@ -250,4 +250,68 @@ describe('POST /api/cron/absence-poll', () => {
 		const body = await res.json();
 		expect(body.error).toBe('internal_error');
 	});
+
+	it('processes shared-attribution absence feeds via assignment patterns', async () => {
+		const SHARED_FEED = {
+			id: 'feed-3',
+			user_id: 'user-alice',
+			url: 'https://example.com/shared.ics',
+			type: 'absence' as const,
+			label: 'Team',
+			absence_attribution: 'shared' as const,
+			title_filter: null,
+			enabled: true,
+			created_at: '2025-01-01T00:00:00Z',
+			updated_at: '2025-01-01T00:00:00Z',
+		};
+
+		const admin = makeAdmin({
+			getAllEnabledFeeds: vi.fn().mockResolvedValue([SHARED_FEED]),
+			getAllProfiles: vi.fn().mockResolvedValue([PROFILE_ALICE, PROFILE_BOB]),
+			getAbsenceAssignments: vi.fn().mockResolvedValue([
+				{
+					id: 'assign-1',
+					user_id: 'user-alice',
+					pattern: 'bob',
+					user_emails: ['bob@example.com'],
+					created_at: '2025-01-01T00:00:00Z',
+					updated_at: '2025-01-01T00:00:00Z',
+				},
+			]),
+			replaceAbsenceRecords: vi.fn().mockResolvedValue(undefined),
+		});
+
+		const fakeEvent: AbsenceEvent = {
+			summary: 'Bob vacation',
+			dtstart: '20260721',
+			dtend: '20260722',
+			rrule: '',
+			exdates: [],
+		};
+
+		const res = await handleAbsencePoll(makeRequest(), {
+			supabase: admin,
+			now: NOW,
+			fetchAndParseFeed: vi.fn().mockResolvedValue({ events: [fakeEvent] }),
+		});
+
+		expect(res.status).toBe(200);
+		const body = await res.json();
+		expect(body.feedsProcessed).toBe(1);
+		expect(body.feedErrors).toBe(0);
+		expect(body.totalRecords).toBeGreaterThan(0);
+
+		// Shared event matching "bob" → written to bob only, not alice
+		expect(admin.replaceAbsenceRecords).toHaveBeenCalledTimes(1);
+		const callArgs = (admin.replaceAbsenceRecords as ReturnType<typeof vi.fn>).mock.calls[0];
+		expect(callArgs[0]).toBe('user-bob');
+		const records = callArgs[3] as unknown[];
+		expect(records.length).toBe(1);
+		expect(records[0]).toMatchObject({
+			user_id: 'user-bob',
+			summary: expect.stringContaining('Bob vacation') as unknown,
+			kind: 'vacation',
+			source: 'cron',
+		});
+	});
 });

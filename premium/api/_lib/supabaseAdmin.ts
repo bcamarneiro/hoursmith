@@ -408,7 +408,7 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		const deleteParams = new URLSearchParams({
 			user_id: `eq.${userId}`,
 			date: `gte.${rangeStart}`,
-			and: `date.lte.${rangeEnd}`,
+			and: `(date.lte.${rangeEnd})`,
 		});
 		const delRes = await fetch(
 			`${this.url}/rest/v1/absence_records?${deleteParams.toString()}`,

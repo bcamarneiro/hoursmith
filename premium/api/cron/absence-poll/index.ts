@@ -25,6 +25,7 @@ import {
 	fetchAndParseFeed,
 	expandFeedForUsers,
 	mergeAbsenceResults,
+	toLocalDateString,
 } from '../../_lib/icsParser';
 
 // ---------------------------------------------------------------------------
@@ -224,7 +225,7 @@ export async function handleAbsencePoll(
 				for (const [, day] of dates) {
 					userRecords.push({
 						user_id: uid,
-						feed_id: null, // resolved after we know which feed
+						feed_id: null, // records are merged across feeds, so a single feed_id is not meaningful
 						date: day.date,
 						kind: day.kind,
 						summary: day.summary,
@@ -286,13 +287,6 @@ export async function handleAbsencePoll(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function toLocalDateString(date: Date): string {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const day = String(date.getDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
-}
 
 /**
  * Resolve a feed's owner email from the profiles list.
