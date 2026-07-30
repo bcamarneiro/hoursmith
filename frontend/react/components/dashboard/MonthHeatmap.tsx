@@ -112,6 +112,9 @@ export const MonthHeatmap: React.FC<Props> = ({
 	// Accessibility: disclosure popover for keyboard/touch users
 	const [activePopover, setActivePopover] = useState<string | null>(null);
 	const popoverRef = useRef<HTMLDivElement>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
+	const cellRefs = useRef<Map<string, HTMLLIElement>>(new Map());
+	const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
 
 	const togglePopover = useCallback((key: string) => {
 		setActivePopover((prev) => (prev === key ? null : key));
@@ -120,6 +123,21 @@ export const MonthHeatmap: React.FC<Props> = ({
 	const closePopover = useCallback(() => {
 		setActivePopover(null);
 	}, []);
+
+	// Position the popover relative to the active cell
+	useEffect(() => {
+		if (!activePopover) return;
+		const cellEl = cellRefs.current.get(activePopover);
+		const containerEl = containerRef.current;
+		if (!cellEl || !containerEl) return;
+		const cellRect = cellEl.getBoundingClientRect();
+		const containerRect = containerEl.getBoundingClientRect();
+		setPopoverStyle({
+			position: 'absolute',
+			top: cellRect.bottom - containerRect.top + 4,
+			left: cellRect.left - containerRect.left,
+		});
+	}, [activePopover]);
 
 	// Close popover on Escape
 	useEffect(() => {
@@ -131,25 +149,18 @@ export const MonthHeatmap: React.FC<Props> = ({
 		return () => document.removeEventListener('keydown', handleKey);
 	}, [activePopover, closePopover]);
 
-	// Close popover on outside click
+	// Close popover on outside pointer-down (no setTimeout race)
 	useEffect(() => {
 		if (!activePopover) return;
-		const handleClick = (e: MouseEvent) => {
-			if (
-				popoverRef.current &&
-				!popoverRef.current.contains(e.target as Node)
-			) {
-				closePopover();
-			}
+		const handlePointerDown = (e: PointerEvent) => {
+			const target = e.target as Node;
+			if (popoverRef.current?.contains(target)) return;
+			const cellEl = cellRefs.current.get(activePopover);
+			if (cellEl?.contains(target)) return;
+			closePopover();
 		};
-		// Delay to avoid immediate close from the toggle click
-		const timer = setTimeout(() => {
-			document.addEventListener('mousedown', handleClick);
-		}, 0);
-		return () => {
-			clearTimeout(timer);
-			document.removeEventListener('mousedown', handleClick);
-		};
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => document.removeEventListener('pointerdown', handlePointerDown);
 	}, [activePopover, closePopover]);
 
 	const activeCell = activePopover
@@ -157,7 +168,7 @@ export const MonthHeatmap: React.FC<Props> = ({
 		: null;
 
 	return (
-		<div className={styles.container}>
+		<div className={styles.container} ref={containerRef}>
 			<div className={styles.header}>{monthLabel(year, month)}</div>
 			<div className={styles.summary}>
 				<span>{formatHours(totalLoggedSeconds)} logged</span>
@@ -219,6 +230,13 @@ export const MonthHeatmap: React.FC<Props> = ({
 					return (
 						<li
 							key={cell.dateStr}
+							ref={(el) => {
+								if (el) {
+									cellRefs.current.set(cell.dateStr, el);
+								} else {
+									cellRefs.current.delete(cell.dateStr);
+								}
+							}}
 							tabIndex={0}
 							role="button"
 							aria-expanded={activePopover === cell.dateStr}
@@ -269,7 +287,9 @@ export const MonthHeatmap: React.FC<Props> = ({
 						id={`heatmap-popover-${activeCell.dateStr}`}
 						ref={popoverRef}
 						className={styles.popover}
-						role="tooltip"
+						role="dialog"
+						aria-label={`Details for ${activeCell.dateStr}`}
+						style={popoverStyle}
 					>
 						{popoverText}
 					</div>
