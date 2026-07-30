@@ -120,7 +120,7 @@ describe('POST /api/queue/ingest', () => {
 			user_username: 'alice',
 			ref: 'refs/heads/main',
 			commit_count: 3,
-			pushed_at: '2026-07-30T14:00:00Z',
+			pushed_at: '2026-07-30T12:00:00Z',
 			payload: expect.objectContaining({ object_kind: 'push' }),
 			status: 'pending',
 		});
