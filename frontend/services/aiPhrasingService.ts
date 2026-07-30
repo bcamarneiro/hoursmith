@@ -15,7 +15,7 @@
  * Linear: ADA-588
  */
 
-import { ServiceError } from './serviceErrors';
+import { classifyHttpStatus, ServiceError } from './serviceErrors';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -156,6 +156,13 @@ export function sanitizeNumericalContent(text: string): string {
 	// Any remaining isolated digits (e.g. inside a word boundary glitch)
 	cleaned = cleaned.replace(/\d/g, '');
 
+	// Spelled-out number words — detected by containsNumericalValues,
+	// must also be stripped so the sanitizer fully removes numerical content.
+	cleaned = cleaned.replace(
+		/\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)\b/gi,
+		'',
+	);
+
 	// Clean up trailing symbols / punctuation that the number carried
 	cleaned = cleaned.replace(/[$%]\s*/g, '');
 	cleaned = cleaned.replace(/(?<=\s):\s*/g, '');
@@ -232,7 +239,7 @@ export async function phraseReason(
 
 	if (!response.ok) {
 		throw new ServiceError({
-			kind: 'server-error',
+			kind: classifyHttpStatus(response.status),
 			status: response.status,
 			source: 'ai-phrasing',
 			message: `AI phrasing API returned HTTP ${response.status}`,

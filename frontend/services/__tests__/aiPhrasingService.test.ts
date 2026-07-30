@@ -235,6 +235,18 @@ describe('sanitizeNumericalContent', () => {
 			sanitizeNumericalContent('fixed  3  bugs'),
 		).toBe('fixed bugs');
 	});
+
+	it('strips spelled-out number words', () => {
+		expect(
+			sanitizeNumericalContent('fixed three bugs'),
+		).toBe('fixed bugs');
+	});
+
+	it('strips spelled-out numbers in mixed content', () => {
+		expect(
+			sanitizeNumericalContent('spent two hours on five items'),
+		).toBe('spent hours on items');
+	});
 });
 
 /* ------------------------------------------------------------------ */
