@@ -108,6 +108,66 @@ export async function canCheckout(
 	return isAllowlisted(email, env);
 }
 
+/**
+ * Write flag values to Edge Config. Only the fields present in `patch` are
+ * updated; omitted fields keep their current value. Needs `VERCEL_API_TOKEN`
+ * and `EDGE_CONFIG` (the connection string) to be set in the environment.
+ *
+ * Returns `null` on success or an error message string on failure.
+ */
+export async function writeFlags(
+	patch: Partial<PublicFlags>,
+): Promise<string | null> {
+	const token = process.env.VERCEL_API_TOKEN;
+	const connection = process.env.EDGE_CONFIG;
+	if (!token || !connection) {
+		return 'edge_config_not_configured';
+	}
+	try {
+		const url = new URL(connection);
+		const base = `${url.origin}${url.pathname.replace(/\/$/, '')}`;
+		const edgeConfigId = url.pathname.split('/').pop() || '';
+		if (!edgeConfigId) return 'invalid_edge_config';
+
+		const vercelApiBase = 'https://api.vercel.com/v1/edge-config';
+		const itemsUrl = `${vercelApiBase}/${encodeURIComponent(edgeConfigId)}/items`;
+
+		const keyToEdgeKey: Record<string, string> = {
+			maintenanceMode: 'maintenance_mode',
+			checkoutEnabled: 'polar_checkout_enabled',
+			paywallPublic: 'paywall_public',
+			paywallOpenForMe: 'paywall_public',
+			announcementBanner: 'announcement_banner',
+		};
+
+		const items: Array<{ operation: 'upsert'; key: string; value: unknown }> =
+			[];
+		for (const [field, value] of Object.entries(patch)) {
+			const edgeKey = keyToEdgeKey[field];
+			if (!edgeKey) continue;
+			// paywallOpenForMe is computed per-user, never stored directly
+			if (field === 'paywallOpenForMe') continue;
+			items.push({ operation: 'upsert', key: edgeKey, value });
+		}
+
+		if (items.length === 0) return null;
+
+		const res = await fetch(itemsUrl, {
+			method: 'PATCH',
+			headers: {
+				authorization: `Bearer ${token}`,
+				'content-type': 'application/json',
+			},
+			body: JSON.stringify({ items }),
+		});
+
+		if (!res.ok) return `edge_config_write_failed: ${res.status}`;
+		return null;
+	} catch (err) {
+		return `edge_config_write_error: ${err instanceof Error ? err.message : String(err)}`;
+	}
+}
+
 /** Resolve the public flag snapshot for a given (optional) caller email. */
 export async function resolveFlags(
 	email: string | null,
