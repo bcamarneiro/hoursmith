@@ -11,6 +11,7 @@ import { KeyboardShortcutsHelp } from '../components/dashboard/KeyboardShortcuts
 import { MonthHeatmap } from '../components/dashboard/MonthHeatmap';
 import { OfflineIndicator } from '../components/dashboard/OfflineIndicator';
 import { SourceStatusBar } from '../components/dashboard/SourceStatusBar';
+import { RecentActivity } from '../components/dashboard/RecentActivity';
 import { TemplatesManager } from '../components/dashboard/TemplatesManager';
 import { WeeklyCloseAssistant } from '../components/dashboard/WeeklyCloseAssistant';
 import { WeekNavigator } from '../components/dashboard/WeekNavigator';
@@ -61,6 +62,7 @@ export const MyWeekPage: React.FC = () => {
 
 	const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
 	const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
+	const [isRecentActivityOpen, setIsRecentActivityOpen] = useState(false);
 
 	// Day cards stay in chronological (Mon→Fri) order so they never reshuffle
 	// while you log time. The earlier gap-first sort (ADA-349) re-ranked days by
@@ -256,6 +258,9 @@ export const MyWeekPage: React.FC = () => {
 					<Button variant="secondary" onClick={() => setIsTemplatesOpen(true)}>
 						Templates
 					</Button>
+					<Button variant="secondary" onClick={() => setIsRecentActivityOpen(true)}>
+						Activity
+					</Button>
 					<Button
 						variant="secondary"
 						onClick={handleCopyPrevWeek}
@@ -422,6 +427,10 @@ export const MyWeekPage: React.FC = () => {
 			<TemplatesManager
 				isOpen={isTemplatesOpen}
 				onClose={() => setIsTemplatesOpen(false)}
+			/>
+			<RecentActivity
+				isOpen={isRecentActivityOpen}
+				onClose={() => setIsRecentActivityOpen(false)}
 			/>
 			<KeyboardShortcutsHelp
 				isOpen={showHelp}
