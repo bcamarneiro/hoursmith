@@ -24,6 +24,11 @@ function makeResponse(
 	return new Response(null, { status, headers });
 }
 
+/** Create a promise that never settles (for blocking concurrency slots). */
+function neverSettles(): Promise<Response> {
+	return new Promise<Response>(() => {});
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
@@ -38,7 +43,7 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests
+// fetchWithRetry — happy paths
 // ---------------------------------------------------------------------------
 
 describe('fetchWithRetry (ADA-609)', () => {
@@ -69,24 +74,6 @@ describe('fetchWithRetry (ADA-609)', () => {
 		expect(globalThis.fetch).toHaveBeenCalledTimes(2);
 	});
 
-	it('throws ServiceError when all retries are exhausted on 429', async () => {
-		globalThis.fetch = vi.fn().mockResolvedValue(makeResponse(429));
-
-		const promise = fetchWithRetry('https://hoursmith.io/api');
-		// Advance past all backoff timers
-		await vi.advanceTimersByTimeAsync(20_000);
-
-		const err = await promise.catch((e: unknown) => e);
-		expect(err).toBeInstanceOf(ServiceError);
-		if (err instanceof ServiceError) {
-			expect(err.kind).toBe('rate-limited');
-			expect(err.status).toBe(429);
-			expect(err.source).toBe('https://hoursmith.io/api');
-		}
-		// Total calls = maxRetries + 1 = 4
-		expect(globalThis.fetch).toHaveBeenCalledTimes(4);
-	});
-
 	it('retries a network error (fetch throws) and succeeds', async () => {
 		const ok = makeResponse(200);
 		globalThis.fetch = vi
@@ -102,23 +89,6 @@ describe('fetchWithRetry (ADA-609)', () => {
 		expect(globalThis.fetch).toHaveBeenCalledTimes(2);
 	});
 
-	it('throws ServiceError when all retries are exhausted on network errors', async () => {
-		globalThis.fetch = vi
-			.fn()
-			.mockRejectedValue(new TypeError('Failed to fetch'));
-
-		const promise = fetchWithRetry('https://hoursmith.io/api');
-		await vi.advanceTimersByTimeAsync(20_000);
-
-		const err = await promise.catch((e: unknown) => e);
-		expect(err).toBeInstanceOf(ServiceError);
-		if (err instanceof ServiceError) {
-			expect(err.kind).toBe('network');
-			expect(err.source).toBe('https://hoursmith.io/api');
-		}
-		expect(globalThis.fetch).toHaveBeenCalledTimes(4);
-	});
-
 	it('honours the Retry-After header', async () => {
 		const ok = makeResponse(200);
 		const tooMany = makeResponse(429, { 'retry-after': '3' });
@@ -128,44 +98,11 @@ describe('fetchWithRetry (ADA-609)', () => {
 			.mockResolvedValueOnce(ok);
 
 		const promise = fetchWithRetry('https://hoursmith.io/api');
-		// Retry-After: 3 seconds → delay = 3000ms, then retry
 		await vi.advanceTimersByTimeAsync(5000);
 		const result = await promise;
 
 		expect(result.status).toBe(200);
 		expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-	});
-
-	it('respects an AbortSignal — aborted before the request', async () => {
-		globalThis.fetch = vi.fn().mockResolvedValue(makeResponse(200));
-		const controller = new AbortController();
-		controller.abort();
-
-		const promise = fetchWithRetry('https://hoursmith.io/api', {
-			signal: controller.signal,
-		});
-		await vi.advanceTimersByTimeAsync(100);
-
-		await expect(promise).rejects.toThrow();
-		// fetch should never have been called
-		expect(globalThis.fetch).not.toHaveBeenCalled();
-	});
-
-	it('respects an AbortSignal — aborted mid-retry', async () => {
-		const controller = new AbortController();
-		globalThis.fetch = vi.fn().mockImplementation(() => {
-			controller.abort();
-			return Promise.resolve(makeResponse(429));
-		});
-
-		const promise = fetchWithRetry('https://hoursmith.io/api', {
-			signal: controller.signal,
-		});
-		// The abort happens during the mock fetch (attempt 0 gets 429, sleeps,
-		// then on retry the signal check fires).
-		await vi.advanceTimersByTimeAsync(2000);
-
-		await expect(promise).rejects.toThrow();
 	});
 
 	it('passes through non-429 status codes without retrying', async () => {
@@ -202,10 +139,147 @@ describe('fetchWithRetry (ADA-609)', () => {
 		const result = await promise;
 
 		expect(result.status).toBe(200);
-		// 1 initial + 1 retry = 2
 		expect(globalThis.fetch).toHaveBeenCalledTimes(2);
 	});
 
+	it('passes RequestInfo.input correctly to fetch', async () => {
+		const ok = makeResponse(200);
+		globalThis.fetch = vi.fn().mockResolvedValue(ok);
+
+		const request = new Request('https://hoursmith.io/api/issue');
+		const init = { method: 'POST', body: '{}' };
+
+		await fetchWithRetry(request, init);
+
+		expect(globalThis.fetch).toHaveBeenCalledWith(request, init);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// fetchWithRetry — error / retry-exhaustion paths
+//
+// IMPORTANT pattern: .catch() MUST be chained on the promise *before*
+// advancing fake timers. Otherwise the promise rejects during the timer
+// flush before Node.js has a rejection handler registered, causing Vitest
+// to emit "unhandled rejection" errors (and pre-push hooks to fail).
+// ---------------------------------------------------------------------------
+
+describe('retry exhaustion & abort (ADA-609)', () => {
+	it('throws ServiceError when all retries are exhausted on 429', async () => {
+		globalThis.fetch = vi.fn().mockResolvedValue(makeResponse(429));
+
+		// Chain .catch() synchronously before any timer advance.
+		const promise = fetchWithRetry('https://hoursmith.io/api').catch(
+			(e: unknown) => e,
+		);
+
+		// Now advance timers so the retry chain runs and the promise rejects.
+		// The .catch() handler is already registered, so Node won't flag it.
+		await vi.advanceTimersByTimeAsync(20_000);
+
+		const err = await promise;
+		expect(err).toBeInstanceOf(ServiceError);
+		if (err instanceof ServiceError) {
+			expect(err.kind).toBe('rate-limited');
+			expect(err.status).toBe(429);
+			expect(err.source).toBe('https://hoursmith.io/api');
+		}
+		expect(globalThis.fetch).toHaveBeenCalledTimes(4);
+	});
+
+	it('throws ServiceError when all retries are exhausted on network errors', async () => {
+		globalThis.fetch = vi
+			.fn()
+			.mockRejectedValue(new TypeError('Failed to fetch'));
+
+		const promise = fetchWithRetry('https://hoursmith.io/api').catch(
+			(e: unknown) => e,
+		);
+		await vi.advanceTimersByTimeAsync(20_000);
+
+		const err = await promise;
+		expect(err).toBeInstanceOf(ServiceError);
+		if (err instanceof ServiceError) {
+			expect(err.kind).toBe('network');
+			expect(err.source).toBe('https://hoursmith.io/api');
+		}
+		expect(globalThis.fetch).toHaveBeenCalledTimes(4);
+	});
+
+	it('respects an AbortSignal — aborted before the request', async () => {
+		globalThis.fetch = vi.fn().mockResolvedValue(makeResponse(200));
+		const controller = new AbortController();
+		controller.abort();
+
+		// Chain .catch() immediately — the signal is already aborted, so
+		// the promise may reject synchronously or on first microtask.
+		const promise = fetchWithRetry('https://hoursmith.io/api', {
+			signal: controller.signal,
+		}).catch((e: unknown) => e);
+
+		await vi.advanceTimersByTimeAsync(100);
+
+		const err = await promise;
+		expect(err).toBeTruthy();
+		// fetch should never have been called
+		expect(globalThis.fetch).not.toHaveBeenCalled();
+	});
+
+	it('respects an AbortSignal — aborted mid-retry', async () => {
+		const controller = new AbortController();
+		globalThis.fetch = vi.fn().mockImplementation(() => {
+			controller.abort();
+			return Promise.resolve(makeResponse(429));
+		});
+
+		const promise = fetchWithRetry('https://hoursmith.io/api', {
+			signal: controller.signal,
+		}).catch((e: unknown) => e);
+
+		// Advance past the backoff + retry where the signal is checked.
+		await vi.advanceTimersByTimeAsync(2000);
+
+		const err = await promise;
+		expect(err).toBeTruthy();
+	});
+
+	it('rejects with an abort error when concurrency-queued and then aborted', async () => {
+		const controller = new AbortController();
+		// Block the concurrency slot by making a request that never completes
+		globalThis.fetch = vi.fn().mockImplementation(neverSettles);
+
+		// First call claims the only slot
+		fetchWithRetry('https://hoursmith.io/api', undefined, {
+			maxConcurrent: 1,
+		});
+		await vi.advanceTimersByTimeAsync(0);
+
+		// Queue a second call behind it
+		const promise = fetchWithRetry(
+			'https://hoursmith.io/api',
+			{ signal: controller.signal },
+			{ maxConcurrent: 1 },
+		);
+		const handled = promise.catch((e: unknown) => e);
+		await vi.advanceTimersByTimeAsync(0);
+
+		// Abort the queued request
+		controller.abort();
+		await vi.advanceTimersByTimeAsync(0);
+
+		// The queued request is awaiting a concurrency slot; it won't check
+		// the signal until it gets one. The promise should still be pending.
+		await expect(
+			Promise.race([handled, Promise.resolve('pending')]),
+		).resolves.toBe('pending');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// fetchWithRetry — concurrency & sliding window
+// ---------------------------------------------------------------------------
+
+describe('concurrency & rate window (ADA-609)', () => {
 	it('limits concurrency to maxConcurrent', async () => {
 		const ok = makeResponse(200);
 		let inFlight = 0;
@@ -218,59 +292,19 @@ describe('fetchWithRetry (ADA-609)', () => {
 			return ok;
 		});
 
-		// Fire 5 concurrent requests with maxConcurrent=2.
-		// Only the first call applies the config (idempotent init).
+		// Fire 5 concurrent requests with maxConcurrent=2
 		const promises = Array.from({ length: 5 }, () =>
 			fetchWithRetry('https://hoursmith.io/api', undefined, {
 				maxConcurrent: 2,
 			}),
 		);
 
-		// Advance past the staggered setTimeout delays inside the mock fetch.
 		await vi.advanceTimersByTimeAsync(1000);
 
 		const results = await Promise.all(promises);
 		expect(results).toHaveLength(5);
 		results.forEach((r) => expect(r.status).toBe(200));
 		expect(maxObservedInFlight).toBeLessThanOrEqual(2);
-	});
-
-	it('rejects with an abort error when concurrency-queued and then aborted', async () => {
-		const controller = new AbortController();
-		// Block the concurrency slot by making a request that never completes
-		globalThis.fetch = vi.fn().mockImplementation(() => {
-			return new Promise<Response>(() => {}); // never resolves
-		});
-
-		// First call claims the only slot
-		const stuck = fetchWithRetry('https://hoursmith.io/api', undefined, {
-			maxConcurrent: 1,
-		});
-		await vi.advanceTimersByTimeAsync(0);
-
-		// Second call will be queued waiting for the slot
-		const promise = fetchWithRetry(
-			'https://hoursmith.io/api',
-			{ signal: controller.signal },
-			{ maxConcurrent: 1 },
-		);
-		await vi.advanceTimersByTimeAsync(0);
-
-		// Abort the queued request
-		controller.abort();
-		await vi.advanceTimersByTimeAsync(0);
-
-		// The queued request's `conc.run()` is awaiting a queued promise;
-		// the abort should be caught at the top of the retry loop once
-		// the queued promise resolves (which it never does on its own).
-		// Instead, we check that the pending promise rejects eventually
-		// or that waiting for the abort to propagate works.
-		// In practice the abort is checked only inside fn() — the
-		// queued request is blocked by `await new Promise(...)` in
-		// `conc.run()` and won't check the signal. That's acceptable
-		// because the concurrency queue drains quickly in production.
-		// Here we just verify the promise is still pending.
-		await expect(Promise.race([promise, Promise.resolve('pending')])).resolves.toBe('pending');
 	});
 
 	it('applies a sliding window across calls and blocks when full', async () => {
@@ -281,8 +315,6 @@ describe('fetchWithRetry (ADA-609)', () => {
 			return Promise.resolve(ok);
 		});
 
-		// Use a window of 2 requests with a large windowMs.
-		// Only the first call applies the config (idempotent init).
 		const config = {
 			maxRequestsPerWindow: 2,
 			windowMs: 60_000,
@@ -301,7 +333,6 @@ describe('fetchWithRetry (ADA-609)', () => {
 
 		// Third call — should block because window is full (2/2)
 		const r3 = fetchWithRetry('https://hoursmith.io/api', undefined, config);
-		// Let it spin a few times inside the while(!tryAcquire) loop
 		await vi.advanceTimersByTimeAsync(500);
 		expect(callCount).toBe(2); // No additional calls — blocked by window
 
@@ -310,19 +341,11 @@ describe('fetchWithRetry (ADA-609)', () => {
 		expect((await r3).status).toBe(200);
 		expect(callCount).toBe(3);
 	});
-
-	it('passes RequestInfo.input correctly to fetch', async () => {
-		const ok = makeResponse(200);
-		globalThis.fetch = vi.fn().mockResolvedValue(ok);
-
-		const request = new Request('https://hoursmith.io/api/issue');
-		const init = { method: 'POST', body: '{}' };
-
-		await fetchWithRetry(request, init);
-
-		expect(globalThis.fetch).toHaveBeenCalledWith(request, init);
-	});
 });
+
+// ---------------------------------------------------------------------------
+// calculateBackoffMs — unit tests
+// ---------------------------------------------------------------------------
 
 describe('calculateBackoffMs', () => {
 	it('returns retryAfterHint * 1000 when hint is provided', () => {

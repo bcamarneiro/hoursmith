@@ -132,7 +132,8 @@ function parseRetryAfter(value: string | null): number | null {
 	if (!Number.isNaN(seconds) && seconds > 0) return seconds;
 	// Try HTTP-date format
 	const ms = Date.parse(value);
-	if (!Number.isNaN(ms)) return Math.max(1, Math.ceil((ms - Date.now()) / 1000));
+	if (!Number.isNaN(ms))
+		return Math.max(1, Math.ceil((ms - Date.now()) / 1000));
 	return null;
 }
 
@@ -183,13 +184,19 @@ export async function fetchWithRetry(
 
 		for (let attempt = 0; attempt <= cfg.maxRetries; attempt++) {
 			if (signal?.aborted) {
-				throw signal.reason ?? new DOMException('The operation was aborted', 'AbortError');
+				throw (
+					signal.reason ??
+					new DOMException('The operation was aborted', 'AbortError')
+				);
 			}
 
 			// Wait until the rate window has capacity
 			while (!win.tryAcquire()) {
 				if (signal?.aborted) {
-					throw signal.reason ?? new DOMException('The operation was aborted', 'AbortError');
+					throw (
+						signal.reason ??
+						new DOMException('The operation was aborted', 'AbortError')
+					);
 				}
 				await sleep(100);
 			}
@@ -202,7 +209,11 @@ export async function fetchWithRetry(
 
 				// 429 — prepare to retry
 				const retryAfter = parseRetryAfter(res.headers.get('retry-after'));
-				const delay = calculateBackoffMs(cfg.baseBackoffMs, attempt, retryAfter);
+				const delay = calculateBackoffMs(
+					cfg.baseBackoffMs,
+					attempt,
+					retryAfter,
+				);
 				await sleep(delay);
 				lastError = new ServiceError({
 					kind: 'rate-limited',
@@ -229,7 +240,9 @@ export async function fetchWithRetry(
 		throw new ServiceError({
 			kind: 'network',
 			source: typeof input === 'string' ? input : input.url,
-			message: lastError?.message ?? `Request failed after ${cfg.maxRetries + 1} attempts.`,
+			message:
+				lastError?.message ??
+				`Request failed after ${cfg.maxRetries + 1} attempts.`,
 		});
 	});
 }
