@@ -40,6 +40,15 @@ export interface SubscriptionUpsert {
 	current_period_end: string | null;
 }
 
+export interface DayNoteRow {
+	id: string;
+	user_id: string;
+	date: string;
+	note: string;
+	created_at: string;
+	updated_at: string;
+}
+
 export interface SupabaseAdminClient {
 	getProfile(userId: string): Promise<ProfileRow | null>;
 	getSubscription(userId: string): Promise<SubscriptionRow | null>;
@@ -73,6 +82,13 @@ export interface SupabaseAdminClient {
 	 * already seen (a duplicate delivery that must not be reprocessed).
 	 */
 	recordBillingEvent(eventId: string): Promise<boolean>;
+	getDayNotes(userId: string): Promise<DayNoteRow[]>;
+	upsertDayNote(input: {
+		userId: string;
+		date: string;
+		note: string;
+	}): Promise<void>;
+	deleteDayNote(userId: string, date: string): Promise<void>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -293,5 +309,57 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		}
 		const rows = (await res.json()) as unknown[];
 		return Array.isArray(rows) && rows.length > 0;
+	}
+
+	async getDayNotes(userId: string): Promise<DayNoteRow[]> {
+		const params = new URLSearchParams({
+			user_id: `eq.${userId}`,
+			select: 'id,user_id,date,note,created_at,updated_at',
+			order: 'date.asc',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/day_notes?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getDayNotes failed: ${res.status}`);
+		}
+		return (await res.json()) as DayNoteRow[];
+	}
+
+	async upsertDayNote(input: {
+		userId: string;
+		date: string;
+		note: string;
+	}): Promise<void> {
+		const res = await fetch(`${this.url}/rest/v1/day_notes`, {
+			method: 'POST',
+			headers: this.headers({
+				'content-type': 'application/json',
+				prefer: 'resolution=merge-duplicates,return=minimal',
+			}),
+			body: JSON.stringify({
+				user_id: input.userId,
+				date: input.date,
+				note: input.note,
+			}),
+		});
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.upsertDayNote failed: ${res.status}`);
+		}
+	}
+
+	async deleteDayNote(userId: string, date: string): Promise<void> {
+		const params = new URLSearchParams({
+			user_id: `eq.${userId}`,
+			date: `eq.${date}`,
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/day_notes?${params.toString()}`,
+			{ method: 'DELETE', headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.deleteDayNote failed: ${res.status}`);
+		}
 	}
 }
