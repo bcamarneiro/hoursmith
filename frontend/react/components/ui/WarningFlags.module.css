@@ -1,0 +1,115 @@
+/* ============================================================
+   WarningFlags — inline and list layouts
+   ============================================================ */
+
+/* ─── Container ─────────────────────────────────────────── */
+
+.container {
+	display: flex;
+	font-family: var(--font-sans);
+	font-size: var(--text-xs);
+	gap: var(--space-2);
+	line-height: var(--leading-tight);
+}
+
+.layoutList {
+	flex-direction: column;
+}
+
+.layoutInline {
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+
+/* ─── Single flag ───────────────────────────────────────── */
+
+.flag {
+	align-items: center;
+	background: var(--color-surface);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-sm);
+	display: inline-flex;
+	gap: var(--space-1);
+	padding: var(--space-1) var(--space-2);
+	white-space: nowrap;
+}
+
+.flag:hover {
+	background: var(--color-surface-hover);
+}
+
+/* ─── Icon ──────────────────────────────────────────────── */
+
+.icon {
+	flex-shrink: 0;
+	font-size: calc(var(--text-xs) * 1.15);
+	line-height: 1;
+}
+
+/* ─── Message ──────────────────────────────────────────── */
+
+.message {
+	color: var(--color-text-secondary);
+}
+
+/* ─── Severity colouring via token overrides ───────────── */
+
+/* Incomplete / under target → amber warning ramp */
+.severityIncomplete {
+	background: var(--color-warning-bg);
+	border-color: var(--color-warning-border);
+	color: var(--color-warning);
+}
+.severityIncomplete .message {
+	color: var(--color-text);
+}
+
+/* Missing hours → red error ramp */
+.severityMissing {
+	background: var(--color-error-bg);
+	border-color: var(--color-error-border);
+	color: var(--color-error);
+}
+.severityMissing .message {
+	color: var(--color-text);
+}
+
+/* Backdated entry → teal-slate info ramp */
+.severityBackdated {
+	background: var(--color-info-bg);
+	border-color: var(--color-info-border);
+	color: var(--color-info);
+}
+.severityBackdated .message {
+	color: var(--color-text-secondary);
+}
+
+/* Overtime → teal-slate info ramp (same as backdated but distinct icon) */
+.severityOvertime {
+	background: var(--color-info-bg);
+	border-color: var(--color-info-border);
+	color: var(--color-info);
+}
+.severityOvertime .message {
+	color: var(--color-text-secondary);
+}
+
+/* Weekend work → amber warning ramp */
+.severityWeekendWork {
+	background: var(--color-warning-bg);
+	border-color: var(--color-warning-border);
+	color: var(--color-warning);
+}
+.severityWeekendWork .message {
+	color: var(--color-text);
+}
+
+/* Absence gap → amber warning ramp */
+.severityAbsenceGap {
+	background: var(--color-warning-bg);
+	border-color: var(--color-warning-border);
+	color: var(--color-warning);
+}
+.severityAbsenceGap .message {
+	color: var(--color-text);
+}
