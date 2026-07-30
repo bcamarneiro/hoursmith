@@ -16,7 +16,6 @@
  * Linear: ADA-594.
  */
 
-import { logAuditEvent } from '../_lib/auditLog.js';
 import { userIdFromToken } from '../_lib/auth.js';
 import {
 	defaultSupabaseAdmin,
@@ -149,7 +148,7 @@ async function handlePut(
 		return jsonResponse(400, { error: 'invalid_date_format' });
 	}
 
-	if (!body.date || !body.note.trim()) {
+	if (!body.note.trim()) {
 		// Empty note — delete instead.
 		try {
 			await admin.deleteDayNote(userId, body.date);
