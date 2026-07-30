@@ -55,8 +55,8 @@ export async function handleAuthorize(
 		);
 	}
 
-	const url = new URL(request.url);
-	const redirectUrl = url.searchParams.get('redirect');
+	const requestUrl = new URL(request.url);
+	const redirectUrl = requestUrl.searchParams.get('redirect');
 
 	// Validate the redirect URL: must be provided and must not be open redirect.
 	if (!redirectUrl) {
@@ -69,9 +69,10 @@ export async function handleAuthorize(
 		);
 	}
 
+	let parsed: URL;
 	try {
 		// The redirect must be a valid URL with an http/https scheme.
-		const parsed = new URL(redirectUrl);
+		parsed = new URL(redirectUrl);
 		if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
 			return new Response(
 				JSON.stringify({ error: 'invalid_redirect_scheme' }),
@@ -84,6 +85,17 @@ export async function handleAuthorize(
 	} catch {
 		return new Response(
 			JSON.stringify({ error: 'invalid_redirect' }),
+			{
+				status: 400,
+				headers: { 'content-type': 'application/json' },
+			},
+		);
+	}
+
+	// Prevent open redirect: the redirect host must match the request origin.
+	if (parsed.origin !== requestUrl.origin) {
+		return new Response(
+			JSON.stringify({ error: 'invalid_redirect_host' }),
 			{
 				status: 400,
 				headers: { 'content-type': 'application/json' },

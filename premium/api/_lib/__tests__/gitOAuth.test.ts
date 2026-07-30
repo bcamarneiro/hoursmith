@@ -23,6 +23,7 @@ import {
 	verifyState,
 	type GitHubTokenResponse,
 } from '../gitOAuth.js';
+import { handleAuthorize } from '../../git-oauth/authorize.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────
 
@@ -422,5 +423,42 @@ describe('buildAuthorizeUrl', () => {
 		expect(url).toContain('scope=repo');
 		expect(url).toContain('state=test_state_value');
 		expect(url).toContain('redirect_uri=https%3A%2F%2Fhoursmith.io%2Fapi%2Fgit-oauth%2Fcallback');
+	});
+});
+
+describe('handleAuthorize open redirect', () => {
+	it('rejects a redirect to an external host', async () => {
+		const request = new Request(
+			'https://hoursmith.io/api/git-oauth/authorize?redirect=https://evil.com/steal',
+		);
+		const response = await handleAuthorize(request, {
+			env: {
+				GIT_OAUTH_SECRET: TEST_SECRET,
+				GIT_OAUTH_CLIENT_ID: TEST_CLIENT_ID,
+				GIT_OAUTH_CLIENT_SECRET: TEST_CLIENT_SECRET,
+				APP_URL: 'https://hoursmith.io',
+			},
+			nowMs: BASE_NOW,
+		});
+		expect(response.status).toBe(400);
+		const body = await response.json();
+		expect(body.error).toBe('invalid_redirect_host');
+	});
+
+	it('allows a redirect to the same origin', async () => {
+		const request = new Request(
+			'https://hoursmith.io/api/git-oauth/authorize?redirect=https://hoursmith.io/settings/git',
+		);
+		const response = await handleAuthorize(request, {
+			env: {
+				GIT_OAUTH_SECRET: TEST_SECRET,
+				GIT_OAUTH_CLIENT_ID: TEST_CLIENT_ID,
+				GIT_OAUTH_CLIENT_SECRET: TEST_CLIENT_SECRET,
+				APP_URL: 'https://hoursmith.io',
+			},
+			nowMs: BASE_NOW,
+		});
+		expect(response.status).toBe(302);
+		expect(response.headers.get('location')).toContain('github.com/login/oauth/authorize');
 	});
 });
