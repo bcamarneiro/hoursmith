@@ -1,5 +1,6 @@
 import type { JiraWorklog } from '../../../types/jira';
 import { classifyWorklog } from './worklogClassifier';
+import { isWeekend, wallClockDay } from './date';
 
 /** Categories for why a worklog entry should be skipped during summation. */
 export type SkipReason = 'backdated' | 'flagged';
@@ -16,6 +17,22 @@ export interface WorklogSkipResult {
 }
 
 /**
+ * Detect worklog-level warning flags that should cause this entry to be
+ * excluded from calculation totals.
+ *
+ * Currently detects:
+ * - **weekend-work** — worklogs whose wall-clock date falls on a weekend day.
+ *
+ * Day-level flags (incomplete, missing, overtime, absence-gap) are assessed
+ * at the day level by their respective hooks and are not checked here.
+ */
+export function hasWarningFlags(wl: JiraWorklog): boolean {
+	if (!wl.started) return false;
+	const day = wallClockDay(wl.started);
+	return day ? isWeekend(day) : false;
+}
+
+/**
  * Single source of truth for "should this worklog be excluded from
  * summation?".
  *
@@ -27,11 +44,16 @@ export interface WorklogSkipResult {
  * Currently skips:
  * - **Backdated** entries — they appear as ghosts / side-notes only, never
  *   counted toward hour totals (AGENTS.md ghost-reconciliation invariant).
+ * - **Flagged** entries — worklogs with worklog-level warning flags
+ *   (e.g. weekend-work) are excluded from summation totals.
  */
 export function shouldSkipWorklog(wl: JiraWorklog): WorklogSkipResult {
 	const c = classifyWorklog(wl);
 	if (c.isBackdated) {
 		return { skip: true, reason: 'backdated' };
+	}
+	if (hasWarningFlags(wl)) {
+		return { skip: true, reason: 'flagged' };
 	}
 	return { skip: false };
 }

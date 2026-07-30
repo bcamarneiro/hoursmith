@@ -169,7 +169,7 @@ describe('useMonthTotalCalculation', () => {
 		expect(result.current.totalSeconds).toBe(9000);
 	});
 
-	it('should handle large numbers of worklogs', () => {
+	it('should count only weekday worklogs (weekend worklogs are flagged & skipped)', () => {
 		const days: Record<string, JiraWorklog[]> = {};
 
 		// Create 31 days (full January) with 10 worklogs each (30 minutes each)
@@ -188,7 +188,8 @@ describe('useMonthTotalCalculation', () => {
 			useMonthTotalCalculation(days, 2025, 0),
 		);
 
-		// 31 days * 10 worklogs * 1800 seconds = 558000 seconds = 155 hours
-		expect(result.current.totalSeconds).toBe(558000);
+		// 31 days, but 8 fall on weekends (Jan 4,5,11,12,18,19,25,26 2025)
+		// Weekend worklogs are flagged and skipped → 23 weekdays × 10 × 1800 = 414000
+		expect(result.current.totalSeconds).toBe(414000);
 	});
 });
