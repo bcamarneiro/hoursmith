@@ -261,6 +261,19 @@ describe('absenceDayToUserAbsenceInput', () => {
 		}
 	});
 
+	it('returns a fresh metadata object each call (mutation safety)', () => {
+		const day = makeDay({ reasons: ['single reason'] });
+		const result1 = absenceDayToUserAbsenceInput(day, USER_ID);
+		const result2 = absenceDayToUserAbsenceInput(day, USER_ID);
+
+		// Mutate metadata on the first result
+		(result1.metadata as Record<string, unknown>).polluted = true;
+
+		// Second result must NOT see the mutation
+		expect(result2.metadata).toEqual({});
+		expect(result2.metadata).not.toHaveProperty('polluted');
+	});
+
 	it('handles date format consistently', () => {
 		const dates = ['2026-01-01', '2026-12-31', '2026-02-28'];
 		for (const date of dates) {

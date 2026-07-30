@@ -93,8 +93,6 @@ export interface UserAbsenceInput {
 	metadata: Record<string, unknown>;
 }
 
-const DEFAULT_METADATA: Record<string, unknown> = {};
-
 /**
  * Converts a single `AbsenceDay` domain object into the canonical
  * `UserAbsence` insert shape.
@@ -120,14 +118,13 @@ export function absenceDayToUserAbsenceInput(
 	}
 
 	if (Object.keys(metadata).length === 0) {
-		// Re-use a shared empty object to reduce allocations on the hot path.
 		return {
 			userId,
 			providerId,
 			absenceDate: day.date,
 			kind: day.kind,
 			reason,
-			metadata: DEFAULT_METADATA,
+			metadata: {},
 		};
 	}
 
