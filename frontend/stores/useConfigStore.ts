@@ -45,6 +45,9 @@ export interface Config {
 	calendarFeeds: CalendarFeed[];
 	absenceAssignments: AbsenceAssignment[];
 	complianceReminderEnabled: boolean;
+	aiDetectionEnabled: boolean;
+	aiDetectionApiKey: string;
+	aiDetectionEndpoint: string;
 	theme: 'system' | 'light' | 'dark';
 	timeRounding: 'off' | '15m' | '30m';
 	/**
@@ -75,7 +78,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 7;
+export const CONFIG_STORAGE_VERSION = 8;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -182,6 +185,9 @@ export function createDefaultConfig(): Config {
 		calendarFeeds: [],
 		absenceAssignments: [],
 		complianceReminderEnabled: false,
+		aiDetectionEnabled: false,
+		aiDetectionApiKey: '',
+		aiDetectionEndpoint: '',
 		theme: 'system',
 		timeRounding: 'off',
 		includeAbsenceInCsv: true,
@@ -267,6 +273,18 @@ export function normalizeConfig(
 			typeof config?.complianceReminderEnabled === 'boolean'
 				? config.complianceReminderEnabled
 				: fallback.complianceReminderEnabled,
+		aiDetectionEnabled:
+			typeof config?.aiDetectionEnabled === 'boolean'
+				? config.aiDetectionEnabled
+				: fallback.aiDetectionEnabled,
+		aiDetectionApiKey:
+			typeof config?.aiDetectionApiKey === 'string'
+				? config.aiDetectionApiKey.trim()
+				: fallback.aiDetectionApiKey.trim(),
+		aiDetectionEndpoint:
+			typeof config?.aiDetectionEndpoint === 'string'
+				? config.aiDetectionEndpoint.trim().replace(/\/+$/g, '')
+				: fallback.aiDetectionEndpoint.trim().replace(/\/+$/g, ''),
 		theme:
 			config?.theme === 'light' ||
 			config?.theme === 'dark' ||
@@ -307,6 +325,9 @@ export function normalizeConfig(
  *        migrate step is a no-op pass-through normaliser.
  *   v7 → added analyticsOptOut (boolean, default false). No shape change;
  *        `normalizeConfig` fills the field for pre-v7 blobs.
+ *   v8 → added aiDetectionEnabled, aiDetectionApiKey, aiDetectionEndpoint
+ *        (ADA-622). All have safe defaults in createDefaultConfig so
+ *        `normalizeConfig` handles pre-v8 blobs transparently.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -314,7 +335,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v7(
+function migrateLegacy_v0_to_v8(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -328,7 +349,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v7(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v8(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and
