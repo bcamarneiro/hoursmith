@@ -39,6 +39,23 @@ const DEFAULT_CONFIG: RateLimiterConfig = {
 	baseBackoffMs: 1000,
 };
 
+/**
+ * Set the rate-limiter configuration once before any calls.
+ * Must be called before the first `fetchWithRetry` — after the first
+ * call the config is locked and subsequent `configure()` calls are
+ * ignored (a warning is logged).
+ */
+export function configure(config: Partial<RateLimiterConfig>): void {
+	if (concurrencyQueue) {
+		console.warn(
+			'[rateLimiter] configure() called after first fetchWithRetry — ignored. ' +
+				'Call configure() before any fetchWithRetry() to set defaults.',
+		);
+		return;
+	}
+	activeConfig = { ...DEFAULT_CONFIG, ...config };
+}
+
 // ---------------------------------------------------------------------------
 // Sliding-window rate tracker
 // ---------------------------------------------------------------------------
@@ -168,6 +185,11 @@ export async function fetchWithRetry(
 		activeConfig = { ...DEFAULT_CONFIG, ...config };
 		windowTracker = null;
 		concurrencyQueue = null;
+	} else if (config) {
+		console.warn(
+			'[rateLimiter] config provided after first fetchWithRetry — ignored. ' +
+				'Use configure() before the first call to set defaults.',
+		);
 	}
 	// If config is provided but the queue already exists, the config from the
 	// first initializing call is kept — subsequent calls with the same config
@@ -179,6 +201,20 @@ export async function fetchWithRetry(
 	const win = getWindow();
 	const conc = getConcurrency();
 
+	// Wait for a rate-window slot before entering the concurrency queue.
+	// This prevents the window spin-wait from occupying a concurrency slot,
+	// so other requests that would pass the window check immediately are not
+	// blocked while one request waits for the window to roll.
+	while (!win.tryAcquire()) {
+		if (signal?.aborted) {
+			throw (
+				signal.reason ??
+				new DOMException('The operation was aborted', 'AbortError')
+			);
+		}
+		await sleep(100);
+	}
+
 	return conc.run(async () => {
 		let lastError: Error | null = null;
 
@@ -188,17 +224,6 @@ export async function fetchWithRetry(
 					signal.reason ??
 					new DOMException('The operation was aborted', 'AbortError')
 				);
-			}
-
-			// Wait until the rate window has capacity
-			while (!win.tryAcquire()) {
-				if (signal?.aborted) {
-					throw (
-						signal.reason ??
-						new DOMException('The operation was aborted', 'AbortError')
-					);
-				}
-				await sleep(100);
 			}
 
 			try {
