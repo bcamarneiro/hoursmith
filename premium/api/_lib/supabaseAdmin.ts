@@ -73,6 +73,23 @@ export interface SupabaseAdminClient {
 	 * already seen (a duplicate delivery that must not be reprocessed).
 	 */
 	recordBillingEvent(eventId: string): Promise<boolean>;
+	/**
+	 * Upsert absence records into public.user_absences (ADA-645).
+	 * Each row represents one absence day for one user.
+	 * Uses `resolution=merge-duplicates` against the
+	 * (user_id, absence_date, provider_id) unique constraint so re-deliveries
+	 * are idempotent.
+	 */
+	upsertUserAbsences(rows: UserAbsenceUpsert[]): Promise<void>;
+}
+
+export interface UserAbsenceUpsert {
+	user_id: string;
+	provider_id: string | null;
+	absence_date: string;
+	kind: string;
+	reason: string;
+	metadata?: Record<string, unknown>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -293,5 +310,21 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		}
 		const rows = (await res.json()) as unknown[];
 		return Array.isArray(rows) && rows.length > 0;
+	}
+
+	async upsertUserAbsences(rows: UserAbsenceUpsert[]): Promise<void> {
+		const res = await fetch(`${this.url}/rest/v1/user_absences`, {
+			method: 'POST',
+			headers: this.headers({
+				'content-type': 'application/json',
+				prefer: 'resolution=merge-duplicates,return=minimal',
+			}),
+			body: JSON.stringify(rows),
+		});
+		if (!res.ok) {
+			throw new Error(
+				`supabaseAdmin.upsertUserAbsences failed: ${res.status}`,
+			);
+		}
 	}
 }
