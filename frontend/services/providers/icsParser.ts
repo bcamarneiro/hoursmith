@@ -94,7 +94,6 @@ export function parseIcsEvents(text: string): ParsedCalendarEvent[] {
       if (inEvent && dtstart && status !== 'CANCELLED') {
         // Only keep all-day events (VALUE=DATE or 8-digit dates without T)
         const isAllDay =
-          line.includes('VALUE=DATE') ||
           dtstart.length <= 8 ||
           dtstart.includes('VALUE=DATE');
         // Check the raw dtstart for all-day pattern
