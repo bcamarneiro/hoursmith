@@ -294,9 +294,9 @@ describe('nagerDateService', () => {
 			},
 		} as unknown as Response);
 
-		await expect(fetchPublicHolidays('PT', 2024)).rejects.toThrow(
-			'invalid JSON response',
-		);
+		await expect(fetchPublicHolidays('PT', 2024)).rejects.toMatchObject({
+			source: 'Nager.Date',
+		});
 	});
 
 	it('re-throws an AbortError from the AbortSignal without wrapping', async () => {
