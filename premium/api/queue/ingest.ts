@@ -75,11 +75,12 @@ export async function handleIngest(
 				? (body.commits as unknown[]).length
 				: 0;
 
-	// Compute pushed_at — use latest commit timestamp, fallback to now
+	// Compute pushed_at — use latest commit timestamp, fallback to now.
+	// GitLab Push Hook orders commits newest-first; commits[0] is the most recent.
 	const commits = Array.isArray(body.commits) ? (body.commits as Record<string, unknown>[]) : [];
 	const pushedAt =
-		commits.length > 0 && typeof commits[commits.length - 1]?.timestamp === 'string'
-			? (commits[commits.length - 1].timestamp as string)
+		commits.length > 0 && typeof commits[0]?.timestamp === 'string'
+			? (commits[0].timestamp as string)
 			: new Date().toISOString();
 
 	let admin: SupabaseAdminClient;
