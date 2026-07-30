@@ -1,5 +1,6 @@
-export { createCalendarParser } from './parserFactory';
+export { createCalendarParser, detectParser } from './parserFactory';
 export { icsParser } from './icsParser';
+export { jsonParser, parseJsonEvents, expandJsonEventDates } from './jsonParser';
 export {
   parseIcsEvents,
   expandIcsEventDates,
