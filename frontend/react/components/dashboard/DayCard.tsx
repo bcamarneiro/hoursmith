@@ -9,6 +9,7 @@ import {
 	toLocalDateString,
 	withLocalOffset,
 } from '../../utils/date';
+import { suggestionToWorklogParams } from '../../../services/suggestionConverter';
 import { formatHours, formatJiraTimeSpent } from '../../utils/format';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
@@ -241,12 +242,9 @@ export const DayCard = memo<Props>(function DayCard({
 	const handleLogAll = async () => {
 		setIsBatchLogging(true);
 		try {
-			const params = loggableSuggestions.map((s) => ({
-				issueKey: s.issueKey,
-				timeSpent: s.suggestedTimeSpent,
-				comment: '',
-				started: withLocalOffset(`${s.date}T09:00`),
-			}));
+			const params = loggableSuggestions.map(
+				suggestionToWorklogParams,
+			);
 
 			if (params.length === 0) {
 				toast.error('No mapped suggestions available to log');
