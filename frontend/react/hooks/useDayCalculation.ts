@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { JiraWorklog } from '../../../types/JiraWorklog';
 import { computeDayTargetSeconds } from '../utils/dayTarget';
-import { classifyWorklog } from '../utils/worklogClassifier';
+import { shouldSkipWorklog } from '../utils/worklogFilter';
 
 export function useDayCalculation(
 	worklogs: JiraWorklog[],
@@ -13,9 +13,10 @@ export function useDayCalculation(
 		let backdatedSeconds = 0;
 		for (const wl of worklogs) {
 			const seconds = wl.timeSpentSeconds ?? 0;
-			if (classifyWorklog(wl).isBackdated) {
+			const { skip, reason } = shouldSkipWorklog(wl);
+			if (skip && reason === 'backdated') {
 				backdatedSeconds += seconds;
-			} else {
+			} else if (!skip) {
 				countedSeconds += seconds;
 			}
 		}
