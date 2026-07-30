@@ -128,6 +128,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const VALID_KINDS = new Set(['vacation', 'sick', 'off', 'holiday']);
 
+/** Validate YYYY-MM-DD string including month/day ranges and leap years. */
+function isValidDateString(s: string): boolean {
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+	const [y, m, d] = s.split('-').map(Number);
+	const date = new Date(Date.UTC(y, m - 1, d));
+	return (
+		date.getUTCFullYear() === y &&
+		date.getUTCMonth() === m - 1 &&
+		date.getUTCDate() === d
+	);
+}
+
 function validatePayload(body: unknown): UserAbsenceUpsert[] | null {
 	const items: unknown[] = Array.isArray(body) ? body : [body];
 	const records: UserAbsenceUpsert[] = [];
@@ -145,8 +157,7 @@ function validatePayload(body: unknown): UserAbsenceUpsert[] | null {
 			userId.length === 0 ||
 			typeof absenceDate !== 'string' ||
 			absenceDate.length === 0 ||
-			// Quick sanity: YYYY-MM-DD
-			!/^\d{4}-\d{2}-\d{2}$/.test(absenceDate) ||
+			!isValidDateString(absenceDate) ||
 			typeof kind !== 'string' ||
 			!VALID_KINDS.has(kind) ||
 			typeof reason !== 'string' ||
@@ -222,6 +233,12 @@ export async function handleAbsenceWebhook(
 	try {
 		rawBody = await request.text();
 	} catch {
+		logAbsence({
+			userId: null,
+			code: 'invalid_payload',
+			status: 400,
+			durationMs: Date.now() - start,
+		});
 		return jsonResponse(400, { error: 'invalid_payload' });
 	}
 
@@ -242,6 +259,12 @@ export async function handleAbsenceWebhook(
 	try {
 		parsed = JSON.parse(rawBody);
 	} catch {
+		logAbsence({
+			userId: null,
+			code: 'invalid_payload',
+			status: 400,
+			durationMs: Date.now() - start,
+		});
 		return jsonResponse(400, { error: 'invalid_payload' });
 	}
 

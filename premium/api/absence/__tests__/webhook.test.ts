@@ -139,12 +139,18 @@ describe('handleAbsenceWebhook', () => {
 	});
 
 	it('returns 400 on a malformed body', async () => {
+		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 		const res = await handleAbsenceWebhook(
 			bypassRequest('not json'),
 			{ supabase: makeSupabase(), verify: accept, secret: SECRET },
 		);
 		expect(res.status).toBe(400);
 		expect(await res.json()).toEqual({ error: 'invalid_payload' });
+		expect(logSpy).toHaveBeenCalledOnce();
+		const logEntry = JSON.parse(logSpy.mock.calls[0][0] as string);
+		expect(logEntry.code).toBe('invalid_payload');
+		expect(logEntry.status).toBe(400);
+		logSpy.mockRestore();
 	});
 
 	it('returns 400 on a missing required field (no reason)', async () => {
@@ -182,6 +188,49 @@ describe('handleAbsenceWebhook', () => {
 			{ supabase: makeSupabase(), verify: accept, secret: SECRET },
 		);
 		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 on an impossible date (Feb 30)', async () => {
+		const res = await handleAbsenceWebhook(
+			bypassRequest(payload({ ...ABSENCE, absence_date: '2026-02-30' })),
+			{ supabase: makeSupabase(), verify: accept, secret: SECRET },
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 on month 00', async () => {
+		const res = await handleAbsenceWebhook(
+			bypassRequest(payload({ ...ABSENCE, absence_date: '2026-00-15' })),
+			{ supabase: makeSupabase(), verify: accept, secret: SECRET },
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 on month 13', async () => {
+		const res = await handleAbsenceWebhook(
+			bypassRequest(payload({ ...ABSENCE, absence_date: '2026-13-01' })),
+			{ supabase: makeSupabase(), verify: accept, secret: SECRET },
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it('returns 400 on Feb 29 in a non-leap year', async () => {
+		const res = await handleAbsenceWebhook(
+			bypassRequest(payload({ ...ABSENCE, absence_date: '2025-02-29' })),
+			{ supabase: makeSupabase(), verify: accept, secret: SECRET },
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it('accepts a valid leap-year date (Feb 29 2024)', async () => {
+		const supabase = makeSupabase();
+		const body = payload({ ...ABSENCE, absence_date: '2024-02-29' });
+		const req = await signedRequest(body, SECRET);
+		const res = await handleAbsenceWebhook(req, {
+			supabase,
+			secret: SECRET,
+		});
+		expect(res.status).toBe(200);
 	});
 
 	it('returns 400 on an invalid kind', async () => {
