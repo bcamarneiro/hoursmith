@@ -177,7 +177,7 @@ export function useWorklogOperations() {
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to create worklog';
 			setError(errorMessage);
-			throw new Error(errorMessage);
+			throw err instanceof Error ? err : new Error(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
@@ -270,7 +270,7 @@ export function useWorklogOperations() {
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to update worklog';
 			setError(errorMessage);
-			throw new Error(errorMessage);
+			throw err instanceof Error ? err : new Error(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
@@ -391,7 +391,7 @@ export function useWorklogOperations() {
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to delete worklog';
 			setError(errorMessage);
-			throw new Error(errorMessage);
+			throw err instanceof Error ? err : new Error(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}

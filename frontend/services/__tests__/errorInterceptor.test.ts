@@ -151,7 +151,7 @@ describe('reportError', () => {
 		}
 	});
 
-	it('does not toast for unknown non-error values without a fallback', () => {
+	it('handles null errors with a generic message (still toasts)', () => {
 		const copy = reportError(null);
 		expect(copy.message).not.toBe('');
 		expect(toastErrorMock).toHaveBeenCalledTimes(1);

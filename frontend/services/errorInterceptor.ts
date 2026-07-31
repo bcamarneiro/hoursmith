@@ -112,6 +112,7 @@ export function reportError(
 			console.warn(
 				`[errorInterceptor] suppressed error toast: ${copy.message}`,
 			);
+			lastShownByMessage.set(copy.message, now);
 			return copy;
 		}
 
