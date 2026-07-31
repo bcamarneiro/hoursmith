@@ -101,8 +101,7 @@ function toConfig(options: RedisOptions): QueueConnectionConfig {
 export function loadQueueConnectionConfig(
 	env: RedisEnv = process.env,
 ): QueueConnectionConfig {
-	const credentials: QueueServiceCredentials =
-		getQueueServiceCredentials(env);
+	const credentials: QueueServiceCredentials = getQueueServiceCredentials(env);
 
 	if (credentials.url) {
 		try {

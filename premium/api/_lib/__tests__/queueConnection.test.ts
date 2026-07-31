@@ -116,9 +116,9 @@ describe('describeQueueConnection', () => {
 
 describe('redactQueueUrl', () => {
 	it('masks the password userinfo', () => {
-		expect(
-			redactQueueUrl('redis://user:secret@host:6379'),
-		).toBe('redis://***:***@host:6379');
+		expect(redactQueueUrl('redis://user:secret@host:6379')).toBe(
+			'redis://***:***@host:6379',
+		);
 	});
 
 	it('masks a password without a username', () => {
