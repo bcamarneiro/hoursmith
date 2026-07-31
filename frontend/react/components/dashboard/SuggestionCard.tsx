@@ -62,6 +62,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 	const isLongReason = suggestion.reason.length > 80;
 	const canOpenIssue = !!jiraDomain && !!suggestion.issueKey;
 	const cardRef = useRef<HTMLLIElement>(null);
+	const preEditFocusRef = useRef<Element | null>(null);
 
 	// The dashboard's keyboard nav (useKeyboardShortcuts) moves a virtual focus
 	// between day cards and suggestion cards. Mirror that state into the DOM so
@@ -70,6 +71,21 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 	useEffect(() => {
 		if (isFocused) cardRef.current?.focus({ preventScroll: true });
 	}, [isFocused]);
+
+	// Save / restore actual DOM focus around the edit-worklog dialog so
+	// keyboard-only users return to the suggestion card they were on, not
+	// <body>. This works alongside the native <dialog> close() focus
+	// restoration in <Modal> — whichever fires last wins, and they target the
+	// same element.
+	useEffect(() => {
+		if (isEditOpen) {
+			preEditFocusRef.current = document.activeElement;
+		} else {
+			const el = preEditFocusRef.current;
+			preEditFocusRef.current = null;
+			if (el instanceof HTMLElement) el.focus();
+		}
+	}, [isEditOpen]);
 
 	const isUnmapped =
 		suggestion.source === 'calendar' &&
