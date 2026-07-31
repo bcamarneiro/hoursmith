@@ -18,18 +18,15 @@
  * forced shutdown (drain timeout / second signal).
  */
 
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import type { Processor } from 'bullmq';
 
 import { QUEUE_NAMES } from '../_lib/queueProvider.js';
 import { registerGracefulShutdown } from './gracefulShutdown.js';
-import {
-	createWorker,
-	defaultWorkerLog,
-	type WorkerHandle,
-} from './worker.js';
+import { createWorker, defaultWorkerLog, type WorkerHandle } from './worker.js';
 
 const USAGE = `Usage:
   npx tsx premium/api/worker/runWorker.ts --queue <name> --processor <module> [options]
@@ -99,7 +96,11 @@ export function parseRunWorkerArgs(argv: string[]): RunWorkerOptions {
 				break;
 			case '--queue':
 				options.queue = value();
-				if (!(Object.values(QUEUE_NAMES) as readonly string[]).includes(options.queue)) {
+				if (
+					!(Object.values(QUEUE_NAMES) as readonly string[]).includes(
+						options.queue,
+					)
+				) {
 					fail(
 						`unknown queue "${options.queue}". Valid: ${Object.values(QUEUE_NAMES).join(', ')}.`,
 					);
@@ -183,10 +184,13 @@ async function main(): Promise<void> {
 
 /** Check whether the current process is running this module as the main entrypoint. */
 export function isMainModule(argv1: string | undefined): boolean {
-	return (
-		argv1 !== undefined &&
-		import.meta.url === pathToFileURL(path.resolve(argv1)).href
-	);
+	if (argv1 === undefined) return false;
+	const resolved = path.resolve(argv1);
+	try {
+		return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(resolved);
+	} catch {
+		return false;
+	}
 }
 
 if (isMainModule(process.argv[1])) {
