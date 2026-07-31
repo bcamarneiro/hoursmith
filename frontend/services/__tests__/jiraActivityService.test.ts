@@ -16,6 +16,7 @@ import type {
 import {
 	fetchJiraActivitySuggestions,
 	fetchRecentActivity,
+	jiraActivityItemsToSuggestions,
 	JIRA_KEY_RE,
 } from '../jiraActivityService';
 import { fetchSearchPage } from '../jiraSearch';
@@ -336,6 +337,39 @@ describe('fetchJiraActivitySuggestions', () => {
 				logged: false,
 			},
 		]);
+	});
+});
+
+describe('jiraActivityItemsToSuggestions', () => {
+	it('maps normalized activity items to suggestions without fetching', () => {
+		const suggestions = jiraActivityItemsToSuggestions([
+			{
+				issueKey: 'PROJ-1',
+				issueSummary: 'Test issue',
+				date: '2025-10-15',
+				transitions: 1,
+				comments: 1,
+			},
+		]);
+
+		expect(suggestions).toEqual([
+			{
+				id: 'jira-PROJ-1-2025-10-15',
+				source: 'jira-activity',
+				issueKey: 'PROJ-1',
+				issueSummary: 'Test issue',
+				date: '2025-10-15',
+				suggestedTimeSpent: '1h 30m',
+				suggestedSeconds: 5400,
+				confidence: 'medium',
+				reason: '1 status change, 1 comment',
+				logged: false,
+			},
+		]);
+	});
+
+	it('handles an empty item list', () => {
+		expect(jiraActivityItemsToSuggestions([])).toEqual([]);
 	});
 });
 

@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchRecentActivity } from '../../../services/jiraActivityService';
 import { useConfigStore } from '../../../stores/useConfigStore';
+import type { Config } from '../../../stores/useConfigStore';
 import type { JiraActivityItem } from '../../../types/activity';
 import { jiraActivityQueryKey, useJiraActivity } from '../useJiraActivity';
 
@@ -122,5 +123,43 @@ describe('useJiraActivity', () => {
 			WEEK_START,
 			WEEK_END,
 		]);
+	});
+
+	it('serves prefetched activity items from the shared cache without refetching', async () => {
+		const items: JiraActivityItem[] = [
+			{
+				issueKey: 'PROJ-1',
+				issueSummary: 'Test issue',
+				date: '2025-10-15',
+				transitions: 1,
+				comments: 0,
+			},
+		];
+		mockedFetch.mockResolvedValue(items);
+
+		// Simulate the dashboard fetcher warming the cache with the canonical shape.
+		await queryClient.fetchQuery({
+			queryKey: jiraActivityQueryKey(
+				'example.atlassian.net',
+				'',
+				WEEK_START,
+				WEEK_END,
+			),
+			queryFn: () =>
+				fetchRecentActivity(
+					{ jiraHost: 'example.atlassian.net', apiToken: 'token' } as Config,
+					WEEK_START,
+					WEEK_END,
+				),
+			staleTime: 15 * 60 * 1000,
+		});
+
+		const { result } = renderHook(() => useJiraActivity(WEEK_START, WEEK_END), {
+			wrapper,
+		});
+
+		await waitFor(() => expect(result.current.data).toEqual(items));
+		// The hook must reuse the cached activity items, not fetch again.
+		expect(mockedFetch).toHaveBeenCalledTimes(1);
 	});
 });
