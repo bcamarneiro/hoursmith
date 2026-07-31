@@ -14,8 +14,16 @@
 --
 -- RLS: users can read, update, and delete their own rows.
 -- Service-role writes (via the hosted proxy or account management) bypass RLS.
+--
+-- Idempotent: safe to run multiple times. Uses IF NOT EXISTS throughout so
+-- this migration is a no-op when applied against a database that already has
+-- the user_tokens table (e.g. from a prior non-idempotent apply).
 
-create table public.user_tokens (
+-- ---------------------------------------------------------------------------
+-- Table: one row per (user_id, provider), upserted on re-auth.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.user_tokens (
     id uuid primary key default gen_random_uuid(),
     user_id uuid not null references auth.users (id) on delete cascade,
     provider text not null,
@@ -34,7 +42,14 @@ create table public.user_tokens (
         unique (user_id, provider)
 );
 
+-- RLS (safe to call multiple times).
 alter table public.user_tokens enable row level security;
+
+-- Policies: drop-then-create so re-runs pick up any definition changes.
+drop policy if exists "user_tokens_select_own" on public.user_tokens;
+drop policy if exists "user_tokens_insert_own" on public.user_tokens;
+drop policy if exists "user_tokens_update_own" on public.user_tokens;
+drop policy if exists "user_tokens_delete_own" on public.user_tokens;
 
 -- Users manage their own tokens: create, read, update, delete.
 create policy "user_tokens_select_own"
@@ -54,16 +69,21 @@ create policy "user_tokens_delete_own"
     on public.user_tokens for delete
     using (auth.uid() = user_id);
 
--- Reuse the existing updated_at trigger.
+-- Trigger: keep updated_at fresh on every write.
+-- Reuses the public.set_updated_at() function defined in the init_paywall
+-- migration. Drop first so re-runs are safe.
+drop trigger if exists user_tokens_set_updated_at on public.user_tokens;
+
 create trigger user_tokens_set_updated_at
     before update on public.user_tokens
     for each row execute function public.set_updated_at();
 
--- Index for fast lookup by user.
-create index user_tokens_user_id_idx
+-- Indexes (IF NOT EXISTS makes re-runs no-ops).
+-- Fast lookup by user.
+create index if not exists user_tokens_user_id_idx
     on public.user_tokens (user_id);
 
--- Index for finding tokens that haven't been used recently (cleanup / expiry).
-create index user_tokens_last_used_at_idx
+-- Find tokens that haven't been used recently (cleanup / expiry).
+create index if not exists user_tokens_last_used_at_idx
     on public.user_tokens (last_used_at)
     where last_used_at is not null;
