@@ -15,7 +15,7 @@
  *     advance the active key. Old payloads keep decrypting because their kid
  *     still resolves, while every new payload is written with the new key.
  *   - Env wiring: `makeEncryptionService(env)` reads `TOKEN_ENCRYPTION_SECRET`
- *     (the active key — the same variable `authTokenService.ts` consumes)
+ *     (the active key for encryption/decryption operations)
  *     plus the optional `TOKEN_ENCRYPTION_KEY_ID` and
  *     `TOKEN_ENCRYPTION_LEGACY_KEYS` (JSON object `{ kid: secret }`).
  *
