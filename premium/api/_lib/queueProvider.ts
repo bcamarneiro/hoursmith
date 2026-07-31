@@ -9,6 +9,7 @@
 
 import { Queue, type QueueOptions } from 'bullmq';
 
+import { parseQueueSettings } from './queueConfig.js';
 import { type RedisEnv, redisOptions } from './redisConfig.js';
 
 /** Queue names shared by producers and consumers. */
@@ -32,17 +33,31 @@ export interface QueueFactoryOptions {
 	env?: RedisEnv;
 }
 
-/** BullMQ options shared by every premium queue (bounded retention + retries). */
+/**
+ * BullMQ options shared by every premium queue (bounded retention + retries).
+ * The job settings resolve from `QUEUE_JOB_*` env vars via `parseQueueSettings`,
+ * so operators can tune retry/retention without a code deploy.
+ */
 export function queueOptions(env: RedisEnv = process.env): QueueOptions {
+	const settings = parseQueueSettings(env);
 	return {
 		connection: redisOptions(env),
 		defaultJobOptions: {
 			// Webhook ingestion sees transient failures; retry before giving up.
-			attempts: 3,
-			backoff: { type: 'exponential', delay: 5_000 },
+			attempts: settings.attempts,
+			backoff: {
+				type: settings.backoffType,
+				delay: settings.backoffDelayMs,
+			},
 			// Keep Redis memory bounded: drop finished jobs after 1h, failures after 1d.
-			removeOnComplete: { age: 3_600, count: 1_000 },
-			removeOnFail: { age: 86_400, count: 1_000 },
+			removeOnComplete: {
+				age: settings.removeOnCompleteAgeS,
+				count: settings.removeOnCompleteCount,
+			},
+			removeOnFail: {
+				age: settings.removeOnFailAgeS,
+				count: settings.removeOnFailCount,
+			},
 		},
 	};
 }
