@@ -113,13 +113,13 @@ export const DayCard = memo<Props>(function DayCard({
 		return day.suggestions
 			.filter((s) => s.logged && !!s.issueKey && !seen.has(s.issueKey))
 			.filter((s) => {
-				const key = s.issueKey!;
+				const key = s.issueKey as string;
 				if (seen.has(key)) return false;
 				seen.add(key);
 				return true;
 			})
 			.map((s) => ({
-				issueKey: s.issueKey!,
+				issueKey: s.issueKey as string,
 				issueSummary: s.issueSummary,
 				timeSpent: s.suggestedTimeSpent,
 				started: formatDateTimeLocalValue(new Date(`${s.date}T09:00`)),

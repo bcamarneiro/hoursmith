@@ -12,7 +12,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
  * trigger for landing each fix.
  */
 
-function tolerant(a: number, b: number, eps = 0.05) {
+function _tolerant(a: number, b: number, eps = 0.05) {
 	return Math.abs(a - b) <= eps;
 }
 

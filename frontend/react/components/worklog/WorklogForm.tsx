@@ -163,7 +163,9 @@ export const WorklogForm: React.FC<Props> = ({
 					spellCheck={false}
 					required
 				/>
-				<small className={formStyles.hint}>Format: 1h, 30m, 1h 30m, 2d, etc.</small>
+				<small className={formStyles.hint}>
+					Format: 1h, 30m, 1h 30m, 2d, etc.
+				</small>
 			</div>
 
 			<div className={formStyles.formGroup}>
