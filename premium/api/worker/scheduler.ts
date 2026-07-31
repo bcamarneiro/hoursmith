@@ -86,13 +86,13 @@ export async function syncCronTasks(
 	try {
 		const existing = await queue.getJobSchedulers();
 		for (const scheduler of existing) {
-			const id = scheduler.id ?? null;
-			if (id === null || wanted.has(id)) {
-				continue;
-			}
-			await queue.removeJobScheduler(id);
-			removed += 1;
-			log('stale schedule removed', { queue: queue.name, id });
+		const id = scheduler.key;
+		if (wanted.has(id)) {
+			continue;
+		}
+		await queue.removeJobScheduler(id);
+		removed += 1;
+		log('stale schedule removed', { queue: queue.name, id });
 		}
 	} catch (error) {
 		throw new CronSchedulerError(

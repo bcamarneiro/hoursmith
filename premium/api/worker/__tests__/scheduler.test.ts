@@ -15,7 +15,7 @@ import type { CronTask } from '../cron.js';
 import { CronSchedulerError, syncCronTasks } from '../scheduler.js';
 
 interface FakeScheduler {
-	id: string;
+	key: string;
 	pattern?: string;
 	every?: number;
 }
@@ -32,7 +32,7 @@ function makeQueue(initialSchedulers: FakeScheduler[] = []): {
 		.fn()
 		.mockImplementation(async () => [...schedulers]);
 	const removeJobScheduler = vi.fn().mockImplementation(async (id: string) => {
-		const index = schedulers.findIndex((s) => s.id === id);
+		const index = schedulers.findIndex((s) => s.key === id);
 		if (index !== -1) {
 			schedulers.splice(index, 1);
 		}
@@ -106,8 +106,8 @@ describe('syncCronTasks', () => {
 
 	it('removes schedulers that are no longer in the registry', async () => {
 		const { queue, removeJobScheduler } = makeQueue([
-			{ id: 'raw-commits-reconcile', pattern: '*/5 * * * *' },
-			{ id: 'zombie-schedule', pattern: '0 0 * * *' },
+			{ key: 'raw-commits-reconcile', pattern: '*/5 * * * *' },
+			{ key: 'zombie-schedule', pattern: '0 0 * * *' },
 		]);
 
 		await syncCronTasks(queue, TASKS);
@@ -120,8 +120,8 @@ describe('syncCronTasks', () => {
 
 	it('is idempotent: does not remove schedulers that are still wanted', async () => {
 		const { queue, removeJobScheduler, upsertJobScheduler } = makeQueue([
-			{ id: 'raw-commits-reconcile', pattern: '*/5 * * * *' },
-			{ id: 'report-rollup', pattern: '0 2 * * *' },
+			{ key: 'raw-commits-reconcile', pattern: '*/5 * * * *' },
+			{ key: 'report-rollup', pattern: '0 2 * * *' },
 		]);
 
 		await syncCronTasks(queue, TASKS);
@@ -144,7 +144,7 @@ describe('syncCronTasks', () => {
 
 	it('wraps stale-pruning failures in a CronSchedulerError', async () => {
 		const { queue, removeJobScheduler } = makeQueue([
-			{ id: 'zombie-schedule' },
+			{ key: 'zombie-schedule' },
 		]);
 		removeJobScheduler.mockRejectedValueOnce(new Error('redis down'));
 
