@@ -20,6 +20,7 @@ import { useUserDataStore } from '../../stores/useUserDataStore';
 import { classifyWorklog } from '../utils/worklogClassifier';
 import { useAbsenceDays } from './useAbsenceDays';
 import { useEffectiveProxyUrl } from './useEffectiveProxyUrl';
+import { jiraActivityQueryKey } from './useJiraActivity';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
 
 interface WorklogEntry {
@@ -326,7 +327,19 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					}
 				})(),
 
-				fetchJiraActivitySuggestions(config, weekStart, weekEnd, signal)
+				// Jira activity: fetch from shared query cache (cached/deduplicated)
+				queryClient
+					.fetchQuery({
+						queryKey: jiraActivityQueryKey(
+							jiraHost,
+							corsProxy,
+							weekStart,
+							weekEnd,
+						),
+						queryFn: ({ signal: s }) =>
+							fetchJiraActivitySuggestions(config, weekStart, weekEnd, s),
+						staleTime: 15 * 60 * 1000,
+					})
 					.catch((e) => {
 						if (!signal.aborted) setError('jira', e.message);
 						return [];
