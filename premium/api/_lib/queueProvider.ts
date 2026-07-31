@@ -10,7 +10,8 @@
 import { Queue, type QueueOptions } from 'bullmq';
 
 import { parseQueueSettings } from './queueConfig.js';
-import { type RedisEnv, redisOptions } from './redisConfig.js';
+import { loadQueueConnectionConfig } from './queueConnection.js';
+import type { RedisEnv } from './redisConfig.js';
 
 /** Queue names shared by producers and consumers. */
 export const QUEUE_NAMES = {
@@ -41,7 +42,7 @@ export interface QueueFactoryOptions {
 export function queueOptions(env: RedisEnv = process.env): QueueOptions {
 	const settings = parseQueueSettings(env);
 	return {
-		connection: redisOptions(env),
+		connection: loadQueueConnectionConfig(env).options,
 		defaultJobOptions: {
 			// Webhook ingestion sees transient failures; retry before giving up.
 			attempts: settings.attempts,
