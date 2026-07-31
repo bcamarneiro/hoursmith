@@ -1,8 +1,8 @@
 /**
  * Tests for the digital signature library (ADA-684).
  *
- * Uses a minimal WebCrypto stub for deterministic tests + real WebCrypto
- * for integration-path tests (skipped in environments without crypto).
+ * All tests use real WebCrypto (Node 19+ or browser). Tests are skipped
+ * in environments without crypto.subtle.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +17,6 @@ import {
 	verifyWithJwk,
 	verifyWithKey,
 	type SignatureCrypto,
-	type SignatureResult,
 } from '../signature.js';
 
 // ---------------------------------------------------------------------------
@@ -73,6 +72,43 @@ describe('signWithKeyPair and verifyWithKey (real crypto)', () => {
 		const kp = await realKeyPair();
 		const result = await signWithKeyPair('original', kp);
 		const v = await verifyWithKey('tampered', result.signature, kp.publicKey);
+		expect(v.valid).toBe(false);
+		expect(v.reason).toBe('Signature does not match payload.');
+	});
+
+	itReal('signs a nested object payload and verifies it', async () => {
+		const kp = await realKeyPair();
+		const payload = {
+			user: 'alice',
+			entries: [
+				{ id: 1, hours: 8, project: 'ALPHA' },
+				{ id: 2, hours: 4, project: 'BETA' },
+			],
+		};
+		const result = await signWithKeyPair(payload, kp);
+
+		const v = await verifyWithKey(payload, result.signature, kp.publicKey);
+		expect(v.valid).toBe(true);
+	});
+
+	itReal('rejects a tampered nested payload (canonicalisation covers nested keys)', async () => {
+		const kp = await realKeyPair();
+		const original = {
+			user: 'alice',
+			entries: [
+				{ id: 1, hours: 8, project: 'ALPHA' },
+			],
+		};
+		const result = await signWithKeyPair(original, kp);
+
+		// Tamper a nested value — changing hours from 8 to 999
+		const tampered = {
+			user: 'alice',
+			entries: [
+				{ id: 1, hours: 999, project: 'ALPHA' },
+			],
+		};
+		const v = await verifyWithKey(tampered, result.signature, kp.publicKey);
 		expect(v.valid).toBe(false);
 		expect(v.reason).toBe('Signature does not match payload.');
 	});

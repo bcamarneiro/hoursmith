@@ -83,13 +83,29 @@ function base64UrlToBytes(s: string): Uint8Array {
 }
 
 /**
+ * Recursively sort keys of an object for deterministic serialisation.
+ * Arrays and primitives are returned as-is; objects have their keys sorted
+ * at every nesting level so that nested payloads produce stable output.
+ */
+function sortKeysDeep(obj: unknown): unknown {
+	if (Array.isArray(obj)) return obj.map(sortKeysDeep);
+	if (obj !== null && typeof obj === 'object') {
+		const sorted: Record<string, unknown> = {};
+		for (const key of Object.keys(obj as Record<string, unknown>).sort()) {
+			sorted[key] = sortKeysDeep((obj as Record<string, unknown>)[key]);
+		}
+		return sorted;
+	}
+	return obj;
+}
+
+/**
  * Canonicalise a payload to a UTF-8-serialised string.
- * Objects are JSON-stringified with sorted keys and no trailing whitespace.
+ * Objects are JSON-stringified with recursively sorted keys and no trailing whitespace.
  */
 function canonicalisePayload(payload: string | object): string {
 	if (typeof payload === 'string') return payload.trim();
-	return JSON.stringify(payload, Object.keys(payload as object).sort(), 0)
-		.trim();
+	return JSON.stringify(sortKeysDeep(payload)).trim();
 }
 
 function throwOnEmptyPayload(): never {
@@ -154,7 +170,7 @@ const DEFAULT_CRYPTO: SignatureCrypto = {
 				'getRandomValues not available — are you in a secure context?',
 			);
 		}
-		return crypto.getRandomValues(array);
+		return (crypto.getRandomValues as <U extends ArrayBufferView | null>(a: U) => U)(array);
 	},
 
 	get subtle() {
@@ -203,45 +219,6 @@ export async function generateKeyPair(
 // ---------------------------------------------------------------------------
 // Sign
 // ---------------------------------------------------------------------------
-
-/**
- * Sign a payload string (or JSON-serialisable object) with the given private
- * key. Returns the base64url-encoded signature and the public key JWK so a
- * verifier doesn't need a separate key exchange.
- */
-export async function sign(
-	payload: string | object,
-	privateKey: CryptoKey,
-	crypto: SignatureCrypto = DEFAULT_CRYPTO,
-): Promise<SignatureResult> {
-	if (!privateKey) {
-		throw new SignatureError('KEY_MISSING', 'Private key is required.');
-	}
-
-	const raw = canonicalisePayload(payload);
-	if (raw.length === 0) throwOnEmptyPayload();
-
-	try {
-		const sigBytes = await crypto.subtle.sign(
-			SIGN_ALG,
-			privateKey,
-			encoder().encode(raw) as BufferSource,
-		);
-		if (!sigBytes) throwOnNullResult('sign');
-
-		// Export the public key JWK for the verifier.
-		// We generate a fresh key here unless the caller pre-extracted — but
-		// the standard sign flow generates a key pair, signs with the private
-		// key, and exports the public key. For a pre-existing private key the
-		// caller should provide the public key separately; that's handled by
-		// the API route (the caller provides both or a key-pair id).
-		const signature = bytesToBase64Url(new Uint8Array(sigBytes));
-
-		return { signature, publicKeyJwk: {} as JsonWebKey };
-	} catch (err) {
-		throw SignatureError.wrap(err, 'SIGN_FAILED');
-	}
-}
 
 /**
  * Sign a payload and export the public key JWK in one call.
