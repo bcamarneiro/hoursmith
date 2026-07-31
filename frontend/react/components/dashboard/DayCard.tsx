@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import type { DaySummary, LoggedWorklog } from '../../../../types/Suggestion';
+import { reportError } from '../../../services/errorInterceptor';
 import { useDashboardStore } from '../../../stores/useDashboardStore';
 import { useWorklogOperations } from '../../hooks/useWorklogOperations';
 import { getAbsenceKindLabel } from '../../utils/absence';
@@ -154,8 +155,11 @@ export const DayCard = memo<Props>(function DayCard({
 						: formatDateTimeLocalValue(new Date(`${day.date}T09:00`)),
 				},
 			});
-		} catch {
-			toast.error('Could not load this worklog to edit');
+		} catch (e) {
+			reportError(e, {
+				source: 'Jira worklog',
+				fallbackMessage: 'Could not load this worklog to edit',
+			});
 		} finally {
 			setIsEditOpening(false);
 		}
@@ -180,8 +184,11 @@ export const DayCard = memo<Props>(function DayCard({
 			);
 			setEditingWorklog(null);
 			toast.success('Worklog updated');
-		} catch {
-			toast.error('Failed to update worklog');
+		} catch (e) {
+			reportError(e, {
+				source: 'Jira worklog',
+				fallbackMessage: 'Failed to update worklog',
+			});
 		}
 	};
 
@@ -191,8 +198,11 @@ export const DayCard = memo<Props>(function DayCard({
 			await deleteWorklog(deleteTarget.issueKey, deleteTarget.worklogId);
 			setDeleteTarget(null);
 			toast.success('Worklog deleted');
-		} catch {
-			toast.error('Failed to delete worklog');
+		} catch (e) {
+			reportError(e, {
+				source: 'Jira worklog',
+				fallbackMessage: 'Failed to delete worklog',
+			});
 		}
 	};
 
@@ -234,7 +244,10 @@ export const DayCard = memo<Props>(function DayCard({
 				);
 			}
 		} catch (e) {
-			toast.error(e instanceof Error ? e.message : 'Clone failed');
+			reportError(e, {
+				source: 'Jira worklog',
+				fallbackMessage: 'Clone failed',
+			});
 		}
 	};
 
@@ -289,7 +302,10 @@ export const DayCard = memo<Props>(function DayCard({
 				);
 			}
 		} catch (e) {
-			toast.error(e instanceof Error ? e.message : 'Batch log failed');
+			reportError(e, {
+				source: 'Jira worklog',
+				fallbackMessage: 'Batch log failed',
+			});
 		} finally {
 			setIsBatchLogging(false);
 		}
