@@ -16,6 +16,7 @@
 
 import { logAuditEvent } from '../_lib/auditLog.js';
 import { userIdFromToken } from '../_lib/auth.js';
+import { logger } from '../_lib/logger.js';
 import {
 	defaultSupabaseAdmin,
 	type SupabaseAdminClient,
@@ -169,13 +170,8 @@ interface LogFields {
 }
 
 function logEvent(fields: LogFields): void {
-	console.log(
-		JSON.stringify({
-			ts: new Date().toISOString(),
-			svc: 'hoursmith-account',
-			event: fields.event,
-			status: fields.status,
-			...(fields.note ? { note: fields.note } : {}),
-		}),
-	);
+	logger.info('hoursmith-account', fields.event, {
+		status: fields.status,
+		...(fields.note ? { note: fields.note } : {}),
+	});
 }

@@ -19,6 +19,7 @@
  * Linear: ADA-294 (migrated from Stripe ADA-262).
  */
 
+import { logger } from '../_lib/logger.js';
 import { createPolarCustomerSession } from '../_lib/polarClient.js';
 import {
 	defaultSupabaseAdmin,
@@ -169,16 +170,12 @@ interface PortalLogFields {
 
 /** Structured log line. Scrubbed: no headers, no body, no portal URL. */
 function logPortal(fields: PortalLogFields): void {
-	console.log(
-		JSON.stringify({
-			ts: new Date().toISOString(),
-			svc: 'hoursmith-billing-portal',
-			user_id: fields.userId,
-			polar_customer_id: fields.customerId,
-			code: fields.code,
-			status: fields.status,
-			duration_ms: fields.durationMs,
-			...(fields.detail ? { detail: fields.detail } : {}),
-		}),
-	);
+	logger.info('hoursmith-billing-portal', 'billing_portal', {
+		user_id: fields.userId,
+		polar_customer_id: fields.customerId,
+		code: fields.code,
+		status: fields.status,
+		duration_ms: fields.durationMs,
+		...(fields.detail ? { detail: fields.detail } : {}),
+	});
 }
