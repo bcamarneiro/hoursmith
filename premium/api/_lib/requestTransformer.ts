@@ -171,7 +171,11 @@ export async function transformRequest<const TSchema extends RequestSchema>(
 		return { ok: false, status: 400, error: 'invalid_body_type' };
 	}
 
-	return validateAndCastBody(rawBody as Record<string, unknown>, schema.body, query);
+	return validateAndCastBody(
+		rawBody as Record<string, unknown>,
+		schema.body,
+		query,
+	);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,9 +194,7 @@ async function requestCloneSafeText(request: Request): Promise<string> {
 	return request.text();
 }
 
-function requiredBodyErrors(
-	schema: BodySchema,
-): TransformErrorDetail[] {
+function requiredBodyErrors(schema: BodySchema): TransformErrorDetail[] {
 	const errors: TransformErrorDetail[] = [];
 	for (const [key, def] of Object.entries(schema)) {
 		if (def.required) {
@@ -230,7 +232,12 @@ function validateAndCastBody(
 	}
 
 	if (errors.length > 0) {
-		return { ok: false, status: 400, error: 'validation_failed', details: errors };
+		return {
+			ok: false,
+			status: 400,
+			error: 'validation_failed',
+			details: errors,
+		};
 	}
 
 	return { ok: true, body: cast, query };
@@ -270,7 +277,10 @@ function typeMatches(val: unknown, type: FieldType): boolean {
 // Convenience: standard JSON error response
 // ---------------------------------------------------------------------------
 
-export function jsonError(status: number, body: Record<string, unknown>): Response {
+export function jsonError(
+	status: number,
+	body: Record<string, unknown>,
+): Response {
 	return new Response(JSON.stringify(body), {
 		status,
 		headers: { 'content-type': 'application/json' },

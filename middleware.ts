@@ -87,10 +87,7 @@ function corsPreflightResponse(request: Request): Response {
 	return new Response(null, { status: 204, headers });
 }
 
-function jsonResponse(
-	status: number,
-	body: Record<string, unknown>,
-): Response {
+function jsonResponse(status: number, body: Record<string, unknown>): Response {
 	return new Response(JSON.stringify(body), {
 		status,
 		headers: { 'content-type': 'application/json' },
