@@ -13,7 +13,7 @@ import * as path from 'node:path';
 import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadWorkerProcessor, parseRunWorkerArgs } from '../runWorker.js';
+import { isMainModule, loadWorkerProcessor, parseRunWorkerArgs } from '../runWorker.js';
 
 const PROCESSOR_FIXTURE = path.join(
 	__dirname,
@@ -52,7 +52,7 @@ describe('parseRunWorkerArgs', () => {
 	it('parses explicit flags', () => {
 		const options = parseRunWorkerArgs([
 			'--queue',
-			'parsed-commits',
+			'raw-commits',
 			'--processor',
 			PROCESSOR_FIXTURE,
 			'--concurrency',
@@ -62,12 +62,23 @@ describe('parseRunWorkerArgs', () => {
 		]);
 
 		expect(options).toEqual({
-			queue: 'parsed-commits',
+			queue: 'raw-commits',
 			processor: PROCESSOR_FIXTURE,
 			concurrency: 4,
 			shutdownTimeoutMs: 9_000,
 			help: false,
 		});
+	});
+
+	it('rejects an invalid queue name', () => {
+		expect(() =>
+			parseRunWorkerArgs([
+				'--queue',
+				'bogus-queue',
+				'--processor',
+				PROCESSOR_FIXTURE,
+			]),
+		).toThrow('exit(1)');
 	});
 
 	it('supports --help without a processor', () => {
@@ -126,5 +137,20 @@ describe('loadWorkerProcessor', () => {
 		await expect(
 			loadWorkerProcessor('/nonexistent/does-not-exist.mjs'),
 		).rejects.toThrow('exit(1)');
+	});
+});
+
+describe('isMainModule', () => {
+	it('returns true when argv[1] points to runWorker.ts', () => {
+		const runWorkerFile = path.resolve(__dirname, '..', 'runWorker.ts');
+		expect(isMainModule(runWorkerFile)).toBe(true);
+	});
+
+	it('returns false when argv[1] is a different file', () => {
+		expect(isMainModule('/some/other/script.js')).toBe(false);
+	});
+
+	it('returns false when argv1 is undefined', () => {
+		expect(isMainModule(undefined)).toBe(false);
 	});
 });

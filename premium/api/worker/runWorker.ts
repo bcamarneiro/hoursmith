@@ -9,8 +9,8 @@
  *   npx tsx premium/api/worker/runWorker.ts --queue raw-commits \
  *     --processor ./dist/processRawCommits.js
  *
- * The processor module must export (default export or `processor`)
- * a BullMQ processor `(job) => Promise<result>`. Job-level retries come from
+ * The processor module must export (default export, `processor`, `process` or
+ * `handler`) a BullMQ processor `(job) => Promise<result>`. Job-level retries come from
  * the queue's default job options (`attempts` + exponential `backoff`);
  * connection failures (Redis down) are retried by BullMQ until they clear.
  *
@@ -25,13 +25,18 @@ import type { Processor } from 'bullmq';
 
 import { QUEUE_NAMES } from '../_lib/queueProvider.js';
 import { registerGracefulShutdown } from './gracefulShutdown.js';
-import { createWorker, type WorkerHandle, type WorkerLogFn } from './worker.js';
+import {
+	createWorker,
+	defaultWorkerLog,
+	type WorkerHandle,
+} from './worker.js';
 
 const USAGE = `Usage:
   npx tsx premium/api/worker/runWorker.ts --queue <name> --processor <module> [options]
 
 Required:
-  --processor <module>    Path to a module exporting the processor function.
+  --processor <module>    Path to a module exporting the processor function
+                          (default export, \`processor\`, \`process\` or \`handler\`).
 
 Options:
   --queue <name>          Queue to listen on (default: ${QUEUE_NAMES.RAW_COMMITS}).
@@ -94,6 +99,11 @@ export function parseRunWorkerArgs(argv: string[]): RunWorkerOptions {
 				break;
 			case '--queue':
 				options.queue = value();
+				if (!(Object.values(QUEUE_NAMES) as readonly string[]).includes(options.queue)) {
+					fail(
+						`unknown queue "${options.queue}". Valid: ${Object.values(QUEUE_NAMES).join(', ')}.`,
+					);
+				}
 				break;
 			case '--processor':
 				options.processor = value();
@@ -134,7 +144,7 @@ export async function loadWorkerProcessor(
 		record.default ?? record.processor ?? record.process ?? record.handler;
 	if (typeof processor !== 'function') {
 		fail(
-			`processor module "${processorPath}" must export a function (default export or \`processor\`).`,
+			`processor module "${processorPath}" must export a function (default export, \`processor\`, \`process\` or \`handler\`).`,
 		);
 	}
 	return processor as Processor<unknown, unknown>;
@@ -151,36 +161,35 @@ async function main(): Promise<void> {
 	}
 
 	const processor = await loadWorkerProcessor(options.processor);
-	const log: WorkerLogFn = (message, extra) => {
-		const suffix =
-			extra && Object.keys(extra).length > 0 ? ` ${JSON.stringify(extra)}` : '';
-		console.log(`[worker] ${message}${suffix}`);
-	};
 
 	const handle: WorkerHandle<unknown, unknown> = createWorker({
 		queueName: options.queue,
 		processor,
 		concurrency: options.concurrency,
-		log,
+		log: defaultWorkerLog,
 	});
 
 	registerGracefulShutdown({
 		drain: () => handle.close(),
 		timeoutMs: options.shutdownTimeoutMs,
-		log,
+		log: defaultWorkerLog,
 	});
 
-	log(`listening`, {
+	defaultWorkerLog(`listening`, {
 		queue: options.queue,
 		concurrency: options.concurrency,
 	});
 }
 
-const isMain =
-	process.argv[1] !== undefined &&
-	import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+/** Check whether the current process is running this module as the main entrypoint. */
+export function isMainModule(argv1: string | undefined): boolean {
+	return (
+		argv1 !== undefined &&
+		import.meta.url === pathToFileURL(path.resolve(argv1)).href
+	);
+}
 
-if (isMain) {
+if (isMainModule(process.argv[1])) {
 	main().catch((error: unknown) => {
 		console.error(
 			'[run-worker] fatal:',
