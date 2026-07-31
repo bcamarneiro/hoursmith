@@ -172,11 +172,25 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-2);
-	padding: var(--space-1) var(--space-2);
+	padding: var(--space-2) var(--space-2);
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
 	background: var(--color-surface);
 	font-size: var(--text-sm);
+}
+
+/* At 375px and below, stack worklog actions below the info row. */
+@media (max-width: 375px) {
+	.loggedWorklog {
+		flex-wrap: wrap;
+	}
+	.worklogActions {
+		margin-left: 0;
+		width: 100%;
+		justify-content: flex-end;
+		padding-top: var(--space-1);
+		border-top: 1px solid var(--color-border-subtle);
+	}
 }
 
 .loggedWorklogCheck {
@@ -204,25 +218,28 @@
 	min-width: 0;
 }
 
-/* Right-aligned group of per-worklog actions (Edit · Clone · Delete). */
+/* Right-aligned group of per-worklog actions (Edit · Clone · Delete).
+ * Buttons must meet 44px min tap-target (WCAG 2.5.5). */
 .worklogActions {
 	margin-left: auto;
 	display: flex;
 	align-items: center;
-	gap: var(--space-2);
+	gap: var(--space-3);
 }
 
 .cloneButton {
 	background: none;
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
-	padding: var(--space-1) var(--space-3);
-	font-size: var(--text-xs);
+	padding: 12px var(--space-3);
+	font-size: var(--text-sm);
 	font-weight: var(--font-semibold);
 	color: var(--color-primary);
 	cursor: pointer;
 	white-space: nowrap;
 	transition: all var(--transition-fast);
+	min-height: 44px;
+	min-width: 44px;
 }
 
 .cloneButton:hover {
@@ -240,13 +257,15 @@
 	background: none;
 	border: 1px solid var(--color-border);
 	border-radius: var(--radius-md);
-	padding: var(--space-1) var(--space-3);
-	font-size: var(--text-xs);
+	padding: 12px var(--space-3);
+	font-size: var(--text-sm);
 	font-weight: var(--font-semibold);
 	color: var(--color-error);
 	cursor: pointer;
 	white-space: nowrap;
 	transition: all var(--transition-fast);
+	min-height: 44px;
+	min-width: 44px;
 }
 
 .deleteWorklogButton:hover {

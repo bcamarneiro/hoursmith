@@ -77,7 +77,7 @@ describe('DayCard — add worklog (ADA-433)', () => {
 
 		// Fill in the issue key and submit.
 		const issueInput = screen.getByPlaceholderText(
-			'e.g., PROJ-123',
+			'e.g., PROJ-123 or search Jira',
 		) as HTMLInputElement;
 		fireEvent.change(issueInput, { target: { value: 'proj-9' } });
 
