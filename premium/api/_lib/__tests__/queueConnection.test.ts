@@ -129,6 +129,12 @@ describe('redactQueueUrl', () => {
 		expect(redactQueueUrl('redis://host:6379')).toBe('redis://host:6379');
 	});
 
+	it('masks a password containing a raw @ character', () => {
+		expect(redactQueueUrl('redis://user:p@ss@host:6379')).toBe(
+			'redis://***:***@host:6379',
+		);
+	});
+
 	it('leaves non-URL strings untouched', () => {
 		expect(redactQueueUrl('not a url')).toBe('not a url');
 	});

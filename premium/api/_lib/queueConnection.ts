@@ -57,11 +57,32 @@ export interface QueueConnectionConfig {
  * debuggable.
  */
 export function redactQueueUrl(url: string): string {
-	const match = /^([a-z][a-z0-9+.-]*:\/\/)[^@/]*:([^@]*)@/i.exec(url);
-	if (!match) {
+	try {
+		const parsed = new URL(url);
+		if (parsed.username || parsed.password) {
+			parsed.username = '***';
+			parsed.password = '***';
+			const redacted = parsed.toString();
+			// Strip trailing slash added by URL.toString() when the
+			// original URL had no path, to keep Redis URLs clean.
+			if (!url.endsWith('/') && redacted.endsWith('/')) {
+				return redacted.slice(0, -1);
+			}
+			return redacted;
+		}
+		return url;
+	} catch {
+		// Fallback regex-based redaction when the URL is malformed
+		// (e.g. spaces in hostname cause `new URL()` to throw).
+		const atIndex = url.lastIndexOf('@');
+		if (atIndex !== -1) {
+			const schemeEnd = url.indexOf('://');
+			if (schemeEnd !== -1 && schemeEnd < atIndex) {
+				return `${url.substring(0, schemeEnd + 3)}***:***${url.substring(atIndex)}`;
+			}
+		}
 		return url;
 	}
-	return `${match[1]}***:***@${url.slice(match[0].length)}`;
 }
 
 /**
