@@ -26,7 +26,15 @@ function makeAdmin(
 ): SupabaseAdminClient {
 	return {
 		getUserIdFromToken: vi.fn().mockResolvedValue('user-123'),
-		getSubscription: vi.fn(),
+		getSubscription: vi.fn().mockResolvedValue({
+			user_id: 'user-123',
+			stripe_customer_id: 'polar_cus_1',
+			stripe_subscription_id: 'polar_sub_1',
+			tier: 'premium',
+			status: 'active',
+			current_period_end: null,
+			updated_at: '2026-07-01T00:00:00.000Z',
+		}),
 		getProfile: vi.fn(),
 		getSubscriptionByCustomerId: vi.fn(),
 		insertIncompleteSubscription: vi.fn(),
@@ -286,5 +294,108 @@ describe('provider probes', () => {
 		const body = (await res.json()) as Record<string, unknown>;
 		expect(body.ok).toBe(true);
 		expect(body.note).toBeTruthy();
+	});
+});
+
+// ── Entitlement gate (ADA-272) ──
+
+describe('entitlement gate', () => {
+	it('returns 403 when subscription is not active', async () => {
+		const admin = makeAdmin({
+			getSubscription: vi.fn().mockResolvedValue(null),
+		});
+		const res = await handleTestConnection(
+			makeRequest({ provider: 'github', apiKey: 'ghp_token' }),
+			{ admin },
+		);
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.error).toBe('subscription_required');
+	});
+
+	it('returns 403 for canceled subscriptions', async () => {
+		const admin = makeAdmin({
+			getSubscription: vi.fn().mockResolvedValue({
+				user_id: 'user-123',
+				stripe_customer_id: 'polar_cus_1',
+				stripe_subscription_id: 'polar_sub_1',
+				tier: 'premium',
+				status: 'canceled',
+				current_period_end: null,
+				updated_at: '2026-07-01T00:00:00.000Z',
+			}),
+		});
+		const res = await handleTestConnection(
+			makeRequest({ provider: 'github', apiKey: 'ghp_token' }),
+			{ admin },
+		);
+		expect(res.status).toBe(403);
+	});
+});
+
+// ── SSRF guard ──
+
+describe('SSRF guard', () => {
+	it('rejects custom host with HTTP scheme', async () => {
+		const res = await handleTestConnection(
+			makeRequest({
+				provider: 'jira_api',
+				apiKey: 'token',
+				host: 'http://example.atlassian.net',
+			}),
+			{ admin: makeAdmin() },
+		);
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as Record<string, unknown>;
+		expect(body.error).toContain('HTTPS');
+	});
+
+	it('rejects custom host with private IP (127.0.0.1)', async () => {
+		const res = await handleTestConnection(
+			makeRequest({
+				provider: 'jira_api',
+				apiKey: 'token',
+				host: 'https://127.0.0.1',
+			}),
+			{ admin: makeAdmin() },
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it('rejects custom host with private IP (10.x.x.x)', async () => {
+		const res = await handleTestConnection(
+			makeRequest({
+				provider: 'jira_api',
+				apiKey: 'token',
+				host: 'https://10.0.0.1',
+			}),
+			{ admin: makeAdmin() },
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it('rejects unparseable URLs', async () => {
+		const res = await handleTestConnection(
+			makeRequest({
+				provider: 'jira_api',
+				apiKey: 'token',
+				host: 'not-a-url',
+			}),
+			{ admin: makeAdmin() },
+		);
+		expect(res.status).toBe(400);
+	});
+
+	it('accepts valid HTTPS hostname', async () => {
+		const probe = fakeProbe(200, { emailAddress: 'user@example.com' });
+		const res = await handleTestConnection(
+			makeRequest({
+				provider: 'jira_api',
+				apiKey: 'token',
+				host: 'https://my-company.atlassian.net',
+			}),
+			{ admin: makeAdmin(), probeFetch: probe },
+		);
+		expect(res.status).toBe(200);
 	});
 });

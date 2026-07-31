@@ -27,11 +27,80 @@ import {
 	defaultSupabaseAdmin,
 	type SupabaseAdminClient,
 } from '../_lib/supabaseAdmin.js';
+import { getEntitlement } from '../_lib/entitlement.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
 
 export const config = {
 	runtime: 'edge',
 	regions: ['fra1'],
 };
+
+// ── SSRF guard ──
+
+/**
+ * Patterns that match private / reserved / loopback IPv4 addresses.
+ * These MUST be rejected when a caller supplies a custom host (jira_api).
+ */
+const PRIVATE_IP_PATTERNS = [
+	/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+	/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
+	/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/,
+	/^192\.168\.\d{1,3}\.\d{1,3}$/,
+	/^169\.254\.\d{1,3}\.\d{1,3}$/,
+	/^0\.0\.0\.0$/,
+];
+
+const IPV4_REGEX = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+
+function isPrivateIP(hostname: string): boolean {
+	const match = hostname.match(IPV4_REGEX);
+	if (!match) return false;
+
+	const octets = match.slice(1).map(Number);
+	if (octets.some((o) => o > 255)) return false; // invalid IP
+
+	return PRIVATE_IP_PATTERNS.some((p) => p.test(hostname));
+}
+
+/**
+ * Validate a caller-supplied provider host URL.
+ *
+ * Rejects:
+ *  - Non-HTTPS URLs
+ *  - Raw IP addresses in private / reserved ranges
+ *  - Unparseable URLs
+ */
+function validateProbeHost(raw: string): string {
+	const url = safeParseURL(raw);
+	if (url.protocol !== 'https:') {
+		throw new ValidationError(
+			'Host URL must use HTTPS. Plain HTTP is not accepted.',
+		);
+	}
+	if (isPrivateIP(url.hostname)) {
+		throw new ValidationError(
+			'Host URL resolves to a private or reserved IP address.',
+		);
+	}
+	return url.origin;
+}
+
+class ValidationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'ValidationError';
+	}
+}
+
+function safeParseURL(raw: string): URL {
+	try {
+		return new URL(raw);
+	} catch (err) {
+		throw new ValidationError(
+			`Invalid host URL: ${(err as Error).message}`,
+		);
+	}
+}
 
 // ── Request / response shapes ──
 
@@ -163,6 +232,31 @@ export async function handleTestConnection(
 		return jsonResponse(401, { error: 'invalid_token' });
 	}
 
+	// Entitlement gate — require active premium subscription (ADA-272).
+	const subscription = await admin.getSubscription(userId);
+	const entitled =
+		subscription?.status === 'active' ||
+		subscription?.status === 'trialing' ||
+		subscription?.status === 'past_due';
+	if (!entitled) {
+		logEvent({ userId, status: 403, note: 'subscription_required' });
+		return jsonResponse(403, { error: 'subscription_required' });
+	}
+
+	// Rate limit guard — shared with the CORS proxy (ADA-302).
+	const rate = await checkRateLimit(userId);
+	if (!rate.allowed) {
+		const headers = new Headers();
+		headers.set('Retry-After', String(rate.retryAfterSeconds));
+		return new Response(
+			JSON.stringify({
+				error: 'rate_limit_exceeded',
+				retryAfterSeconds: rate.retryAfterSeconds,
+			}),
+			{ status: 429, headers },
+		);
+	}
+
 	let body: TestConnectionRequest;
 	try {
 		body = (await request.json()) as TestConnectionRequest;
@@ -199,6 +293,19 @@ export async function handleTestConnection(
 
 	const fetchImpl = deps.probeFetch ?? fetch;
 
+	// SSRF guard: validate caller-supplied host (jira_api only).
+	if (provider === 'jira_api' && body.host) {
+		try {
+			body.host = validateProbeHost(body.host);
+		} catch (err) {
+			if (err instanceof ValidationError) {
+				logEvent({ userId, provider, status: 400, note: `ssrf_guard:${err.message}` });
+				return jsonResponse(400, { error: `Invalid host: ${err.message}` });
+			}
+			throw err;
+		}
+	}
+
 	try {
 		// 'custom' is a special case — it has no probe endpoint, so we return
 		// a synthetic success. The real validation is that we can store it.
@@ -220,7 +327,7 @@ export async function handleTestConnection(
 		const res = await fetchImpl(url, {
 			method: 'GET',
 			headers,
-			redirect: 'follow',
+			redirect: 'manual',
 		});
 
 		// 2xx means the credentials are valid.

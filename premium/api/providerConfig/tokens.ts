@@ -185,7 +185,7 @@ async function handleUpsert(
 		return jsonResponse(400, { error: 'api_key_required' });
 	}
 
-	const encryptedValue = encryptValue(body.apiKey.trim());
+	const encryptedValue = await encryptValue(body.apiKey.trim());
 
 	const upserted = await store.upsertToken(userId, {
 		provider: body.provider as TokenProvider,
@@ -246,22 +246,83 @@ async function handleDelete(
 	>);
 }
 
-// ── Helpers ──
+// ── Encryption ──
+
+const ENCRYPTION_ALGORITHM: AesKeyGenParams = { name: 'AES-GCM', length: 256 };
+const IV_LENGTH_BYTES = 12;
 
 /**
- * Encrypt a plaintext API key for storage.
- *
- * Production MUST use a real KMS / envelope encryption scheme (Web Crypto
- * via AES-GCM + a per-user key fetched from Supabase Vault or a KMS provider).
- * Today this is a stub: it prefixes the value with `aes256gcm:` to match the
- * wire format that `tokenStorage` expects, but does not perform real
- * encryption. This is tracked in ADA-649 (KMS integration).
+ * Derive a CryptoKey from the ENCRYPTION_KEY environment variable.
+ * The env var must be a base64-encoded 32-byte key.
  */
-function encryptValue(plaintext: string): string {
-	// Stub: real encryption via Web Crypto + KMS is tracked in ADA-649.
-	// The prefix `aes256gcm:` is the tokenStorage wire-format marker.
-	return `aes256gcm:${Buffer.from(plaintext).toString('base64')}`;
+async function getEncryptionKey(): Promise<CryptoKey> {
+	const keyB64 = process.env.ENCRYPTION_KEY;
+	if (!keyB64) {
+		throw new Error('ENCRYPTION_KEY environment variable is not set.');
+	}
+	const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+	if (keyBytes.length !== 32) {
+		throw new Error(
+			'ENCRYPTION_KEY must be 32 bytes (base64-encoded).',
+		);
+	}
+	return crypto.subtle.importKey(
+		'raw',
+		keyBytes,
+		ENCRYPTION_ALGORITHM,
+		false,
+		['encrypt', 'decrypt'],
+	);
 }
+
+/**
+ * Encrypt a plaintext API key using AES-256-GCM (Web Crypto).
+ *
+ * Returns `aes256gcm:<base64(iv + ciphertext)>` matching the wire format
+ * expected by `tokenStorage`. The IV is randomly generated per encryption
+ * and prepended to the ciphertext so each stored value is unique.
+ */
+async function encryptValue(plaintext: string): Promise<string> {
+	const key = await getEncryptionKey();
+	const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
+	const encoded = new TextEncoder().encode(plaintext);
+	const ciphertext = await crypto.subtle.encrypt(
+		{ name: 'AES-GCM', iv },
+		key,
+		encoded,
+	);
+
+	const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+	combined.set(iv);
+	combined.set(new Uint8Array(ciphertext), iv.length);
+
+	return `aes256gcm:${btoa(String.fromCharCode(...combined))}`;
+}
+
+/**
+ * Decrypt a value previously encrypted with {@link encryptValue}.
+ * Used when consuming stored provider tokens for upstream API calls.
+ */
+export async function decryptValue(encrypted: string): Promise<string> {
+	if (!encrypted.startsWith('aes256gcm:')) {
+		throw new Error('Invalid encrypted value format.');
+	}
+	const key = await getEncryptionKey();
+	const combined = Uint8Array.from(
+		atob(encrypted.slice('aes256gcm:'.length)),
+		(c) => c.charCodeAt(0),
+	);
+	const iv = combined.slice(0, IV_LENGTH_BYTES);
+	const ciphertext = combined.slice(IV_LENGTH_BYTES);
+	const decrypted = await crypto.subtle.decrypt(
+		{ name: 'AES-GCM', iv },
+		key,
+		ciphertext,
+	);
+	return new TextDecoder().decode(decrypted);
+}
+
+// ── Helpers ──
 
 function extractBearer(header: string | null): string | null {
 	if (!header) return null;
