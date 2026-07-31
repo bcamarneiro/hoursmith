@@ -22,7 +22,9 @@ describe('POOL_SETTINGS_SCHEMA', () => {
 	it('covers every PoolSettings field exactly once', () => {
 		const keys = POOL_SETTINGS_SCHEMA.map((entry) => entry.key).sort();
 		expect(keys).toEqual(
-			(Object.keys(POOL_ENV_DEFAULTS.production) as (keyof PoolSettings)[]).sort(),
+			(
+				Object.keys(POOL_ENV_DEFAULTS.production) as (keyof PoolSettings)[]
+			).sort(),
 		);
 	});
 
