@@ -226,6 +226,85 @@ describe('Scheduler', () => {
 			expect(consoleSpy).toHaveBeenCalled();
 			consoleSpy.mockRestore();
 		});
+
+		it('catches async handler rejections via the errorHandler (ADA-662 fix)', async () => {
+			const error = new Error('async-boom');
+			const onError = vi.fn();
+			const handler = async () => {
+				throw error;
+			};
+			const cronInstance = scheduler.register(
+				makeConfig({ name: 'async-err', handler, errorHandler: onError }),
+			);
+			const fn = (cronInstance as unknown as { fn?: () => Promise<void> }).fn;
+			if (fn) await fn();
+
+			expect(onError).toHaveBeenCalledTimes(1);
+			expect(onError).toHaveBeenCalledWith(error, 'async-err');
+		});
+
+		it('catches async handler rejections with console.error fallback (ADA-662 fix)', async () => {
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const handler = async () => {
+				throw new Error('async-silent');
+			};
+			const cronInstance = scheduler.register(
+				makeConfig({ name: 'async-no-err', handler }),
+			);
+			const fn = (cronInstance as unknown as { fn?: () => Promise<void> }).fn;
+			if (fn) await fn();
+
+			expect(consoleSpy).toHaveBeenCalled();
+			consoleSpy.mockRestore();
+		});
+	});
+
+	// -- maxRuns & protect (ADA-662 regression coverage) -------------------
+
+	describe('maxRuns', () => {
+		it('propagates maxRuns to croner at construction (ADA-662 fix)', () => {
+			scheduler.register(
+				makeConfig({ name: 'limited', maxRuns: 3 }),
+			);
+			const status = scheduler.getJob('limited')!;
+			// croner snapshots maxRuns at construction; runsLeft reflects it.
+			// Before the fix, post-construction mutation was ignored → Infinity.
+			expect(status.runsLeft).toBe(3);
+		});
+
+		it('reports runsLeft as Infinity when maxRuns is not set', () => {
+			scheduler.register(makeConfig({ name: 'unlimited' }));
+			const status = scheduler.getJob('unlimited')!;
+			expect(status.runsLeft).toBe(Infinity);
+		});
+	});
+
+	describe('protect', () => {
+		it(
+			'accepts protect at construction so croner tracks the promise (ADA-662 fix)',
+			() => {
+				const cronInstance = scheduler.register(
+					makeConfig({ name: 'protected', protect: true }),
+				);
+				// protect is now passed at construction — verify croner accepted it.
+				expect(cronInstance.options).toBeDefined();
+				expect(
+					(cronInstance.options as Record<string, unknown>).protect,
+				).toBe(true);
+			},
+		);
+
+		it(
+			'protect: false is the default (not set on options)',
+			() => {
+				const cronInstance = scheduler.register(
+					makeConfig({ name: 'unprotected' }),
+				);
+				expect(
+					(cronInstance.options as Record<string, unknown>).protect,
+				).toBeUndefined();
+			},
+		);
 	});
 
 	// -- Job description propagation ---------------------------------------

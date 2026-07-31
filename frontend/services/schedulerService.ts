@@ -91,9 +91,22 @@ export class Scheduler {
 			this.stop(config.name);
 		}
 
-		const job = new Cron(config.cronExpression, { name: config.name }, () => {
+		// Build croner options at construction time — croner snapshots
+		// maxRuns and protect internally during construction; post-construction
+		// mutations are ignored.
+		const cronOptions: Record<string, unknown> = { name: config.name };
+		if (config.maxRuns !== undefined) {
+			cronOptions.maxRuns = config.maxRuns;
+		}
+		if (config.protect) {
+			cronOptions.protect = true;
+		}
+
+		const job = new Cron(config.cronExpression, cronOptions, async () => {
 			try {
-				config.handler(job);
+				// Await so async rejections are caught and so croner can
+				// track the in-flight promise for its protect mechanism.
+				await config.handler(job);
 			} catch (err: unknown) {
 				const meta = this.meta.get(config.name);
 				if (meta) {
@@ -107,15 +120,6 @@ export class Scheduler {
 				}
 			}
 		});
-
-		if (config.maxRuns !== undefined) {
-			// croner accepts maxRuns via options at construction time, but the
-			// constructor signature doesn't expose it directly. Set on options.
-			(job.options as Record<string, unknown>).maxRuns = config.maxRuns;
-		}
-		if (config.protect) {
-			(job.options as Record<string, unknown>).protect = true;
-		}
 
 		this.jobs.set(config.name, job);
 		this.meta.set(config.name, {
