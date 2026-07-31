@@ -9,6 +9,8 @@ import type { SupabaseAdminClient } from '../../_lib/supabaseAdmin.js';
 import type { TokenStorage, UserToken } from '../../_lib/tokenStorage.js';
 import { handleTokens } from '../tokens.js';
 
+process.env.ENCRYPTION_KEY = 'Sztw6NAT+ZYoFYUAXd6SkqX7O65uTnDmvA7WeEPgGEg=';
+
 // ── Helpers ──
 
 function makeRequest(
@@ -16,14 +18,11 @@ function makeRequest(
 	headers: Record<string, string> = {},
 	body?: unknown,
 ): Request {
-	return new Request(
-		'https://hoursmith.io/api/providerConfig/tokens',
-		{
-			method,
-			headers: { 'content-type': 'application/json', ...headers },
-			body: body !== undefined ? JSON.stringify(body) : undefined,
-		},
-	);
+	return new Request('https://hoursmith.io/api/providerConfig/tokens', {
+		method,
+		headers: { 'content-type': 'application/json', ...headers },
+		body: body !== undefined ? JSON.stringify(body) : undefined,
+	});
 }
 
 function makeAdmin(
@@ -119,7 +118,10 @@ describe('GET /api/providerConfig/tokens', () => {
 	it('returns empty array when user has no tokens', async () => {
 		const res = await handleTokens(
 			makeRequest('GET', { authorization: 'Bearer ok' }),
-			{ admin: makeAdmin(), tokens: makeTokenStore({ listTokens: vi.fn().mockResolvedValue([]) }) },
+			{
+				admin: makeAdmin(),
+				tokens: makeTokenStore({ listTokens: vi.fn().mockResolvedValue([]) }),
+			},
 		);
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as { tokens: unknown[] };
@@ -136,11 +138,15 @@ describe('POST /api/providerConfig/tokens', () => {
 			upsertToken: vi.fn().mockResolvedValue(created),
 		});
 		const res = await handleTokens(
-			makeRequest('POST', { authorization: 'Bearer ok' }, {
-				provider: 'github',
-				apiKey: 'ghp_abc123',
-				label: 'GitHub',
-			}),
+			makeRequest(
+				'POST',
+				{ authorization: 'Bearer ok' },
+				{
+					provider: 'github',
+					apiKey: 'ghp_abc123',
+					label: 'GitHub',
+				},
+			),
 			{ admin: makeAdmin(), tokens: store },
 		);
 		expect(res.status).toBe(200);
@@ -152,10 +158,14 @@ describe('POST /api/providerConfig/tokens', () => {
 
 	it('rejects invalid providers', async () => {
 		const res = await handleTokens(
-			makeRequest('POST', { authorization: 'Bearer ok' }, {
-				provider: 'unknown_svc',
-				apiKey: 'abc123',
-			}),
+			makeRequest(
+				'POST',
+				{ authorization: 'Bearer ok' },
+				{
+					provider: 'unknown_svc',
+					apiKey: 'abc123',
+				},
+			),
 			{ admin: makeAdmin(), tokens: makeTokenStore() },
 		);
 		expect(res.status).toBe(400);
@@ -163,9 +173,13 @@ describe('POST /api/providerConfig/tokens', () => {
 
 	it('rejects missing apiKey', async () => {
 		const res = await handleTokens(
-			makeRequest('POST', { authorization: 'Bearer ok' }, {
-				provider: 'jira_api',
-			}),
+			makeRequest(
+				'POST',
+				{ authorization: 'Bearer ok' },
+				{
+					provider: 'jira_api',
+				},
+			),
 			{ admin: makeAdmin(), tokens: makeTokenStore() },
 		);
 		expect(res.status).toBe(400);
@@ -173,27 +187,28 @@ describe('POST /api/providerConfig/tokens', () => {
 
 	it('rejects blank apiKey', async () => {
 		const res = await handleTokens(
-			makeRequest('POST', { authorization: 'Bearer ok' }, {
-				provider: 'jira_api',
-				apiKey: '   ',
-			}),
+			makeRequest(
+				'POST',
+				{ authorization: 'Bearer ok' },
+				{
+					provider: 'jira_api',
+					apiKey: '   ',
+				},
+			),
 			{ admin: makeAdmin(), tokens: makeTokenStore() },
 		);
 		expect(res.status).toBe(400);
 	});
 
 	it('rejects invalid JSON body', async () => {
-		const req = new Request(
-			'https://hoursmith.io/api/providerConfig/tokens',
-			{
-				method: 'POST',
-				headers: {
-					authorization: 'Bearer ok',
-					'content-type': 'application/json',
-				},
-				body: 'not json',
+		const req = new Request('https://hoursmith.io/api/providerConfig/tokens', {
+			method: 'POST',
+			headers: {
+				authorization: 'Bearer ok',
+				'content-type': 'application/json',
 			},
-		);
+			body: 'not json',
+		});
 		const res = await handleTokens(req, {
 			admin: makeAdmin(),
 			tokens: makeTokenStore(),
@@ -207,10 +222,14 @@ describe('POST /api/providerConfig/tokens', () => {
 			upsertToken: vi.fn().mockResolvedValue(updated),
 		});
 		const res = await handleTokens(
-			makeRequest('POST', { authorization: 'Bearer ok' }, {
-				provider: 'jira_api',
-				apiKey: 'newkey',
-			}),
+			makeRequest(
+				'POST',
+				{ authorization: 'Bearer ok' },
+				{
+					provider: 'jira_api',
+					apiKey: 'newkey',
+				},
+			),
 			{ admin: makeAdmin(), tokens: store },
 		);
 		expect(res.status).toBe(200);
