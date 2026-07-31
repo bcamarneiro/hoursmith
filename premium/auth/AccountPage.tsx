@@ -28,6 +28,7 @@ import { LEAD_TIER_ENABLED } from '../../frontend/featureFlags';
 import { PremiumWaitlistForm } from '../../frontend/react/components/marketing/PremiumWaitlistForm';
 import { useFlags } from '../../frontend/react/hooks/useFlags';
 import * as styles from './AccountPage.module.css';
+import { ProviderConfigSection } from './ProviderConfigSection';
 import { getSupabase } from './supabaseClient';
 import { useAuth } from './useAuth';
 
@@ -513,6 +514,8 @@ export function AccountPage(): JSX.Element {
 					</button>
 				</div>
 			</section>
+
+			<ProviderConfigSection />
 
 			<section className={styles.section}>
 				<h2 className={styles.sectionTitle}>Session</h2>
