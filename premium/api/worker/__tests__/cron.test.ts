@@ -7,11 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import {
-	CRON_TASKS,
-	validateCronPattern,
-	validateCronTasks,
-} from '../cron.js';
+import { CRON_TASKS, validateCronPattern, validateCronTasks } from '../cron.js';
 
 describe('validateCronPattern', () => {
 	it('accepts a standard 5-field pattern', () => {
@@ -52,18 +48,18 @@ describe('validateCronTasks', () => {
 			{ id: 'a', queue: 'q', pattern: '* * * * *' },
 		];
 		const problems = validateCronTasks(tasks);
-		expect(problems.some((problem) => problem.includes('duplicate task id'))).toBe(
-			true,
-		);
+		expect(
+			problems.some((problem) => problem.includes('duplicate task id')),
+		).toBe(true);
 	});
 
 	it('flags empty ids and empty queue names', () => {
 		const problems = validateCronTasks([
 			{ id: '', queue: '', pattern: '* * * * *' },
 		]);
-		expect(problems.some((problem) => problem.includes('non-empty string'))).toBe(
-			true,
-		);
+		expect(
+			problems.some((problem) => problem.includes('non-empty string')),
+		).toBe(true);
 	});
 
 	it('flags malformed patterns with the task id in context', () => {
@@ -75,7 +71,12 @@ describe('validateCronTasks', () => {
 
 	it('flags unknown IANA timezones', () => {
 		const problems = validateCronTasks([
-			{ id: 'tz-task', queue: 'q', pattern: '* * * * *', timezone: 'Mars/Olympus' },
+			{
+				id: 'tz-task',
+				queue: 'q',
+				pattern: '* * * * *',
+				timezone: 'Mars/Olympus',
+			},
 		]);
 		expect(
 			problems.some((problem) => problem.includes('unknown IANA timezone')),
@@ -84,7 +85,12 @@ describe('validateCronTasks', () => {
 
 	it('accepts a valid IANA timezone', () => {
 		const problems = validateCronTasks([
-			{ id: 'tz-task', queue: 'q', pattern: '* * * * *', timezone: 'America/New_York' },
+			{
+				id: 'tz-task',
+				queue: 'q',
+				pattern: '* * * * *',
+				timezone: 'America/New_York',
+			},
 		]);
 		expect(problems).toEqual([]);
 	});

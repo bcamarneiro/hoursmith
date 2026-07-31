@@ -75,9 +75,9 @@ async function main(): Promise<void> {
 		);
 	}
 
-	const queueNames = [
-		...new Set(CRON_TASKS.map((task) => task.queue)),
-	].filter((name) => !options.queueFilter || name === options.queueFilter);
+	const queueNames = [...new Set(CRON_TASKS.map((task) => task.queue))].filter(
+		(name) => !options.queueFilter || name === options.queueFilter,
+	);
 
 	if (queueNames.length === 0) {
 		throw new CronSchedulerError(

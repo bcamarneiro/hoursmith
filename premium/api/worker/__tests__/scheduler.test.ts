@@ -31,15 +31,13 @@ function makeQueue(initialSchedulers: FakeScheduler[] = []): {
 	const getJobSchedulers = vi
 		.fn()
 		.mockImplementation(async () => [...schedulers]);
-	const removeJobScheduler = vi
-		.fn()
-		.mockImplementation(async (id: string) => {
-			const index = schedulers.findIndex((s) => s.id === id);
-			if (index !== -1) {
-				schedulers.splice(index, 1);
-			}
-			return true;
-		});
+	const removeJobScheduler = vi.fn().mockImplementation(async (id: string) => {
+		const index = schedulers.findIndex((s) => s.id === id);
+		if (index !== -1) {
+			schedulers.splice(index, 1);
+		}
+		return true;
+	});
 	return {
 		queue: {
 			name: 'raw-commits',
@@ -145,7 +143,9 @@ describe('syncCronTasks', () => {
 	});
 
 	it('wraps stale-pruning failures in a CronSchedulerError', async () => {
-		const { queue, removeJobScheduler } = makeQueue([{ id: 'zombie-schedule' }]);
+		const { queue, removeJobScheduler } = makeQueue([
+			{ id: 'zombie-schedule' },
+		]);
 		removeJobScheduler.mockRejectedValueOnce(new Error('redis down'));
 
 		const error = await syncCronTasks(queue, TASKS).catch((e: unknown) => e);
