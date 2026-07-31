@@ -10,14 +10,27 @@ interface KeyboardShortcutsResult {
 }
 
 function isInputFocused(): boolean {
-	const tag = document.activeElement?.tagName;
-	if (!tag) return false;
-	return (
+	const el = document.activeElement;
+	if (!el) return false;
+	const tag = el.tagName;
+	// Yield to any interactive element so the user can interact with buttons,
+	// links, and editable content inside a suggestion card without the global
+	// keyboard shortcuts swallowing their keystrokes.
+	if (
 		tag === 'INPUT' ||
 		tag === 'TEXTAREA' ||
 		tag === 'SELECT' ||
-		tag === 'DIALOG'
-	);
+		tag === 'DIALOG' ||
+		tag === 'BUTTON' ||
+		tag === 'A'
+	) {
+		return true;
+	}
+	// contentEditable divs (some rich-text fields) also need unhindered key input.
+	if (el instanceof HTMLElement && el.isContentEditable) {
+		return true;
+	}
+	return false;
 }
 
 export function useKeyboardShortcuts(

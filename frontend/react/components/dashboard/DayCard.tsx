@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { DaySummary, LoggedWorklog } from '../../../../types/Suggestion';
 import { useDashboardStore } from '../../../stores/useDashboardStore';
 import { useWorklogOperations } from '../../hooks/useWorklogOperations';
@@ -105,6 +105,16 @@ export const DayCard = memo<Props>(function DayCard({
 		comment: string;
 		started: string;
 	} | null>(null);
+	const cardRef = useRef<HTMLDivElement>(null);
+
+	// Mirror the dashboard keyboard nav into the DOM. When virtual focus is
+	// on this day card (not on a child suggestion), move real DOM focus to the
+	// card so keyboard and screen-reader users land on it.
+	useEffect(() => {
+		if (isFocused && focusedSuggestionIndex === -1) {
+			cardRef.current?.focus({ preventScroll: true });
+		}
+	}, [isFocused, focusedSuggestionIndex]);
 
 	// Open a blank worklog form prefilled with this day's date (09:00) and the
 	// remaining gap as the suggested duration, so a user with no suggestions can
@@ -297,6 +307,8 @@ export const DayCard = memo<Props>(function DayCard({
 
 	return (
 		<div
+			ref={cardRef}
+			tabIndex={isFocused && focusedSuggestionIndex === -1 ? -1 : undefined}
 			className={`${styles.card} ${isToday ? styles.today : ''} ${day.isWeekend ? styles.weekend : ''} ${isFocused ? styles.focused : ''} ${isClosed && !expanded ? styles.closed : ''}`}
 		>
 			<div className={styles.header}>
