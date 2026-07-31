@@ -15,6 +15,8 @@ import { type RedisEnv, redisOptions } from './redisConfig.js';
 export const QUEUE_NAMES = {
 	/** GitLab webhook ingestion queue (ADA-631); jobs reference `raw_commits` rows. */
 	RAW_COMMITS: 'raw-commits',
+	/** Product event queue (ADA-721); jobs carry validated `ProductEvent` envelopes. */
+	EVENTS: 'events',
 } as const;
 
 /** Payload of a `raw-commits` job: which `raw_commits` row to process. */
