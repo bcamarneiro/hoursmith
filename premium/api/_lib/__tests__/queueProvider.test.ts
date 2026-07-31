@@ -72,6 +72,25 @@ describe('queueOptions', () => {
 			count: 1_000,
 		});
 	});
+
+	it('applies QUEUE_JOB_* env overrides to job options', () => {
+		const opts = queueOptions({
+			REDIS_URL: 'redis://cache',
+			QUEUE_JOB_ATTEMPTS: '6',
+			QUEUE_JOB_BACKOFF_TYPE: 'fixed',
+			QUEUE_JOB_BACKOFF_DELAY_MS: '250',
+			QUEUE_JOB_REMOVE_ON_COMPLETE_AGE_S: '30',
+		});
+		expect(opts.defaultJobOptions?.attempts).toBe(6);
+		expect(opts.defaultJobOptions?.backoff).toEqual({
+			type: 'fixed',
+			delay: 250,
+		});
+		expect(opts.defaultJobOptions?.removeOnComplete).toMatchObject({
+			age: 30,
+			count: 1_000,
+		});
+	});
 });
 
 describe('createQueue', () => {
