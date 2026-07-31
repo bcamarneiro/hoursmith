@@ -363,8 +363,8 @@ export async function validateToken(
 // ---------------------------------------------------------------------------
 
 export type AuthTokenErrorCode =
-	| 'token_missing'
 	| 'token_revoked'
+	| 'token_expired'
 	| 'token_unreadable'
 	| 'token_malformed'
 	| 'server_misconfigured';
@@ -467,7 +467,7 @@ export function makeAuthTokenService(
 		);
 	}
 	const storage = options.storage ?? makeTokenStorage(env as TokenStorageEnv);
-	const cipher = options.cipher ?? makeAesCipher(secret, { iterations: 1_000 });
+	const cipher = options.cipher ?? makeAesCipher(secret);
 	const clock: () => number =
 		options.nowMs !== undefined ? () => options.nowMs as number : Date.now;
 	return new AuthTokenServiceImpl(storage, cipher, clock, options.expiry ?? {});
@@ -503,6 +503,36 @@ class AuthTokenServiceImpl implements AuthTokenService {
 				);
 			}
 		}
+		if (
+			input.refreshToken !== undefined &&
+			input.refreshToken !== null &&
+			typeof input.refreshToken !== 'string'
+		) {
+			throw new AuthTokenError(
+				'token_malformed',
+				'authTokenService.saveToken: refreshToken must be a string or null.',
+			);
+		}
+		if (
+			input.tokenType !== undefined &&
+			input.tokenType !== null &&
+			typeof input.tokenType !== 'string'
+		) {
+			throw new AuthTokenError(
+				'token_malformed',
+				'authTokenService.saveToken: tokenType must be a string or null.',
+			);
+		}
+		if (
+			input.scope !== undefined &&
+			input.scope !== null &&
+			typeof input.scope !== 'string'
+		) {
+			throw new AuthTokenError(
+				'token_malformed',
+				'authTokenService.saveToken: scope must be a string or null.',
+			);
+		}
 		const bundle: AuthTokenBundle = {
 			version: AUTH_TOKEN_BUNDLE_VERSION,
 			provider,
@@ -531,6 +561,12 @@ class AuthTokenServiceImpl implements AuthTokenService {
 			throw new AuthTokenError(
 				'token_revoked',
 				`authTokenService.getDecryptedToken: ${provider} token is revoked.`,
+			);
+		}
+		if (row.status === 'expired') {
+			throw new AuthTokenError(
+				'token_expired',
+				`authTokenService.getDecryptedToken: ${provider} token is expired.`,
 			);
 		}
 		const bundle = await this.decryptOrThrow(row);

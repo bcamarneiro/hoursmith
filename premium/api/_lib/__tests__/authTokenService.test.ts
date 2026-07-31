@@ -34,6 +34,10 @@ import type {
 
 const SECRET = 'test-secret-12345';
 
+function assertNotNull<T>(value: T | null | undefined): asserts value is T {
+	if (value == null) throw new Error('test invariant violated: expected non-null');
+}
+
 const NOW_MS = Date.parse('2026-07-31T12:00:00.000Z');
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
@@ -438,14 +442,45 @@ describe('authTokenService.saveToken', () => {
 		).rejects.toThrow(AuthTokenError);
 	});
 
+	it('rejects non-string refreshToken', async () => {
+		const { svc } = service();
+		await expect(
+			svc.saveToken('usr_1', 'jira_api', {
+				accessToken: 'at',
+				refreshToken: 42 as never,
+			}),
+		).rejects.toThrow(AuthTokenError);
+	});
+
+	it('rejects non-string tokenType', async () => {
+		const { svc } = service();
+		await expect(
+			svc.saveToken('usr_1', 'jira_api', {
+				accessToken: 'at',
+				tokenType: 1 as never,
+			}),
+		).rejects.toThrow(AuthTokenError);
+	});
+
+	it('rejects non-string scope', async () => {
+		const { svc } = service();
+		await expect(
+			svc.saveToken('usr_1', 'jira_api', {
+				accessToken: 'at',
+				scope: true as never,
+			}),
+		).rejects.toThrow(AuthTokenError);
+	});
+
 	it('upsert overwrites an existing token for the same provider', async () => {
 		const { svc, storage } = service();
 		await svc.saveToken('usr_1', 'jira_api', { accessToken: 'first' });
 		await svc.saveToken('usr_1', 'jira_api', { accessToken: 'second' });
 		const rows = storage.rows.get('usr_1:jira_api');
 		expect(rows).toBeDefined();
+		assertNotNull(rows);
 		const parsed = parseBundle(
-			await fastCipher().decrypt(rows!.encrypted_value),
+			await fastCipher().decrypt(rows.encrypted_value),
 		);
 		expect(parsed.accessToken).toBe('second');
 	});
@@ -460,9 +495,10 @@ describe('authTokenService.getDecryptedToken', () => {
 		});
 		const out = await svc.getDecryptedToken('usr_1', 'jira_api');
 		expect(out).not.toBeNull();
-		expect(out!.accessToken).toBe('at-secret');
-		expect(out!.scope).toBe('read');
-		expect(out!.provider).toBe('jira_api');
+		assertNotNull(out);
+		expect(out.accessToken).toBe('at-secret');
+		expect(out.scope).toBe('read');
+		expect(out.provider).toBe('jira_api');
 	});
 
 	it('returns null when no token exists', async () => {
@@ -474,7 +510,10 @@ describe('authTokenService.getDecryptedToken', () => {
 		const { svc, storage } = service();
 		await storedRow(storage, 'jira_api');
 		await svc.getDecryptedToken('usr_1', 'jira_api');
-		expect(storage.rows.get('usr_1:jira_api')!.last_used_at).not.toBeNull();
+		const row = storage.rows.get('usr_1:jira_api');
+		expect(row).toBeDefined();
+		assertNotNull(row);
+		expect(row.last_used_at).not.toBeNull();
 	});
 
 	it('fails closed on revoked tokens', async () => {
@@ -482,6 +521,14 @@ describe('authTokenService.getDecryptedToken', () => {
 		await storedRow(storage, 'jira_api', {}, { status: 'revoked' });
 		await expect(svc.getDecryptedToken('usr_1', 'jira_api')).rejects.toThrow(
 			/revoked/,
+		);
+	});
+
+	it('fails closed on expired tokens', async () => {
+		const { svc, storage } = service();
+		await storedRow(storage, 'jira_api', {}, { status: 'expired' });
+		await expect(svc.getDecryptedToken('usr_1', 'jira_api')).rejects.toThrow(
+			/expired/,
 		);
 	});
 
@@ -603,10 +650,12 @@ describe('authTokenService.silentRefreshDecision', () => {
 			refreshToken: 'refresh-token',
 		});
 		const decision = await svc.silentRefreshDecision('usr_1', 'jira_api');
-		expect(decision!.state).toBe('expiring');
-		expect(decision!.shouldRefresh).toBe(true);
-		expect(decision!.canRefresh).toBe(true);
-		expect(decision!.shouldSilentlyRefresh).toBe(true);
+		expect(decision).not.toBeNull();
+		assertNotNull(decision);
+		expect(decision.state).toBe('expiring');
+		expect(decision.shouldRefresh).toBe(true);
+		expect(decision.canRefresh).toBe(true);
+		expect(decision.shouldSilentlyRefresh).toBe(true);
 	});
 
 	it('does not silently refresh a PAT without a refresh grant', async () => {
@@ -616,10 +665,12 @@ describe('authTokenService.silentRefreshDecision', () => {
 			refreshToken: null,
 		});
 		const decision = await svc.silentRefreshDecision('usr_1', 'gitlab');
-		expect(decision!.state).toBe('expiring');
-		expect(decision!.shouldRefresh).toBe(true);
-		expect(decision!.canRefresh).toBe(false);
-		expect(decision!.shouldSilentlyRefresh).toBe(false);
+		expect(decision).not.toBeNull();
+		assertNotNull(decision);
+		expect(decision.state).toBe('expiring');
+		expect(decision.shouldRefresh).toBe(true);
+		expect(decision.canRefresh).toBe(false);
+		expect(decision.shouldSilentlyRefresh).toBe(false);
 	});
 
 	it('never throws on unreadable or revoked tokens', async () => {
@@ -641,11 +692,15 @@ describe('authTokenService.silentRefreshDecision', () => {
 			),
 		);
 		const unreadable = await svc.silentRefreshDecision('usr_1', 'jira_api');
-		expect(unreadable!.state).toBe('unreadable');
-		expect(unreadable!.shouldSilentlyRefresh).toBe(false);
+		expect(unreadable).not.toBeNull();
+		assertNotNull(unreadable);
+		expect(unreadable.state).toBe('unreadable');
+		expect(unreadable.shouldSilentlyRefresh).toBe(false);
 		const revoked = await svc.silentRefreshDecision('usr_1', 'gitlab');
-		expect(revoked!.state).toBe('revoked');
-		expect(revoked!.shouldSilentlyRefresh).toBe(false);
+		expect(revoked).not.toBeNull();
+		assertNotNull(revoked);
+		expect(revoked.state).toBe('revoked');
+		expect(revoked.shouldSilentlyRefresh).toBe(false);
 	});
 
 	it('reports hard-expired tokens without a refresh trigger', async () => {
@@ -655,9 +710,11 @@ describe('authTokenService.silentRefreshDecision', () => {
 			refreshToken: 'refresh-token',
 		});
 		const decision = await svc.silentRefreshDecision('usr_1', 'jira_api');
-		expect(decision!.state).toBe('expired');
-		expect(decision!.shouldRefresh).toBe(false);
-		expect(decision!.shouldSilentlyRefresh).toBe(false);
+		expect(decision).not.toBeNull();
+		assertNotNull(decision);
+		expect(decision.state).toBe('expired');
+		expect(decision.shouldRefresh).toBe(false);
+		expect(decision.shouldSilentlyRefresh).toBe(false);
 	});
 });
 
@@ -670,7 +727,9 @@ describe('authTokenService.revokeToken / deleteToken', () => {
 		const { svc, storage } = service();
 		await storedRow(storage, 'jira_api');
 		const revoked = await svc.revokeToken('usr_1', 'jira_api');
-		expect(revoked!.status).toBe('revoked');
+		expect(revoked).not.toBeNull();
+		assertNotNull(revoked);
+		expect(revoked.status).toBe('revoked');
 		expect(await svc.deleteToken('usr_1', 'jira_api')).toBe(true);
 		expect(await svc.deleteToken('usr_1', 'jira_api')).toBe(false);
 	});
