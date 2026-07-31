@@ -16,16 +16,15 @@
  */
 
 import { userIdFromToken } from './auth.js';
+import type {
+	SubscriptionStatus,
+	SubscriptionTier,
+} from './subscriptionLifecycle.js';
 
-export type SubscriptionStatus =
-	| 'active'
-	| 'past_due'
-	| 'canceled'
-	| 'incomplete'
-	| 'trialing'
-	| 'unpaid';
-
-export type SubscriptionTier = 'free' | 'premium';
+export type {
+	SubscriptionStatus,
+	SubscriptionTier,
+} from './subscriptionLifecycle.js';
 
 export interface Entitlement {
 	ok: true;

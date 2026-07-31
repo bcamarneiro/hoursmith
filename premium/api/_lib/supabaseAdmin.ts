@@ -11,6 +11,7 @@
  */
 
 import { userIdFromToken } from './auth.js';
+import type { SubscriptionStatus } from './subscriptionLifecycle.js';
 
 export interface ProfileRow {
 	id: string;
@@ -26,7 +27,7 @@ export interface SubscriptionRow {
 	stripe_customer_id: string;
 	stripe_subscription_id: string | null;
 	tier: string;
-	status: string;
+	status: SubscriptionStatus;
 	current_period_end: string | null;
 	updated_at: string;
 }
@@ -36,7 +37,7 @@ export interface SubscriptionUpsert {
 	stripe_customer_id: string;
 	stripe_subscription_id: string | null;
 	tier: 'free' | 'premium';
-	status: string;
+	status: SubscriptionStatus;
 	current_period_end: string | null;
 }
 

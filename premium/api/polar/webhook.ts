@@ -22,6 +22,8 @@
  * Access model: a subscription canceled with `cancel_at_period_end` keeps
  * `active` status until the period ends, when Polar fires `subscription.revoked`.
  * So only `revoked` downgrades the user to free — `canceled` leaves access on.
+ * The state enum / transition rules / guards live in
+ * `_lib/subscriptionLifecycle.ts` (ADA-740); this handler only applies them.
  *
  * Logging discipline: log event type, user_id, outcome. Never log raw body,
  * signature, or customer-facing PII.
@@ -30,6 +32,10 @@
  */
 
 import { verifyPolarWebhook } from '../_lib/polarClient.js';
+import {
+	isPolarSubscriptionEvent,
+	resolveLifecycleTransition,
+} from '../_lib/subscriptionLifecycle.js';
 import {
 	defaultSupabaseAdmin,
 	type SubscriptionUpsert,
@@ -178,7 +184,7 @@ export async function handlePolarWebhook(
 		return jsonResponse(500, { error: 'server_misconfigured' });
 	}
 
-	if (!event.type?.startsWith('subscription.')) {
+	if (!isPolarSubscriptionEvent(event.type)) {
 		logWebhook({
 			eventType: event.type,
 			userId: null,
@@ -261,7 +267,19 @@ async function handleSubscription(
 		return jsonResponse(200, { received: true });
 	}
 
-	const revoked = event.type === 'subscription.revoked';
+	const transition = resolveLifecycleTransition(event.type, data.status);
+	if (!transition) {
+		// Unreachable: handlePolarWebhook already rejected non-lifecycle
+		// events. Fail closed (ignore) rather than write nothing.
+		logWebhook({
+			eventType: event.type,
+			userId,
+			outcome: 'ignored_unknown_event',
+			status: 200,
+		});
+		return jsonResponse(200, { received: true });
+	}
+	const revoked = transition.tier === 'free';
 
 	// Product validation (ADA-453): a non-revoked event may only grant premium
 	// for a product we actually sell. Polar can deliver subscriptions for other
@@ -296,23 +314,14 @@ async function handleSubscription(
 	}
 
 	const customerId = data.customer_id ?? '';
-	const upsert: SubscriptionUpsert = revoked
-		? {
-				user_id: userId,
-				stripe_customer_id: customerId,
-				stripe_subscription_id: data.id,
-				tier: 'free',
-				status: 'canceled',
-				current_period_end: null,
-			}
-		: {
-				user_id: userId,
-				stripe_customer_id: customerId,
-				stripe_subscription_id: data.id,
-				tier: 'premium',
-				status: normaliseStatus(data.status),
-				current_period_end: data.current_period_end ?? null,
-			};
+	const upsert: SubscriptionUpsert = {
+		user_id: userId,
+		stripe_customer_id: customerId,
+		stripe_subscription_id: data.id,
+		tier: transition.tier,
+		status: transition.status,
+		current_period_end: revoked ? null : (data.current_period_end ?? null),
+	};
 
 	await supabase.upsertSubscription(upsert);
 	logWebhook({
@@ -363,23 +372,6 @@ function isKnownProduct(
 		(id): id is string => typeof id === 'string' && id.length > 0,
 	);
 	return known.includes(productId);
-}
-
-/** Clamp Polar's subscription status onto the values our DB CHECK accepts. */
-function normaliseStatus(status: string): SubscriptionUpsert['status'] {
-	switch (status) {
-		case 'active':
-		case 'past_due':
-		case 'canceled':
-		case 'incomplete':
-		case 'trialing':
-		case 'unpaid':
-			return status;
-		case 'incomplete_expired':
-			return 'canceled';
-		default:
-			return 'incomplete';
-	}
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
