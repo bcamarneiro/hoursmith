@@ -3,7 +3,6 @@ import type { RescueTimeDaySummary, WorklogSuggestion } from '../../../types/Sug
 import {
 	fetchProviderTransformations,
 	type ProviderError,
-	type ProviderTransformationResult,
 } from '../providerTransformationService';
 
 // --------------- helpers ---------------
