@@ -90,7 +90,10 @@ describe('findMatchedUsers', () => {
 	const assignments = [
 		{ pattern: 'Bruno C', userEmails: ['bruno@example.com'] },
 		{ pattern: 'Daniel D', userEmails: ['daniel@example.com'] },
-		{ pattern: 'Team All', userEmails: ['alice@example.com', 'bob@example.com'] },
+		{
+			pattern: 'Team All',
+			userEmails: ['alice@example.com', 'bob@example.com'],
+		},
 	];
 
 	it('matches a single user by pattern', () => {
@@ -108,9 +111,9 @@ describe('findMatchedUsers', () => {
 	});
 
 	it('returns empty array when no pattern matches', () => {
-		expect(
-			findMatchedUsers('Unrelated Event - Training', assignments),
-		).toEqual([]);
+		expect(findMatchedUsers('Unrelated Event - Training', assignments)).toEqual(
+			[],
+		);
 	});
 
 	it('is case-insensitive', () => {
@@ -163,12 +166,7 @@ describe('matchEventToUsers', () => {
 	});
 
 	it('returns empty when current user email is empty', () => {
-		const result = matchEventToUsers(
-			'Anything',
-			'self',
-			assignments,
-			'',
-		);
+		const result = matchEventToUsers('Anything', 'self', assignments, '');
 		expect(result.size).toBe(0);
 	});
 
@@ -205,7 +203,10 @@ describe('matchEventToUsers', () => {
 
 	it('matches multiple users via shared pattern', () => {
 		const teamAssignments = [
-			{ pattern: 'Team Standup', userEmails: ['alice@example.com', 'bob@example.com'] },
+			{
+				pattern: 'Team Standup',
+				userEmails: ['alice@example.com', 'bob@example.com'],
+			},
 		];
 		const result = matchEventToUsers(
 			'Team Standup - Daily',
@@ -260,13 +261,10 @@ describe('matchHolidayEvent', () => {
 	});
 
 	it('does not duplicate the same reason for the same user', () => {
-		const result = matchHolidayEvent(
-			'Lisbon Day',
-			[
-				{ pattern: 'Lisbon', userEmails: ['alice@example.com'] },
-				{ pattern: 'Day', userEmails: ['alice@example.com'] },
-			],
-		);
+		const result = matchHolidayEvent('Lisbon Day', [
+			{ pattern: 'Lisbon', userEmails: ['alice@example.com'] },
+			{ pattern: 'Day', userEmails: ['alice@example.com'] },
+		]);
 		const reasons = result.regional.get('alice@example.com');
 		expect(reasons).toHaveLength(1); // Deduplicated
 	});
@@ -288,27 +286,18 @@ describe('collectHolidayRecipients', () => {
 	});
 
 	it('adds current user even when known users is empty', () => {
-		const result = collectHolidayRecipients(
-			new Set(),
-			'solo@example.com',
-		);
+		const result = collectHolidayRecipients(new Set(), 'solo@example.com');
 		expect(result.size).toBe(1);
 		expect(result.has('solo@example.com')).toBe(true);
 	});
 
 	it('lowercases the current user email', () => {
-		const result = collectHolidayRecipients(
-			new Set(),
-			'Solo@Example.com',
-		);
+		const result = collectHolidayRecipients(new Set(), 'Solo@Example.com');
 		expect(result.has('solo@example.com')).toBe(true);
 	});
 
 	it('does not add an empty-string current user', () => {
-		const result = collectHolidayRecipients(
-			new Set(['alice@example.com']),
-			'',
-		);
+		const result = collectHolidayRecipients(new Set(['alice@example.com']), '');
 		expect(result.size).toBe(1);
 	});
 });

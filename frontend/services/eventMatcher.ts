@@ -44,7 +44,10 @@ export interface HolidayMatchResult {
 
 // --- Constants ---
 
-const VALID_ABSENCE_TYPES = new Set<CalendarFeed['type']>(['absence', 'holiday']);
+const VALID_ABSENCE_TYPES = new Set<CalendarFeed['type']>([
+	'absence',
+	'holiday',
+]);
 
 // --- Normalisation ---
 

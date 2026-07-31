@@ -96,9 +96,7 @@ describe('mapDatesToAbsenceRecords', () => {
 			'Team time off',
 		);
 
-		expect(records[0].reason).toBe(
-			'[Team time off] Bruno C - Vacation',
-		);
+		expect(records[0].reason).toBe('[Team time off] Bruno C - Vacation');
 	});
 
 	it('includes provider_id when provided', () => {
@@ -230,7 +228,9 @@ describe('mapHolidayDatesToRecords', () => {
 		// bob → Lisbon Day (regional) + Labour Day (nationwide) = 2
 		expect(records).toHaveLength(4);
 
-		const aliceRecords = records.filter((r) => r.user_id === 'alice@example.com');
+		const aliceRecords = records.filter(
+			(r) => r.user_id === 'alice@example.com',
+		);
 		const bobRecords = records.filter((r) => r.user_id === 'bob@example.com');
 
 		expect(aliceRecords).toHaveLength(2);
@@ -281,7 +281,13 @@ describe('mapDatesAndPublish', () => {
 	it('is fail-safe when mapping produces nothing: no records, no sink call', async () => {
 		const sink = vi.fn<AbsencePublishSink>(async () => {});
 
-		const result = await mapDatesAndPublish([], new Set(), undefined, undefined, sink);
+		const result = await mapDatesAndPublish(
+			[],
+			new Set(),
+			undefined,
+			undefined,
+			sink,
+		);
 
 		expect(sink).not.toHaveBeenCalled();
 		expect(result).toEqual({

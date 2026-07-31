@@ -6,7 +6,9 @@ import {
 } from '../absencePublisher';
 import type { UserAbsenceUpsert } from '../absences';
 
-const record = (overrides: Partial<UserAbsenceUpsert> = {}): UserAbsenceUpsert => ({
+const record = (
+	overrides: Partial<UserAbsenceUpsert> = {},
+): UserAbsenceUpsert => ({
 	user_id: 'bruno@example.com',
 	provider_id: null,
 	absence_date: '2026-04-07',
@@ -114,12 +116,9 @@ describe('mapAndPublish', () => {
 	it('is fail-safe when mapping throws: logs, reports, and never publishes', async () => {
 		const sink = vi.fn<AbsencePublishSink>(async () => {});
 
-		const result = await mapAndPublish(
-			() => {
-				throw new Error('boom');
-			},
-			sink,
-		);
+		const result = await mapAndPublish(() => {
+			throw new Error('boom');
+		}, sink);
 
 		expect(sink).not.toHaveBeenCalled();
 		expect(result).toEqual({
