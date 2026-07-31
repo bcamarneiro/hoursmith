@@ -185,7 +185,7 @@ describe('fetchRecentActivity', () => {
 				author: { emailAddress: 'dev@example.com' },
 				items: [{ field: 'status' }],
 			} as unknown as JiraChangelogHistory,
-			// Missing `items`
+			// Empty `items` (not missing — items is [] but the guard still works)
 			history('2025-10-15T09:00:00.000+0000', 'dev@example.com', []),
 			// Non-array `items`
 			{

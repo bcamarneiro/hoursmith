@@ -335,6 +335,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 							corsProxy,
 							weekStart,
 							weekEnd,
+							email,
 						),
 						queryFn: ({ signal: s }) =>
 							fetchJiraActivitySuggestions(config, weekStart, weekEnd, s),

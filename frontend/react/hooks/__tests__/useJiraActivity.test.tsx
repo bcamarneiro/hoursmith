@@ -114,13 +114,14 @@ describe('useJiraActivity', () => {
 
 	it('builds a stable, configuration-aware query key', () => {
 		expect(
-			jiraActivityQueryKey('example.atlassian.net', '', WEEK_START, WEEK_END),
+			jiraActivityQueryKey('example.atlassian.net', '', WEEK_START, WEEK_END, 'dev@example.com'),
 		).toEqual([
 			'jiraActivity',
 			'example.atlassian.net',
 			'',
 			WEEK_START,
 			WEEK_END,
+			'dev@example.com',
 		]);
 	});
 });

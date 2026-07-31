@@ -10,8 +10,9 @@ export function jiraActivityQueryKey(
 	corsProxy: string,
 	weekStart: string,
 	weekEnd: string,
+	email: string,
 ) {
-	return ['jiraActivity', jiraHost, corsProxy, weekStart, weekEnd];
+	return ['jiraActivity', jiraHost, corsProxy, weekStart, weekEnd, email];
 }
 
 interface UseJiraActivityOptions {
@@ -38,8 +39,10 @@ export function useJiraActivity(
 	// Premium endpoint when entitled — ADA-273), matching the dashboard fetcher.
 	const corsProxy = useEffectiveProxyUrl();
 
+	const email = config.email;
+
 	return useQuery<JiraActivityItem[]>({
-		queryKey: jiraActivityQueryKey(jiraHost, corsProxy, weekStart, weekEnd),
+		queryKey: jiraActivityQueryKey(jiraHost, corsProxy, weekStart, weekEnd, email),
 		queryFn: ({ signal }) =>
 			fetchRecentActivity({ ...config, corsProxy }, weekStart, weekEnd, signal),
 		enabled: (options?.enabled ?? true) && !!jiraHost && !!apiToken,
