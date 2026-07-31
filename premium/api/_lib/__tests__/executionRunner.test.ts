@@ -7,7 +7,7 @@
  * result-vs-payload consistency gates.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ExecutionPayloadError } from '../executionPayload.js';
 import {
@@ -15,6 +15,7 @@ import {
 	ExecutionRunnerError,
 	HANDLER_FAILED_ERROR_CODE,
 } from '../executionRunner.js';
+import { RetryPolicyError } from '../retryPolicy.js';
 import {
 	buildJobData,
 	type ExecutionResult,
@@ -221,7 +222,11 @@ describe('runJob — happy path', () => {
 				}) as unknown as ExecutionResult,
 		);
 
-		const result = await runner.runJob(buildJobData(reconcilePayload()));
+		const result = await runner.runJob(buildJobData(reconcilePayload()), {
+			// Retry is disabled: this test targets result pass-through, not the
+			// retry loop (which would re-run a retryable failure).
+			retry: false,
+		});
 
 		expect(result.status).toBe('failed');
 		if (result.status === 'failed') {
@@ -401,5 +406,219 @@ describe('runJob — result consistency gates', () => {
 		).rejects.toThrow(
 			/result for execution "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" but the job payload was/,
 		);
+	});
+});
+
+describe('runJob — retry policy (ADA-739)', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	const transientPolicy = {
+		maxAttempts: 3,
+		baseDelayMs: 100,
+		jitter: 'none' as const,
+	};
+
+	it('retries a handler that throws retryable errors, then succeeds', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi
+			.fn()
+			.mockRejectedValueOnce(new RetryPolicyError('upstream 503'))
+			.mockRejectedValueOnce(new RetryPolicyError('upstream 503'))
+			.mockResolvedValueOnce(reconcileResult() as unknown as ExecutionResult);
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()), {
+			retry: transientPolicy,
+		});
+
+		await vi.advanceTimersByTimeAsync(0);
+		expect(handler).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(100);
+		expect(handler).toHaveBeenCalledTimes(2);
+		await vi.advanceTimersByTimeAsync(200);
+		expect(handler).toHaveBeenCalledTimes(3);
+
+		await expect(promise).resolves.toMatchObject({ status: 'success' });
+	});
+
+	it('returns a structured failure result after exhausting retries', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi
+			.fn()
+			.mockRejectedValue(new RetryPolicyError('upstream 503'));
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()), {
+			retry: transientPolicy,
+		});
+
+		await vi.advanceTimersByTimeAsync(0);
+		expect(handler).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(handler).toHaveBeenCalledTimes(3);
+
+		await expect(promise).resolves.toMatchObject({
+			status: 'failed',
+			error: { code: HANDLER_FAILED_ERROR_CODE, retryable: true },
+		});
+	});
+
+	it('does not retry a permanent handler error and marks it non-retryable', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi
+			.fn()
+			.mockRejectedValue(
+				new RetryPolicyError('jira rejected', { retryable: false }),
+			);
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()), {
+			retry: transientPolicy,
+		});
+
+		await vi.advanceTimersByTimeAsync(10_000);
+
+		await expect(promise).resolves.toMatchObject({
+			status: 'failed',
+			error: { message: 'jira rejected', retryable: false },
+		});
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not retry plain handler errors (left to job-level retries)', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi.fn().mockRejectedValue(new Error('jira exploded'));
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()), {
+			retry: transientPolicy,
+		});
+
+		await vi.advanceTimersByTimeAsync(10_000);
+
+		await expect(promise).resolves.toMatchObject({
+			status: 'failed',
+			error: { retryable: true },
+		});
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
+	it('retries a returned failed result flagged retryable, then succeeds', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi
+			.fn()
+			.mockResolvedValueOnce(
+				reconcileResult({
+					status: 'failed',
+					failedAt: '2026-07-31T18:10:00Z',
+					error: {
+						code: 'JIRA_API_ERROR',
+						message: 'timeout',
+						retryable: true,
+					},
+				}) as unknown as ExecutionResult,
+			)
+			.mockResolvedValueOnce(reconcileResult() as unknown as ExecutionResult);
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()), {
+			retry: transientPolicy,
+		});
+
+		await vi.advanceTimersByTimeAsync(0);
+		expect(handler).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(100);
+		expect(handler).toHaveBeenCalledTimes(2);
+
+		await expect(promise).resolves.toMatchObject({ status: 'success' });
+	});
+
+	it('does not retry a returned failed result flagged non-retryable', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi.fn().mockResolvedValue(
+			reconcileResult({
+				status: 'failed',
+				failedAt: '2026-07-31T18:10:00Z',
+				error: {
+					code: 'JIRA_API_ERROR',
+					message: 'jira rejected',
+					retryable: false,
+				},
+			}) as unknown as ExecutionResult,
+		);
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()), {
+			retry: transientPolicy,
+		});
+
+		await vi.advanceTimersByTimeAsync(10_000);
+
+		await expect(promise).resolves.toMatchObject({
+			status: 'failed',
+			error: { code: 'JIRA_API_ERROR', retryable: false },
+		});
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
+	it('honors a custom maxAttempts', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi
+			.fn()
+			.mockRejectedValue(new RetryPolicyError('upstream 503'));
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()), {
+			retry: { maxAttempts: 2, baseDelayMs: 100, jitter: 'none' },
+		});
+
+		await vi.advanceTimersByTimeAsync(10_000);
+
+		await expect(promise).resolves.toMatchObject({ status: 'failed' });
+		expect(handler).toHaveBeenCalledTimes(2);
+	});
+
+	it('disables in-process retries when retry is false', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi.fn().mockResolvedValue(
+			reconcileResult({
+				status: 'failed',
+				failedAt: '2026-07-31T18:10:00Z',
+				error: { code: 'JIRA_API_ERROR', message: 'timeout', retryable: true },
+			}) as unknown as ExecutionResult,
+		);
+		runner.registerHandler('reconcile', handler);
+
+		const result = await runner.runJob(buildJobData(reconcilePayload()), {
+			retry: false,
+		});
+
+		expect(result.status).toBe('failed');
+		expect(handler).toHaveBeenCalledTimes(1);
+	});
+
+	it('applies the default policy when no options are passed', async () => {
+		const runner = new ExecutionRunner();
+		const handler = vi
+			.fn()
+			.mockRejectedValue(new RetryPolicyError('upstream 503'));
+		runner.registerHandler('reconcile', handler);
+
+		const promise = runner.runJob(buildJobData(reconcilePayload()));
+
+		await vi.advanceTimersByTimeAsync(0);
+		expect(handler).toHaveBeenCalledTimes(1);
+		await vi.advanceTimersByTimeAsync(10_000);
+		expect(handler).toHaveBeenCalledTimes(3);
+
+		await expect(promise).resolves.toMatchObject({
+			status: 'failed',
+			error: { retryable: true },
+		});
 	});
 });

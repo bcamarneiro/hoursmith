@@ -15,9 +15,17 @@
  *   4. Await the handler. An unexpected throw inside a handler is *not* a
  *      crash: it becomes a structured `failed` result (`code: HANDLER_FAILED`)
  *      so the pipeline always observes a valid execution outcome.
- *   5. `parseExecutionResult` — reject a handler result that breaks the wire
+ *   5. Transient (retryable) failures are re-run in-process with exponential
+ *      backoff per the retry policy (`retryPolicy.ts`, ADA-739) before the
+ *      failure result is returned. Retryable means: a handler `throw`s a
+ *      `RetryPolicyError` with `retryable: true` (e.g. upstream 5xx), the
+ *      handler `throw`s a network `TypeError`, or the handler *returns* a
+ *      `failed` result carrying `error.retryable: true`. Permanent failures
+ *      (a `RetryPolicyError` with `retryable: false`, or a returned failure
+ *      with `error.retryable: false`) are returned immediately.
+ *   6. `parseExecutionResult` — reject a handler result that breaks the wire
  *      contract (unknown fields dropped, per-kind success payload enforced).
- *   6. Consistency gates — the result must carry the same `kind` and the same
+ *   7. Consistency gates — the result must carry the same `kind` and the same
  *      `executionId` as the payload that produced it; a mismatch is a handler
  *      bug and surfaces loudly.
  *
@@ -35,6 +43,14 @@ import {
 	type ExecutionPayload,
 	parseExecutionPayload,
 } from './executionPayload.js';
+import {
+	calculateBackoffDelayMs,
+	DEFAULT_RETRY_POLICY,
+	isRetryableError,
+	type RetryPolicy,
+	RetryPolicyError,
+	resolveRetryPolicy,
+} from './retryPolicy.js';
 import {
 	type ExecutionFailure,
 	type ExecutionKind,
@@ -129,8 +145,17 @@ export class ExecutionRunner {
 	 * dispatch, and result validation. Resolves with a normalized, validated
 	 * `ExecutionResult`; throws `WireFormatError`, `ExecutionPayloadError`, or
 	 * `ExecutionRunnerError` for producer/handler wiring bugs.
+	 *
+	 * Retryable handler failures are re-run in-process with exponential
+	 * backoff (see the class doc). Pass `retry: false` to disable in-process
+	 * retries, or a partial `RetryPolicy` to tune attempts/backoff. Note:
+	 * wire/parse/consistency errors still throw immediately — they are
+	 * producer bugs, not transient conditions.
 	 */
-	async runJob(rawJobData: unknown): Promise<ExecutionResult> {
+	async runJob(
+		rawJobData: unknown,
+		options: RunJobOptions = {},
+	): Promise<ExecutionResult> {
 		const job = parseJobData(rawJobData);
 		const payload = parseExecutionPayload(job.payload);
 
@@ -142,11 +167,36 @@ export class ExecutionRunner {
 			);
 		}
 
+		// `null` disables in-process retries; otherwise resolve + validate now
+		// so a bad policy fails fast instead of after the first attempt.
+		const policy =
+			options.retry === false ? null : resolveRetryPolicy(options.retry);
+
 		let rawResult: ExecutionResult;
-		try {
-			rawResult = await handler(payload);
-		} catch (error) {
-			return toFailureResult(payload, error);
+		let attempts = 0;
+		for (;;) {
+			try {
+				rawResult = await handler(payload);
+			} catch (error) {
+				if (policy === null || !isRetryableError(error, policy)) {
+					return toFailureResult(payload, error);
+				}
+				if (attempts >= policy.maxAttempts - 1) {
+					return toFailureResult(payload, error);
+				}
+				await delayBeforeRetry(attempts, policy, retryHintOf(error));
+				attempts += 1;
+				continue;
+			}
+			if (
+				policy === null ||
+				!isRetryableFailureResult(rawResult) ||
+				attempts >= policy.maxAttempts - 1
+			) {
+				break;
+			}
+			await delayBeforeRetry(attempts, policy, null);
+			attempts += 1;
 		}
 
 		let result: ExecutionResult;
@@ -164,7 +214,21 @@ export class ExecutionRunner {
 	}
 }
 
-/** Wrap an unexpected handler throw into a wire-format `failed` result. */
+/** Options for {@link ExecutionRunner.runJob}. */
+export interface RunJobOptions {
+	/**
+	 * Retry policy for transient handler failures. Defaults to
+	 * {@link DEFAULT_RETRY_POLICY}; pass `false` to disable in-process retries.
+	 */
+	retry?: Partial<RetryPolicy> | false;
+}
+
+/**
+ * Wrap an unexpected handler throw into a wire-format `failed` result. The
+ * `retryable` flag honors a thrown {@link RetryPolicyError} so handlers can
+ * mark permanent failures as such; plain errors stay `retryable: true` so the
+ * job scheduler keeps its existing re-run behavior.
+ */
 function toFailureResult(
 	payload: ExecutionPayload,
 	error: unknown,
@@ -178,9 +242,31 @@ function toFailureResult(
 		error: {
 			code: HANDLER_FAILED_ERROR_CODE,
 			message: message.slice(0, MAX_ERROR_MESSAGE_LENGTH),
-			retryable: true,
+			retryable: error instanceof RetryPolicyError ? error.retryable : true,
 		},
 	};
+}
+
+/** A returned failed result is retryable when it says so on the wire. */
+function isRetryableFailureResult(result: ExecutionResult): boolean {
+	return result.status === 'failed' && result.error.retryable === true;
+}
+
+/** Explicit retry delay from a thrown `RetryPolicyError`, if any. */
+function retryHintOf(error: unknown): number | null {
+	return error instanceof RetryPolicyError ? error.retryAfterMs : null;
+}
+
+/** Backoff sleep between attempts, computed from the policy. */
+function delayBeforeRetry(
+	attempts: number,
+	policy: RetryPolicy,
+	retryAfterMs: number | null,
+): Promise<void> {
+	const ms = calculateBackoffDelayMs(attempts, policy, retryAfterMs);
+	return new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 }
 
 /**
