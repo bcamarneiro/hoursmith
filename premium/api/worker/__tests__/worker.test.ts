@@ -99,7 +99,11 @@ describe('createWorker', () => {
 	});
 
 	it('defaults to one concurrent job', () => {
-		createWorker({ queueName: 'q', processor, env: { REDIS_URL: 'redis://cache' } });
+		createWorker({
+			queueName: 'q',
+			processor,
+			env: { REDIS_URL: 'redis://cache' },
+		});
 		expect(MockWorker).toHaveBeenCalledWith(
 			'q',
 			processor,

@@ -13,10 +13,7 @@ import * as path from 'node:path';
 import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-	loadWorkerProcessor,
-	parseRunWorkerArgs,
-} from '../runWorker.js';
+import { loadWorkerProcessor, parseRunWorkerArgs } from '../runWorker.js';
 
 const PROCESSOR_FIXTURE = path.join(
 	__dirname,
@@ -93,7 +90,12 @@ describe('parseRunWorkerArgs', () => {
 
 	it('rejects a non-positive concurrency', () => {
 		expect(() =>
-			parseRunWorkerArgs(['--processor', PROCESSOR_FIXTURE, '--concurrency', '0']),
+			parseRunWorkerArgs([
+				'--processor',
+				PROCESSOR_FIXTURE,
+				'--concurrency',
+				'0',
+			]),
 		).toThrow('exit(1)');
 	});
 

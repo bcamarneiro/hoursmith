@@ -24,7 +24,8 @@ export type WorkerLogFn = (
 
 /** Default log: `[worker]` prefix plus an optional JSON payload. */
 export const defaultWorkerLog: WorkerLogFn = (message, extra) => {
-	const suffix = extra && Object.keys(extra).length > 0 ? ` ${JSON.stringify(extra)}` : '';
+	const suffix =
+		extra && Object.keys(extra).length > 0 ? ` ${JSON.stringify(extra)}` : '';
 	console.log(`[worker] ${message}${suffix}`);
 };
 

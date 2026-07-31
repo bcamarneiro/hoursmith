@@ -6,7 +6,15 @@
  * The registered listeners are unregistered after each test.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import {
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+	type Mock,
+} from 'vitest';
 
 import type { WorkerLogFn } from '../worker.js';
 import { registerGracefulShutdown } from '../gracefulShutdown.js';
@@ -89,13 +97,20 @@ describe('registerGracefulShutdown', () => {
 		const drain = vi.fn().mockReturnValue(new Promise(() => {}));
 		const exited = waitForExit(exit);
 
-		unregister = registerGracefulShutdown({ drain, timeoutMs: 1_000, exit, log });
+		unregister = registerGracefulShutdown({
+			drain,
+			timeoutMs: 1_000,
+			exit,
+			log,
+		});
 
 		process.emit('SIGTERM');
 		await vi.advanceTimersByTimeAsync(1_001);
 
 		expect(exit).toHaveBeenCalledWith(1);
-		expect(log).toHaveBeenCalledWith('drain timed out after 1000ms; forcing exit');
+		expect(log).toHaveBeenCalledWith(
+			'drain timed out after 1000ms; forcing exit',
+		);
 		await exited;
 	});
 
@@ -105,7 +120,12 @@ describe('registerGracefulShutdown', () => {
 		const drain = vi.fn().mockReturnValue(new Promise(() => {}));
 		const exited = waitForExit(exit);
 
-		unregister = registerGracefulShutdown({ drain, timeoutMs: 30_000, exit, log });
+		unregister = registerGracefulShutdown({
+			drain,
+			timeoutMs: 30_000,
+			exit,
+			log,
+		});
 
 		process.emit('SIGTERM');
 		process.emit('SIGTERM');
