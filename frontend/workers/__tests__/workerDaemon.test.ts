@@ -36,7 +36,9 @@ function latestMock(): MockWorkerInstance {
 beforeEach(() => {
 	mockInstances.length = 0;
 
-	MockWorkerCtor = vi.fn().mockImplementation(function (this: MockWorkerInstance) {
+	MockWorkerCtor = vi.fn().mockImplementation(function (
+		this: MockWorkerInstance,
+	) {
 		const instance = this;
 		instance.onmessage = null;
 		instance.onerror = null;
@@ -86,9 +88,7 @@ function sendErrorToWorker(message: string): void {
 	const inst = latestMock();
 	const handler = inst.onerror;
 	if (handler) {
-		handler(
-			new ErrorEvent('error', { message, error: new Error(message) }),
-		);
+		handler(new ErrorEvent('error', { message, error: new Error(message) }));
 	}
 }
 
@@ -166,7 +166,8 @@ describe('WorkerDaemon', () => {
 			});
 
 			// Simulate worker response.
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 			sendToWorker({
 				id: sentMsg.id,
 				type: 'response',
@@ -181,7 +182,8 @@ describe('WorkerDaemon', () => {
 			await daemon.start();
 
 			const promise = daemon.enqueue('boom');
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 			sendToWorker({
 				id: sentMsg.id,
 				type: 'response',
@@ -198,7 +200,8 @@ describe('WorkerDaemon', () => {
 			const promise = daemon.enqueue('auto-start');
 			await vi.waitFor(() => expect(daemon.getState()).toBe('busy'));
 
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 			sendToWorker({ id: sentMsg.id, type: 'response', payload: 'ok' });
 
 			await expect(promise).resolves.toBe('ok');
@@ -244,7 +247,8 @@ describe('WorkerDaemon', () => {
 			await daemon.start();
 
 			const p = daemon.enqueue('req');
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 
 			expect(daemon.getStatus().requestCount).toBe(1);
 
@@ -421,6 +425,20 @@ describe('WorkerDaemon', () => {
 			);
 		});
 
+		it('enqueue rejects when Worker construction throws', async () => {
+			MockWorkerCtor.mockImplementationOnce(() => {
+				throw new Error('Worker not supported');
+			});
+
+			const daemon = createDaemon({ errorBackoffMs: 50_000 });
+			// Don't call start() — enqueue should auto-start, which fails.
+			const promise = daemon.enqueue('after-failed-construction');
+
+			await expect(promise).rejects.toThrow(ServiceError);
+			await expect(promise).rejects.toThrow(/failed to construct worker/);
+			expect(daemon.getState()).toBe('error');
+		});
+
 		it('wraps Worker construction failure in ServiceError', async () => {
 			MockWorkerCtor.mockImplementationOnce(() => {
 				throw new Error('Worker not supported');
@@ -476,7 +494,8 @@ describe('WorkerDaemon', () => {
 			// without the reset). But now should still be alive.
 			await vi.advanceTimersByTimeAsync(8_000);
 
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 			sendToWorker({ id: sentMsg.id, type: 'response', payload: 'ok' });
 			await p;
 
@@ -490,7 +509,8 @@ describe('WorkerDaemon', () => {
 			const p = daemon.enqueue('req');
 			await vi.advanceTimersByTimeAsync(2_000);
 
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 			sendToWorker({ id: sentMsg.id, type: 'response', payload: 'ok' });
 			await p;
 
@@ -588,7 +608,8 @@ describe('WorkerDaemon', () => {
 
 			expect(MockWorkerCtor).toHaveBeenCalledTimes(2);
 
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 			sendToWorker({ id: sentMsg.id, type: 'response', payload: 'recovered' });
 			await p;
 
@@ -615,7 +636,8 @@ describe('WorkerDaemon', () => {
 			await daemon.start();
 
 			const p = daemon.enqueue('req');
-			const sentMsg = latestMock().postMessage.mock.calls[0][0] as DaemonMessage;
+			const sentMsg = latestMock().postMessage.mock
+				.calls[0][0] as DaemonMessage;
 
 			// First response resolves it.
 			sendToWorker({ id: sentMsg.id, type: 'response', payload: 'first' });
@@ -637,10 +659,16 @@ describe('WorkerDaemon', () => {
 
 			void daemon.start();
 			// It's now 'starting' — waiting for first heartbeat.
-			daemon.enqueue('during-start').catch(() => {});
+			const promise = daemon.enqueue('during-start');
 
 			daemon.stop();
 			expect(daemon.getState()).toBe('idle');
+
+			// The enqueued request must reject because the worker was stopped.
+			await expect(promise).rejects.toThrow(ServiceError);
+			await expect(promise).rejects.toThrow(
+				/terminating before request could be dispatched/,
+			);
 		});
 
 		it('does not restart when errorBackoffMs is 0', async () => {

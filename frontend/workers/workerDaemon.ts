@@ -67,11 +67,17 @@ export type DaemonState =
 export interface WorkerDaemonOptions {
 	/** Heartbeat interval in ms. Set to 0 to disable. Default 10 000 (10 s). */
 	heartbeatIntervalMs?: number;
-	/** Ms without a heartbeat response before declaring the worker dead. Default 30 000. */
+	/** Ms without a heartbeat response before declaring the worker dead. Default 30 000.
+	 * NOTE: Workers performing long synchronous work (blocking the event loop for
+	 * longer than this threshold) will be killed even if healthy. For such workers,
+	 * either disable heartbeats (set heartbeatIntervalMs to 0) or increase this
+	 * timeout to accommodate the worst-case synchronous task duration. */
 	heartbeatTimeoutMs?: number;
 	/** Ms of inactivity before terminating the worker. Set to 0 to disable. Default 30 000. */
 	idleTimeoutMs?: number;
-	/** Ms to wait before auto-restart after a crash. Default 2 000. */
+	/** Ms to wait before auto-restart after a crash. Default 2 000.
+	 * Uses a fixed delay (not exponential backoff) — set to 0 to disable
+	 * auto-restart entirely. */
 	errorBackoffMs?: number;
 	/** Human label used in error messages and logs. Default: "WorkerDaemon". */
 	label?: string;
@@ -80,8 +86,6 @@ export interface WorkerDaemonOptions {
 type PendingRequest<TRes = unknown> = {
 	resolve: (value: TRes) => void;
 	reject: (reason: unknown) => void;
-	/** setTimeout handle for per-request timeout, if active. */
-	timeoutId?: ReturnType<typeof setTimeout>;
 };
 
 // ---------------------------------------------------------------------------
@@ -148,8 +152,9 @@ export class WorkerDaemon<TReq = unknown, TRes = unknown> {
 
 	/**
 	 * Start (or restart) the worker. Safe to call multiple times — no-ops if
-	 * already starting or busy. Resolves when the first heartbeat is received
-	 * (or immediately if heartbeats are disabled).
+	 * already starting or busy. Resolves immediately after spawning the worker
+	 * and setting up heartbeat. The worker transitions to 'busy' when the
+	 * first heartbeat is received (or immediately if heartbeats are disabled).
 	 */
 	async start(): Promise<void> {
 		if (this.state === 'busy' || this.state === 'starting') {
@@ -166,6 +171,17 @@ export class WorkerDaemon<TReq = unknown, TRes = unknown> {
 				...this.workerOptions,
 			});
 		} catch (err) {
+			// Reject pending requests — the worker never started.
+			this.pending.forEach((pr) => {
+				pr.reject(
+					new ServiceError({
+						kind: 'network',
+						source: this.label,
+						message: `${this.label}: failed to construct worker — ${err instanceof Error ? err.message : String(err)}`,
+					}),
+				);
+			});
+			this.pending.clear();
 			this.setState('error');
 			this.emitError(this.wrapError('Failed to construct worker', err));
 			this.scheduleRestart();
@@ -223,7 +239,7 @@ export class WorkerDaemon<TReq = unknown, TRes = unknown> {
 
 	/**
 	 * Enqueue a request to the worker. Returns a promise that resolves with the
-	 * worker's response or rejects on error (crash, timeout, malformed message).
+	 * worker's response or rejects on error (crash, malformed message).
 	 *
 	 * If the daemon is idle (worker not running), it starts the worker first.
 	 */
@@ -251,6 +267,20 @@ export class WorkerDaemon<TReq = unknown, TRes = unknown> {
 								kind: 'network',
 								source: this.label,
 								message: `${this.label}: failed to start — worker error`,
+							}),
+						);
+					} else if (
+						status.state === 'terminating' ||
+						status.state === 'idle'
+					) {
+						unsub();
+						// Worker was stopped or idled out before it could start.
+						this.rejectPending(
+							id,
+							new ServiceError({
+								kind: 'network',
+								source: this.label,
+								message: `${this.label}: worker ${status.state} before request could be dispatched`,
 							}),
 						);
 					}
@@ -313,7 +343,9 @@ export class WorkerDaemon<TReq = unknown, TRes = unknown> {
 		this.worker.postMessage(msg);
 	}
 
-	private onWorkerMessage = (evt: MessageEvent<DaemonMessage<TReq, TRes>>): void => {
+	private onWorkerMessage = (
+		evt: MessageEvent<DaemonMessage<TReq, TRes>>,
+	): void => {
 		const msg = evt.data;
 		if (!msg || typeof msg.id !== 'string' || typeof msg.type !== 'string') {
 			this.emitError(
