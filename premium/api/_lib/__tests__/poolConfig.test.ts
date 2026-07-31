@@ -15,13 +15,9 @@ import {
 
 describe('resolvePoolEnvName', () => {
 	it('maps NODE_ENV to the defaults table', () => {
-		expect(resolvePoolEnvName({ NODE_ENV: 'production' })).toBe(
-			'production',
-		);
+		expect(resolvePoolEnvName({ NODE_ENV: 'production' })).toBe('production');
 		expect(resolvePoolEnvName({ NODE_ENV: 'test' })).toBe('test');
-		expect(resolvePoolEnvName({ NODE_ENV: 'development' })).toBe(
-			'development',
-		);
+		expect(resolvePoolEnvName({ NODE_ENV: 'development' })).toBe('development');
 		expect(resolvePoolEnvName({})).toBe('development');
 	});
 });

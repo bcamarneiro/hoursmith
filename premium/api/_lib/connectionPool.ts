@@ -22,11 +22,7 @@
 
 import { Pool, type PoolClient, type PoolConfig } from 'pg';
 
-import {
-	type PoolEnv,
-	parsePoolSettings,
-	toPoolConfig,
-} from './poolConfig.js';
+import { type PoolEnv, parsePoolSettings, toPoolConfig } from './poolConfig.js';
 
 export type { PoolEnv };
 
@@ -100,9 +96,7 @@ export class PoolManager {
 	 * connection stays checked out for the shortest possible window, which
 	 * keeps the pool from exhausting `maxConnections` under load.
 	 */
-	async withClient<T>(
-		fn: (client: PoolClient) => Promise<T>,
-	): Promise<T> {
+	async withClient<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
 		const pool = this.ensureInitialized();
 		const client = await pool.connect();
 		try {

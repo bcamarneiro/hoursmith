@@ -22,18 +22,19 @@ import {
 
 const MockPool = vi.mocked(Pool);
 
-function makePool(overrides: {
-	query?: unknown;
-	end?: unknown;
-	on?: unknown;
-	connect?: unknown;
-} = {}) {
+function makePool(
+	overrides: {
+		query?: unknown;
+		end?: unknown;
+		on?: unknown;
+		connect?: unknown;
+	} = {},
+) {
 	const query = overrides.query ?? vi.fn().mockResolvedValue({ rows: [] });
 	const end = overrides.end ?? vi.fn().mockResolvedValue(undefined);
 	const on = overrides.on ?? vi.fn();
 	const connect =
-		overrides.connect ??
-		vi.fn().mockResolvedValue({ query, release: vi.fn() });
+		overrides.connect ?? vi.fn().mockResolvedValue({ query, release: vi.fn() });
 	return { query, end, on, connect } as unknown as Pool;
 }
 
@@ -105,9 +106,7 @@ describe('PoolManager max connections', () => {
 			env: testEnv({ NODE_ENV: 'production', PGPOOL_MAX: '12' }),
 		});
 		manager.ensureInitialized();
-		expect(MockPool).toHaveBeenCalledWith(
-			expect.objectContaining({ max: 12 }),
-		);
+		expect(MockPool).toHaveBeenCalledWith(expect.objectContaining({ max: 12 }));
 	});
 });
 
@@ -143,15 +142,13 @@ describe('PoolManager lifecycle: withClient', () => {
 	});
 
 	it('does not release a client that was never acquired when connect fails', async () => {
-		const connect = vi
-			.fn()
-			.mockRejectedValue(new Error('connection refused'));
+		const connect = vi.fn().mockRejectedValue(new Error('connection refused'));
 		MockPool.mockImplementation(() => makePool({ connect }) as unknown as Pool);
 		const manager = new PoolManager({ env: testEnv() });
 
-		await expect(
-			manager.withClient(async () => 'unreachable'),
-		).rejects.toThrow('connection refused');
+		await expect(manager.withClient(async () => 'unreachable')).rejects.toThrow(
+			'connection refused',
+		);
 	});
 });
 
@@ -171,7 +168,9 @@ describe('PoolManager lifecycle: health check', () => {
 	it('probes with SELECT 1 when health checks are enabled', async () => {
 		const query = vi.fn().mockResolvedValue({ rows: [] });
 		MockPool.mockImplementation(() => makePool({ query }) as unknown as Pool);
-		const manager = new PoolManager({ env: testEnv({ NODE_ENV: 'production' }) });
+		const manager = new PoolManager({
+			env: testEnv({ NODE_ENV: 'production' }),
+		});
 
 		const result = await manager.checkHealth();
 		expect(result.ok).toBe(true);
