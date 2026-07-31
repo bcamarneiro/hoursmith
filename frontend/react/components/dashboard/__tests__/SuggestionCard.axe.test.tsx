@@ -88,7 +88,9 @@ describe('SuggestionCard — axe scan (RecentActivity surface)', () => {
 	it('passes axe with the edit-worklog dialog open (portaled, not nested in the list)', async () => {
 		const { container } = renderSuggestionsList([makeSuggestion()]);
 		fireEvent.click(
-			screen.getByRole('button', { name: 'Edit and log suggestion for PROJ-123' }),
+			screen.getByRole('button', {
+				name: 'Edit and log suggestion for PROJ-123',
+			}),
 		);
 		// The dialog is portaled to <body>, so axe scans it from there.
 		const dialog = screen.getByRole('dialog', { name: 'Log Worklog' });

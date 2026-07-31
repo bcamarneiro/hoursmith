@@ -49,7 +49,9 @@ describe('SuggestionCard — accessibility', () => {
 			screen.getByRole('button', { name: 'Log 1h to PROJ-123' }),
 		).toBeTruthy();
 		expect(
-			screen.getByRole('button', { name: 'Edit and log suggestion for PROJ-123' }),
+			screen.getByRole('button', {
+				name: 'Edit and log suggestion for PROJ-123',
+			}),
 		).toBeTruthy();
 		expect(
 			screen.getByRole('button', { name: 'Dismiss suggestion for PROJ-123' }),
@@ -90,9 +92,7 @@ describe('SuggestionCard — accessibility', () => {
 	});
 
 	it('marks the logged checkmark as decorative so only the result is read', () => {
-		renderCard(
-			makeSuggestion({ logged: true, issueSummary: undefined }),
-		);
+		renderCard(makeSuggestion({ logged: true, issueSummary: undefined }));
 		const item = screen.getByRole('listitem');
 		expect(item).toHaveAttribute('aria-label', '1h logged to PROJ-123');
 		const checkmark = item.querySelector('span[aria-hidden="true"]');

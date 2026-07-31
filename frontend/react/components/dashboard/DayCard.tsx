@@ -396,10 +396,7 @@ export const DayCard = memo<Props>(function DayCard({
 					)}
 
 					{activeSuggestions.length > 0 && (
-						<ul
-							className={styles.suggestions}
-							aria-label="Suggestions"
-						>
+						<ul className={styles.suggestions} aria-label="Suggestions">
 							{activeSuggestions.map((s, i) => (
 								<SuggestionCard
 									key={s.id}
@@ -411,10 +408,7 @@ export const DayCard = memo<Props>(function DayCard({
 					)}
 
 					{loggedSuggestions.length > 0 && (
-						<ul
-							className={styles.suggestions}
-							aria-label="Logged suggestions"
-						>
+						<ul className={styles.suggestions} aria-label="Logged suggestions">
 							{loggedSuggestions.map((s) => (
 								<SuggestionCard key={s.id} suggestion={s} />
 							))}

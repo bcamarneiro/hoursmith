@@ -1,7 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { DaySummary, WorklogSuggestion } from '../../../../../types/Suggestion';
+import type {
+	DaySummary,
+	WorklogSuggestion,
+} from '../../../../../types/Suggestion';
 import { DayCard } from '../DayCard';
 
 // 2025-10-15 is a Wednesday and not "today" — so a complete day collapses by
@@ -56,7 +59,10 @@ describe('DayCard — closed-day collapse', () => {
 });
 
 describe('DayCard — suggestion list semantics (RecentActivity surface)', () => {
-	const suggestion = (id: string, overrides: Partial<WorklogSuggestion> = {}): WorklogSuggestion => ({
+	const suggestion = (
+		id: string,
+		overrides: Partial<WorklogSuggestion> = {},
+	): WorklogSuggestion => ({
 		id,
 		source: 'jira-activity',
 		issueKey: 'PROJ-123',

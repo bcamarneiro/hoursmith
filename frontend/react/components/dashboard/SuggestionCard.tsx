@@ -61,7 +61,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 	const [isReasonCollapsed, setIsReasonCollapsed] = useState(false);
 	const isLongReason = suggestion.reason.length > 80;
 	const canOpenIssue = !!jiraDomain && !!suggestion.issueKey;
-	const cardRef = useRef<HTMLDivElement>(null);
+	const cardRef = useRef<HTMLLIElement>(null);
 
 	// The dashboard's keyboard nav (useKeyboardShortcuts) moves a virtual focus
 	// between day cards and suggestion cards. Mirror that state into the DOM so
