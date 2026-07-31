@@ -10,9 +10,9 @@
 import { describe, expect, it } from 'vitest';
 import type { EncryptionKey } from '../encryptionService.js';
 import {
+	DEFAULT_AAD,
 	KeyRotationManager,
 	makeKeyRotationManager,
-	DEFAULT_AAD,
 } from '../keyRotationManager.js';
 
 const KEY_A: EncryptionKey = { id: 'v1', secret: 'secret-a-0123456789abcdef' };
@@ -42,9 +42,7 @@ describe('KeyRotationManager construction', () => {
 	});
 
 	it('rejects empty secrets', () => {
-		expect(() =>
-			manager([{ id: 'v1', secret: '' }]),
-		).toThrow(/empty secret/);
+		expect(() => manager([{ id: 'v1', secret: '' }])).toThrow(/empty secret/);
 	});
 
 	it('rejects invalid key ids', () => {
@@ -54,9 +52,9 @@ describe('KeyRotationManager construction', () => {
 	});
 
 	it('rejects an activeKeyId outside the ring', () => {
-		expect(() =>
-			manager([KEY_A, KEY_B], { activeKeyId: 'nope' }),
-		).toThrow(/activeKeyId "nope" is not in the key ring/);
+		expect(() => manager([KEY_A, KEY_B], { activeKeyId: 'nope' })).toThrow(
+			/activeKeyId "nope" is not in the key ring/,
+		);
 	});
 
 	it('defaults the active key to the first key', () => {
@@ -124,6 +122,7 @@ describe('selectActiveKey', () => {
 describe('generateKey', () => {
 	it('generates a fresh key and makes it active when the ring was empty', async () => {
 		const m = manager([KEY_A]);
+		m.switchContext('hoursmith:audit-logs:v1'); // fresh, empty ring
 		const id = m.generateKey();
 		expect(id).toMatch(/^k[0-9]+$/);
 		expect(m.activeKeyId).toBe(id);
@@ -259,12 +258,16 @@ describe('switchContext', () => {
 
 		const exportOld = await m.encrypt('export:old');
 		const rotated = m.rotate();
+		expect(rotated).toBe('k1');
+		expect(m.listKeyIds()).toEqual(['v2', 'k1']);
 		await expect(m.decrypt(exportOld)).resolves.toBe('export:old');
 
 		m.switchContext(DEFAULT_AAD);
 		expect(m.activeKeyId).toBe('v1');
 		expect(m.listKeyIds()).toEqual(['v1']);
-		expect(m.rotate()).toBe('k2'); // k1 counter is per-context
+		// The default generator scans only the current ring, so each context's
+		// counter restarts at k1 — ids are unique per context, not globally.
+		expect(m.rotate()).toBe('k1');
 	});
 
 	it('fresh contexts start empty and refuse crypto until a key exists', async () => {

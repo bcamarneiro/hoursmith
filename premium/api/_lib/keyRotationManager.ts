@@ -48,8 +48,8 @@
  */
 
 import {
-	EncryptionService,
 	type EncryptionKey,
+	EncryptionService,
 	type EncryptionServiceOptions,
 } from './encryptionService.js';
 
@@ -109,10 +109,7 @@ export class KeyRotationManager {
 	private currentAad: string;
 	private currentRing: Ring;
 
-	constructor(
-		keys: EncryptionKey[],
-		options: KeyRotationManagerOptions = {},
-	) {
+	constructor(keys: EncryptionKey[], options: KeyRotationManagerOptions = {}) {
 		this.iterations = options.iterations;
 		this.generateId = options.generateId ?? defaultGenerateId;
 
@@ -262,7 +259,9 @@ export class KeyRotationManager {
 		}
 		let ring = this.rings.get(aad);
 		if (ring === undefined) {
-			ring = buildRing(keys ?? [], undefined);
+			// Fresh contexts start empty — encryption stays refused (loudly)
+			// until generateKey()/selectActiveKey() supplies a key.
+			ring = buildRing(keys ?? [], undefined, true);
 			this.rings.set(aad, ring);
 		} else if (keys !== undefined) {
 			throw new Error(
@@ -349,8 +348,9 @@ export function makeKeyRotationManager(
 function buildRing(
 	keys: EncryptionKey[],
 	activeKeyId: string | undefined,
+	allowEmpty = false,
 ): Ring {
-	if (keys.length === 0) {
+	if (keys.length === 0 && !allowEmpty) {
 		throw new Error(
 			'keyRotationManager: at least one encryption key is required.',
 		);
@@ -364,9 +364,7 @@ function buildRing(
 			);
 		}
 		if (seen.has(key.id)) {
-			throw new Error(
-				`keyRotationManager: duplicate key id "${key.id}".`,
-			);
+			throw new Error(`keyRotationManager: duplicate key id "${key.id}".`);
 		}
 		if (typeof key.secret !== 'string' || key.secret.length === 0) {
 			throw new Error(
@@ -376,8 +374,9 @@ function buildRing(
 		seen.add(key.id);
 		secrets.set(key.id, key.secret);
 	}
-	let activeId = activeKeyId ?? keys[0].id;
-	if (!seen.has(activeId)) {
+	const activeId: string | null =
+		activeKeyId ?? (keys.length > 0 ? keys[0].id : null);
+	if (activeId !== null && !seen.has(activeId)) {
 		throw new Error(
 			`keyRotationManager: activeKeyId "${activeId}" is not in the key ring.`,
 		);
@@ -394,7 +393,10 @@ function buildService(
 	const keys: EncryptionKey[] = [...ring.secrets.entries()].map(
 		([id, secret]) => ({ id, secret }),
 	);
-	const options: EncryptionServiceOptions = { aad, activeKeyId: ring.activeId ?? undefined };
+	const options: EncryptionServiceOptions = {
+		aad,
+		activeKeyId: ring.activeId ?? undefined,
+	};
 	if (iterations !== undefined) options.iterations = iterations;
 	return new EncryptionService(keys, options);
 }
