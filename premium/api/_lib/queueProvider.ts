@@ -3,15 +3,18 @@
  *
  * Central place for queue names and queue construction so producers and
  * consumers agree on names, the Redis connection, and default job options.
- * The connection is resolved from env via `queueConnection.js`; nothing here
- * touches the network until a producer actually adds a job.
+ * The connection is resolved from env via `queueConnection.js`, which loads
+ * and validates the secrets-managed Redis config before any queue touches the
+ * network; job settings are resolved from `QUEUE_JOB_*` env vars via
+ * `queueConfig.js`. Nothing here touches the network until a producer
+ * actually adds a job.
  */
 
 import { Queue, type QueueOptions } from 'bullmq';
 
 import { parseQueueSettings } from './queueConfig.js';
 import { loadQueueConnectionConfig } from './queueConnection.js';
-import type { RedisEnv } from './redisConfig.js';
+import { type RedisEnv } from './redisConfig.js';
 
 /** Queue names shared by producers and consumers. */
 export const QUEUE_NAMES = {
