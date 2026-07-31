@@ -468,6 +468,7 @@
 .ri-dot.pending {
 	background: var(--line-strong);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: design asset — higher-specificity .rail-item.on .ri-t precedes us by design */
 .rail-item .ri-t {
 	font-weight: 600;
 	font-size: 14px;
@@ -613,10 +614,10 @@ textarea.inp {
 	margin-top: 7px;
 	line-height: 1.5;
 }
-.fg small code,
+.mono-inline,
 .fg-hint code,
 .sec-sub code,
-.mono-inline {
+.fg small code {
 	font-family: var(--p-num);
 	font-size: 0.9em;
 	background: #efe9dd;

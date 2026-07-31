@@ -195,9 +195,7 @@ export async function importKeyPairPem(
 	pem: KeyPairPem,
 ): Promise<CryptoKeyPair> {
 	if (!pem || typeof pem.algorithm !== 'string') {
-		throw new Error(
-			'keyCrypto.importKeyPairPem: invalid key pair descriptor.',
-		);
+		throw new Error('keyCrypto.importKeyPairPem: invalid key pair descriptor.');
 	}
 	const algorithm = pem.algorithm === 'ec' ? 'ec' : 'rsa';
 	const [privateKey, publicKey] = await Promise.all([
@@ -252,10 +250,12 @@ export async function importPublicKeyPem(
 }
 
 /** Import a public key from a public JWK (e.g. one produced by `exportPublicKeyJwk`). */
-export async function importPublicKeyJwk(
-	jwk: JsonWebKey,
-): Promise<CryptoKey> {
-	if (!jwk || typeof jwk !== 'object' || (jwk.kty !== 'RSA' && jwk.kty !== 'EC')) {
+export async function importPublicKeyJwk(jwk: JsonWebKey): Promise<CryptoKey> {
+	if (
+		!jwk ||
+		typeof jwk !== 'object' ||
+		(jwk.kty !== 'RSA' && jwk.kty !== 'EC')
+	) {
 		throw new Error(
 			'keyCrypto.importPublicKeyJwk: JWK must be an object with kty "RSA" or "EC".',
 		);
@@ -335,7 +335,9 @@ function keyAlgorithm(
 /** Map a `CryptoKey.algorithm` name back to the module's family name. */
 function algorithmOf(key: CryptoKey): KeyPairAlgorithm {
 	const name =
-		key.algorithm && typeof key.algorithm === 'object' && 'name' in key.algorithm
+		key.algorithm &&
+		typeof key.algorithm === 'object' &&
+		'name' in key.algorithm
 			? String(key.algorithm.name)
 			: '';
 	if (name === EC_KEY_ALGORITHM) return 'ec';
@@ -404,7 +406,10 @@ async function exportDer(
 	key: CryptoKey,
 ): Promise<ArrayBuffer> {
 	try {
-		return (await globalThis.crypto.subtle.exportKey(format, key)) as ArrayBuffer;
+		return (await globalThis.crypto.subtle.exportKey(
+			format,
+			key,
+		)) as ArrayBuffer;
 	} catch {
 		throw new Error(
 			'keyCrypto.exportKey: key is not extractable or is not exportable in this format.',

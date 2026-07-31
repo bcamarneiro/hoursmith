@@ -10,9 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	exportKeyPairPem,
-	exportPrivateKeyPem,
 	exportPublicKeyJwk,
-	exportPublicKeyPem,
 	generateKeyPair,
 	importKeyPairPem,
 	importPrivateKeyPem,
@@ -43,7 +41,12 @@ function verifyWith(
 		name === 'ECDSA'
 			? { name: 'ECDSA' as const, hash: 'SHA-256' as const }
 			: { name: 'RSA-PSS' as const, saltLength: 32 };
-	return globalThis.crypto.subtle.verify(params, pair.publicKey, signature, MESSAGE);
+	return globalThis.crypto.subtle.verify(
+		params,
+		pair.publicKey,
+		signature,
+		MESSAGE,
+	);
 }
 
 /** RFC 7638 §3.1 example key — the canonical RSA thumbprint test vector. */
@@ -86,9 +89,7 @@ describe('generateKeyPair', () => {
 			generateKeyPair({ algorithm: 'rsa' }),
 			generateKeyPair({ algorithm: 'rsa' }),
 		]);
-		expect(await publicKeyThumbprint(a)).not.toBe(
-			await publicKeyThumbprint(b),
-		);
+		expect(await publicKeyThumbprint(a)).not.toBe(await publicKeyThumbprint(b));
 	});
 
 	it('signs and verifies with its own keys (RSA-PSS)', async () => {
@@ -120,9 +121,7 @@ describe('PEM serialization', () => {
 		const pair = await generateKeyPair({ algorithm: 'rsa' });
 		const pem = await exportKeyPairPem(pair);
 		expect(pem.algorithm).toBe('rsa');
-		expect(pem.privateKeyPem).toMatch(
-			/^-----BEGIN PRIVATE KEY-----\n/,
-		);
+		expect(pem.privateKeyPem).toMatch(/^-----BEGIN PRIVATE KEY-----\n/);
 		expect(pem.privateKeyPem).toMatch(/\n-----END PRIVATE KEY-----\n$/);
 		expect(pem.publicKeyPem).toMatch(/^-----BEGIN PUBLIC KEY-----\n/);
 		expect(pem.publicKeyPem).toMatch(/\n-----END PUBLIC KEY-----\n$/);
@@ -164,9 +163,9 @@ describe('PEM serialization', () => {
 		const rsaPem = await exportKeyPairPem(
 			await generateKeyPair({ algorithm: 'rsa' }),
 		);
-		await expect(importPrivateKeyPem(rsaPem.privateKeyPem, 'ec')).rejects.toThrow(
-			/keyCrypto.importPrivateKeyPem: could not import/,
-		);
+		await expect(
+			importPrivateKeyPem(rsaPem.privateKeyPem, 'ec'),
+		).rejects.toThrow(/keyCrypto.importPrivateKeyPem: could not import/);
 		await expect(importPublicKeyPem(rsaPem.publicKeyPem, 'ec')).rejects.toThrow(
 			/keyCrypto.importPublicKeyPem: could not import/,
 		);
@@ -180,7 +179,10 @@ describe('PEM serialization', () => {
 			/keyCrypto.importPublicKeyPem: PEM is missing the "-----BEGIN PUBLIC KEY-----" header/,
 		);
 		await expect(
-			importPublicKeyPem('-----BEGIN PUBLIC KEY-----\n\n-----END PUBLIC KEY-----\n', 'rsa'),
+			importPublicKeyPem(
+				'-----BEGIN PUBLIC KEY-----\n\n-----END PUBLIC KEY-----\n',
+				'rsa',
+			),
 		).rejects.toThrow(/keyCrypto: PEM is empty/);
 	});
 
