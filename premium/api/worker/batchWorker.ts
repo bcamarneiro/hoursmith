@@ -112,7 +112,9 @@ export function createBatchWorker<Payload, Result = void>(
 		);
 	}
 
-	async function drainOnce(batch: Array<Job<Payload>>): Promise<BatchResult<Result>> {
+	async function drainOnce(
+		batch: Array<Job<Payload>>,
+	): Promise<BatchResult<Result>> {
 		const startedAt = Date.now();
 		const perJob = new Map<string, { result?: Result; error?: Error }>();
 		const errors: Array<{ jobId: string; error: Error }> = [];

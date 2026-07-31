@@ -276,7 +276,9 @@ export function describeServiceError(error: unknown): ServiceErrorCopy {
 						action: settings,
 					};
 				}
-				return { message: error.message || 'Something went wrong. Please try again.' };
+				return {
+					message: error.message || 'Something went wrong. Please try again.',
+				};
 		}
 
 		return { message: error.message };

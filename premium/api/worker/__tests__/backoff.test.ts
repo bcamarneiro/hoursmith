@@ -54,9 +54,9 @@ describe('withRetries', () => {
 
 	it('returns the result on the first attempt', async () => {
 		const fn = vi.fn().mockResolvedValue('ok');
-		await expect(withRetries(fn, { attempts: 3, backoff: BACKOFF })).resolves.toBe(
-			'ok',
-		);
+		await expect(
+			withRetries(fn, { attempts: 3, backoff: BACKOFF }),
+		).resolves.toBe('ok');
 		expect(fn).toHaveBeenCalledTimes(1);
 	});
 
@@ -105,9 +105,7 @@ describe('withRetries', () => {
 	});
 
 	it('does not retry non-retryable failures', async () => {
-		const fn = vi
-			.fn()
-			.mockRejectedValue(new Error('nope'));
+		const fn = vi.fn().mockRejectedValue(new Error('nope'));
 		await expect(
 			withRetries(fn, {
 				attempts: 5,

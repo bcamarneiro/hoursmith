@@ -188,7 +188,10 @@ async function main(): Promise<void> {
 	if (!options.processor) {
 		fail('--processor is required.');
 	}
-	if (options.connectionBackoff.maxDelayMs < options.connectionBackoff.initialDelayMs) {
+	if (
+		options.connectionBackoff.maxDelayMs <
+		options.connectionBackoff.initialDelayMs
+	) {
 		fail('--connection-max-delay-ms must be >= --connection-initial-delay-ms.');
 	}
 
@@ -205,22 +208,25 @@ async function main(): Promise<void> {
 			const suffix = extra ? ` ${JSON.stringify(extra)}` : '';
 			console.log(`[worker] ${message}${suffix}`);
 		},
-		onBatchComplete:
-			options.once
-				? async (batch) => {
-						console.log(
-							`[cli] drained batch (${batch.succeeded} ok, ${batch.failed} failed); checking for more…`,
-						);
-						const counts = await queue.getJobCounts('waiting', 'active', 'delayed');
-						if (counts.waiting + counts.active + counts.delayed === 0) {
-							console.log('[cli] queue empty; exiting (--once).');
-							// Do not await here: stop() waits for the loop, which is
-							// currently inside this callback. Fire-and-forget lets the
-							// current iteration finish and the loop observe `stopped`.
-							void worker.stop();
-						}
-				  }
-				: undefined,
+		onBatchComplete: options.once
+			? async (batch) => {
+					console.log(
+						`[cli] drained batch (${batch.succeeded} ok, ${batch.failed} failed); checking for more…`,
+					);
+					const counts = await queue.getJobCounts(
+						'waiting',
+						'active',
+						'delayed',
+					);
+					if (counts.waiting + counts.active + counts.delayed === 0) {
+						console.log('[cli] queue empty; exiting (--once).');
+						// Do not await here: stop() waits for the loop, which is
+						// currently inside this callback. Fire-and-forget lets the
+						// current iteration finish and the loop observe `stopped`.
+						void worker.stop();
+					}
+				}
+			: undefined,
 	});
 
 	let shuttingDown = false;
