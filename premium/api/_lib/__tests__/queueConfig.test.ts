@@ -8,10 +8,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-	QueueConfigError,
+	parseQueueSettings,
 	QUEUE_SETTINGS_DEFAULTS,
 	QUEUE_SETTINGS_SCHEMA,
-	parseQueueSettings,
+	QueueConfigError,
 	type QueueSettings,
 } from '../queueConfig.js';
 

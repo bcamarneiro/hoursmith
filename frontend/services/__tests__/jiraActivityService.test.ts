@@ -16,8 +16,8 @@ import type {
 import {
 	fetchJiraActivitySuggestions,
 	fetchRecentActivity,
-	jiraActivityItemsToSuggestions,
 	JIRA_KEY_RE,
+	jiraActivityItemsToSuggestions,
 } from '../jiraActivityService';
 import { fetchSearchPage } from '../jiraSearch';
 

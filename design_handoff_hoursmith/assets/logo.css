@@ -295,6 +295,7 @@
 	letter-spacing: -0.025em;
 	color: var(--paper);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: design handoff — intentional cascade */
 .wm-rev .s {
 	color: var(--spark, #ee6b2d);
 }

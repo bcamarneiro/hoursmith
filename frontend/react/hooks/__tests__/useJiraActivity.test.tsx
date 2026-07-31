@@ -8,8 +8,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchRecentActivity } from '../../../services/jiraActivityService';
-import { useConfigStore } from '../../../stores/useConfigStore';
 import type { Config } from '../../../stores/useConfigStore';
+import { useConfigStore } from '../../../stores/useConfigStore';
 import type { JiraActivityItem } from '../../../types/activity';
 import { jiraActivityQueryKey, useJiraActivity } from '../useJiraActivity';
 

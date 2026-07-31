@@ -412,6 +412,7 @@
 	border-radius: 2px;
 	box-shadow: 0 0 0 3px var(--d-paper);
 }
+/* biome-ignore lint/suspicious/noEmptyBlock: design handoff — placeholder block preserved */
 .dir.forge .app-hero {
 }
 .dir.forge .app-hero .eb {
