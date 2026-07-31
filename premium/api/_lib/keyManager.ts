@@ -243,10 +243,7 @@ export class KeyManager {
 	// Internals
 	// -----------------------------------------------------------------------
 
-	private makeCipher(
-		secret: string,
-		version: number,
-	): AesCipher {
+	private makeCipher(secret: string, version: number): AesCipher {
 		const options: AesCipherOptions = {
 			aad: `${this.baseAad}:key-${version}`,
 			subtle: this.subtle,

@@ -86,9 +86,9 @@ describe('keyManager', () => {
 
 	it('decrypts across instances sharing the same material and ordering', async () => {
 		const payload = await fastManager([KEY_1, KEY_2]).encrypt('cross-instance');
-		await expect(
-			fastManager([KEY_1, KEY_2]).decrypt(payload),
-		).resolves.toBe('cross-instance');
+		await expect(fastManager([KEY_1, KEY_2]).decrypt(payload)).resolves.toBe(
+			'cross-instance',
+		);
 	});
 
 	it('resumes the grace period after a restart that lists rotated secrets', async () => {
