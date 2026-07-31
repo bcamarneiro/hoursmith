@@ -138,6 +138,52 @@ describe('oauthTokenStorage', () => {
 		).rejects.toThrow('oauthTokenStorage.upsertToken failed: 500');
 	});
 
+	it('upsertToken omits undefined optional fields from the request body', async () => {
+		let capturedBody: Record<string, unknown> = {};
+		stubFetch((_input, init) => {
+			capturedBody = JSON.parse(init?.body as string);
+			return Response.json([fakeToken()], { status: 201 });
+		});
+		const store = tokenStore();
+
+		await store.upsertToken('usr_1', {
+			provider: 'jira_oauth',
+			encrypted_access_token: 'aes256gcm:newval',
+		});
+
+		// Omitted optional fields must NOT appear in the body.
+		expect(capturedBody).not.toHaveProperty('encrypted_refresh_token');
+		expect(capturedBody).not.toHaveProperty('expires_at');
+		expect(capturedBody).not.toHaveProperty('token_type');
+		expect(capturedBody).not.toHaveProperty('scope');
+		expect(capturedBody).not.toHaveProperty('label');
+		// Required fields always present.
+		expect(capturedBody.encrypted_access_token).toBe('aes256gcm:newval');
+		expect(capturedBody.status).toBe('active');
+	});
+
+	it('upsertToken includes explicitly null optional fields', async () => {
+		let capturedBody: Record<string, unknown> = {};
+		stubFetch((_input, init) => {
+			capturedBody = JSON.parse(init?.body as string);
+			return Response.json(
+				[fakeToken({ encrypted_refresh_token: null, expires_at: null })],
+				{ status: 201 },
+			);
+		});
+		const store = tokenStore();
+
+		await store.upsertToken('usr_1', {
+			provider: 'jira_oauth',
+			encrypted_access_token: 'aes256gcm:newval',
+			encrypted_refresh_token: null,
+			expires_at: null,
+		});
+
+		expect(capturedBody.encrypted_refresh_token).toBeNull();
+		expect(capturedBody.expires_at).toBeNull();
+	});
+
 	// -----------------------------------------------------------------------
 	// getToken
 	// -----------------------------------------------------------------------
@@ -166,6 +212,14 @@ describe('oauthTokenStorage', () => {
 
 		const result = await store.getToken('usr_2', 'jira_oauth');
 		expect(result?.user_id).toBe('usr_2');
+	});
+
+	it('getToken throws on non-ok response', async () => {
+		stubFetch(() => new Response(null, { status: 500 }));
+		const store = tokenStore();
+		await expect(store.getToken('usr_1', 'jira_oauth')).rejects.toThrow(
+			'oauthTokenStorage.getToken failed: 500',
+		);
 	});
 
 	// -----------------------------------------------------------------------

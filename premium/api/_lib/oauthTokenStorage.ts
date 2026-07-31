@@ -1,11 +1,11 @@
 /**
- * Server-side encrypted OAuth token storage for Hoursmith Premium (ADA-680).
+ * Server-side OAuth token storage for Hoursmith Premium (ADA-680).
  *
- * Stores encrypted OAuth credentials (access token, refresh token, expiry)
+ * Stores OAuth credentials (access token, refresh token, expiry)
  * in the `oauth_tokens` table so server-side integrations can refresh and use
  * them without plaintext ever landing in a browser context.
- * Tokens are encrypted at rest; this module only handles the encrypted
- * payload — encryption/decryption is a separate concern.
+ * Column names are prefixed with encrypted_ to indicate intent;
+ * encryption/decryption is a separate concern.
  *
  * Dependency-free `fetch` wrapper following the same pattern as
  * `tokenStorage.ts` and `supabaseAdmin.ts`. The store is injectable so
@@ -66,10 +66,7 @@ export interface OAuthTokenStorage {
 	/**
 	 * Insert or overwrite an OAuth token for (user, provider).
 	 */
-	upsertToken(
-		userId: string,
-		input: OAuthTokenUpsert,
-	): Promise<OAuthToken>;
+	upsertToken(userId: string, input: OAuthTokenUpsert): Promise<OAuthToken>;
 	/**
 	 * List every OAuth token for a user (any status).
 	 */
@@ -131,6 +128,7 @@ class FetchOAuthTokenStorage implements OAuthTokenStorage {
 		const params = new URLSearchParams({
 			user_id: `eq.${userId}`,
 			provider: `eq.${provider}`,
+			status: 'eq.active',
 			select: '*',
 		});
 		const res = await fetch(`${this.rootUrl()}?${params.toString()}`, {
@@ -151,13 +149,14 @@ class FetchOAuthTokenStorage implements OAuthTokenStorage {
 			user_id: userId,
 			provider: input.provider,
 			encrypted_access_token: input.encrypted_access_token,
-			encrypted_refresh_token: input.encrypted_refresh_token ?? null,
-			expires_at: input.expires_at ?? null,
-			token_type: input.token_type ?? null,
-			scope: input.scope ?? null,
 			status: input.status ?? 'active',
 		};
 		if (input.label !== undefined) body.label = input.label;
+		if (input.encrypted_refresh_token !== undefined)
+			body.encrypted_refresh_token = input.encrypted_refresh_token;
+		if (input.expires_at !== undefined) body.expires_at = input.expires_at;
+		if (input.token_type !== undefined) body.token_type = input.token_type;
+		if (input.scope !== undefined) body.scope = input.scope;
 
 		const res = await fetch(this.rootUrl(), {
 			method: 'POST',
@@ -218,10 +217,7 @@ class FetchOAuthTokenStorage implements OAuthTokenStorage {
 		return rows[0] ?? null;
 	}
 
-	async deleteToken(
-		userId: string,
-		provider: OAuthProvider,
-	): Promise<boolean> {
+	async deleteToken(userId: string, provider: OAuthProvider): Promise<boolean> {
 		const params = new URLSearchParams({
 			user_id: `eq.${userId}`,
 			provider: `eq.${provider}`,

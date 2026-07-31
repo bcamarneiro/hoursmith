@@ -1,10 +1,10 @@
 -- OAuth token storage for Hoursmith Premium (ADA-680).
 --
--- Stores encrypted OAuth credentials (access token, refresh token, expiry)
+-- Stores OAuth credentials (access token, refresh token, expiry)
 -- per user and provider so server-side API integrations can refresh and use
 -- them without the tokens ever landing in a browser context.
--- Tokens are encrypted at rest; the plaintext is derived only during API
--- calls and never persisted.
+-- Column names are prefixed with encrypted_ to indicate intent;
+-- encryption/decryption is handled by a separate layer.
 --
 -- One token per (user_id, provider) — a new upsert overwrites the old value.
 -- Lifecycle: upsert overwrites; revoke transitions to 'revoked'; delete is
@@ -64,10 +64,6 @@ create policy "oauth_tokens_delete_own"
 create trigger oauth_tokens_set_updated_at
     before update on public.oauth_tokens
     for each row execute function public.set_updated_at();
-
--- Index for fast lookup by user.
-create index oauth_tokens_user_id_idx
-    on public.oauth_tokens (user_id);
 
 -- Index for finding tokens nearing expiry (proactive refresh).
 create index oauth_tokens_expires_at_idx
