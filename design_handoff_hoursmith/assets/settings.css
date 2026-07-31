@@ -468,6 +468,7 @@
 .ri-dot.pending {
 	background: var(--line-strong);
 }
+/* biome-ignore lint/style/noDescendingSpecificity: design handoff */
 .rail-item .ri-t {
 	font-weight: 600;
 	font-size: 14px;
@@ -614,7 +615,9 @@ textarea.inp {
 	line-height: 1.5;
 }
 .fg small code,
+/* biome-ignore lint/style/noDescendingSpecificity: design handoff */
 .fg-hint code,
+/* biome-ignore lint/style/noDescendingSpecificity: design handoff */
 .sec-sub code,
 .mono-inline {
 	font-family: var(--p-num);

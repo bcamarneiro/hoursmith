@@ -4,7 +4,15 @@ import { formatDateTimeLocalValue, withLocalOffset } from '../../utils/date';
 import { isValidTimeSpentFormat } from '../../utils/timeSpent';
 import { Button } from '../ui/Button';
 import { CommentPresets } from './CommentPresets';
-import * as styles from './WorklogForm.module.css';
+import * as formStyles from './WorklogForm.module.css';
+import * as recentStyles from './AtividadeRecente.module.css';
+
+type RecentActivity = {
+	issueKey: string;
+	issueSummary?: string;
+	timeSpent: string;
+	started: string;
+};
 
 type Props = {
 	initialData?: {
@@ -22,6 +30,7 @@ type Props = {
 	onCancel: () => void;
 	isEdit?: boolean;
 	isLoading?: boolean;
+	recentActivities?: RecentActivity[];
 };
 
 export const WorklogForm: React.FC<Props> = ({
@@ -30,6 +39,7 @@ export const WorklogForm: React.FC<Props> = ({
 	onCancel,
 	isEdit = false,
 	isLoading = false,
+	recentActivities,
 }) => {
 	const issueKeyId = useId();
 	const timeSpentId = useId();
@@ -83,10 +93,40 @@ export const WorklogForm: React.FC<Props> = ({
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className={styles.form}>
-			<div className={styles.formGroup}>
+		<form onSubmit={handleSubmit} className={formStyles.form}>
+			{recentActivities && recentActivities.length > 0 && (
+				<div className={recentStyles.section}>
+					<span className={recentStyles.title}>Atividade Recente</span>
+					<div className={recentStyles.list}>
+						{recentActivities.map((a, i) => (
+							<button
+								key={`${a.issueKey}-${i}`}
+								type="button"
+								className={recentStyles.item}
+								onClick={() => {
+									setIssueKey(a.issueKey);
+									setTimeSpent(a.timeSpent);
+									setStarted(a.started);
+								}}
+								title={`Fill form with ${a.issueKey} (${a.timeSpent})`}
+								aria-label={`Fill form with ${a.issueKey}, ${a.timeSpent}`}
+							>
+								<span className={recentStyles.itemKey}>{a.issueKey}</span>
+								{a.issueSummary && (
+									<span className={recentStyles.itemSummary}>
+										{a.issueSummary}
+									</span>
+								)}
+								<span className={recentStyles.itemTime}>{a.timeSpent}</span>
+							</button>
+						))}
+					</div>
+				</div>
+			)}
+
+			<div className={formStyles.formGroup}>
 				<label htmlFor={issueKeyId}>
-					Issue Key <span className={styles.required}>*</span>
+					Issue Key <span className={formStyles.required}>*</span>
 				</label>
 				<input
 					type="text"
@@ -95,20 +135,20 @@ export const WorklogForm: React.FC<Props> = ({
 					onChange={(e) => setIssueKey(e.target.value)}
 					placeholder="e.g., PROJ-123"
 					disabled={isEdit || isLoading}
-					className={styles.input}
+					className={formStyles.input}
 					autoCapitalize="characters"
 					autoCorrect="off"
 					spellCheck={false}
 					required
 				/>
-				<small className={styles.hint}>
+				<small className={formStyles.hint}>
 					The Jira issue key (e.g., PROJ-123)
 				</small>
 			</div>
 
-			<div className={styles.formGroup}>
+			<div className={formStyles.formGroup}>
 				<label htmlFor={timeSpentId}>
-					Time Spent <span className={styles.required}>*</span>
+					Time Spent <span className={formStyles.required}>*</span>
 				</label>
 				<input
 					type="text"
@@ -117,16 +157,18 @@ export const WorklogForm: React.FC<Props> = ({
 					onChange={(e) => setTimeSpent(e.target.value)}
 					placeholder="e.g., 1h 30m"
 					disabled={isLoading}
-					className={styles.input}
+					className={formStyles.input}
 					inputMode="text"
 					autoCorrect="off"
 					spellCheck={false}
 					required
 				/>
-				<small className={styles.hint}>Format: 1h, 30m, 1h 30m, 2d, etc.</small>
+				<small className={formStyles.hint}>
+					Format: 1h, 30m, 1h 30m, 2d, etc.
+				</small>
 			</div>
 
-			<div className={styles.formGroup}>
+			<div className={formStyles.formGroup}>
 				<label htmlFor={startedId}>Started</label>
 				<input
 					type="datetime-local"
@@ -134,11 +176,11 @@ export const WorklogForm: React.FC<Props> = ({
 					value={started}
 					onChange={(e) => setStarted(e.target.value)}
 					disabled={isLoading}
-					className={styles.input}
+					className={formStyles.input}
 				/>
 			</div>
 
-			<div className={styles.formGroup}>
+			<div className={formStyles.formGroup}>
 				<label htmlFor={commentId}>Description (Optional)</label>
 				<CommentPresets onSelect={handlePresetSelect} />
 				<textarea
@@ -148,13 +190,13 @@ export const WorklogForm: React.FC<Props> = ({
 					placeholder="Add a description of the work done..."
 					rows={4}
 					disabled={isLoading}
-					className={styles.textarea}
+					className={formStyles.textarea}
 				/>
 			</div>
 
-			{error && <div className={styles.error}>{error}</div>}
+			{error && <div className={formStyles.error}>{error}</div>}
 
-			<div className={styles.actions}>
+			<div className={formStyles.actions}>
 				<Button
 					type="button"
 					onClick={onCancel}
