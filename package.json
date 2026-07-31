@@ -38,6 +38,8 @@
 	"dependencies": {
 		"@supabase/supabase-js": "^2.105.4",
 		"@tanstack/react-query": "^5.90.21",
+		"bullmq": "^6.0.2",
+		"ioredis": "^5.11.1",
 		"node-stdlib-browser": "^1.3.1",
 		"posthog-js": "^1.382.0",
 		"react": "^18.3.1",
