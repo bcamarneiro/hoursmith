@@ -1,7 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DaySummary, WorklogSuggestion } from '../../../../../types/Suggestion';
+import type {
+	DaySummary,
+	WorklogSuggestion,
+} from '../../../../../types/Suggestion';
 
 const createWorklog = vi.fn();
 
