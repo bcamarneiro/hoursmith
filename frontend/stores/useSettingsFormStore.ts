@@ -12,6 +12,7 @@ import {
 	type JiraGatewayMode,
 	rewriteForHostedProxy,
 } from '../services/jiraGateway';
+import { fetchWithRetry } from '../services/retryClient';
 import { type Config, normalizeConfig, useConfigStore } from './useConfigStore';
 import { buildJiraConnectionFingerprint, useUIStore } from './useUIStore';
 
@@ -85,7 +86,7 @@ async function fetchWithTimeout(
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), timeoutMs);
 	try {
-		return await fetch(input, { ...init, signal: controller.signal });
+		return await fetchWithRetry(input, { ...init, signal: controller.signal });
 	} catch (error) {
 		// AbortController.abort() surfaces as an AbortError DOMException.
 		if (
@@ -520,7 +521,7 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				normalizedConfig.corsProxy,
 			);
 
-			const res = await fetch(`${baseUrl}/api/v4/user`, {
+			const res = await fetchWithRetry(`${baseUrl}/api/v4/user`, {
 				headers: {
 					'PRIVATE-TOKEN': normalizedConfig.gitlabToken,
 					Accept: 'application/json',
@@ -603,7 +604,7 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				const url = normalizedConfig.corsProxy
 					? `${normalizedConfig.corsProxy.replace(/\/$/, '')}/${feed.url}`
 					: feed.url;
-				const res = await fetch(url);
+				const res = await fetchWithRetry(url);
 				if (!res.ok) {
 					throw new Error(
 						`Feed "${feed.label || feed.url}" returned ${res.status}`,
@@ -682,7 +683,7 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				? `${normalizedConfig.corsProxy.replace(/\/$/, '')}/${baseUrl}?${params}`
 				: `${baseUrl}?${params}`;
 
-			const res = await fetch(url);
+			const res = await fetchWithRetry(url);
 			if (!res.ok) {
 				if (res.status === 403) throw new Error('Invalid RescueTime API key');
 				throw new Error(`RescueTime API error: ${res.status}`);

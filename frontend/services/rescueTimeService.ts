@@ -2,6 +2,7 @@ import type {
 	RescueTimeActivity,
 	RescueTimeDaySummary,
 } from '../../types/Suggestion';
+import { fetchWithRetry } from './retryClient';
 import { fromHttpResponse, ServiceError } from './serviceErrors';
 
 /**
@@ -47,7 +48,7 @@ export async function fetchRescueTimeData(
 		? `${corsProxy.replace(/\/$/, '')}/${baseUrl}?${params}`
 		: `${baseUrl}?${params}`;
 
-	const res = await fetch(url, { signal });
+	const res = await fetchWithRetry(url, { signal });
 	if (!res.ok) {
 		if (res.status === 403) {
 			throw new ServiceError({

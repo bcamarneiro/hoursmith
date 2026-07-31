@@ -2,6 +2,7 @@ import { addDaysToIsoDate } from '../react/utils/date';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
 import { searchAllIssues } from './jiraSearch';
+import { fetchWithRetry } from './retryClient';
 
 export interface TeamMemberSummary {
 	email: string;
@@ -145,7 +146,7 @@ export async function fetchTeamWorklogs(
 			const results = await Promise.all(
 				batch.map(async (key) => {
 					try {
-						const res = await fetch(
+						const res = await fetchWithRetry(
 							buildUrl(
 								config,
 								`/rest/api/2/issue/${key}/worklog?startedAfter=${fetchStartMillis}&startedBefore=${fetchEndMillis}`,

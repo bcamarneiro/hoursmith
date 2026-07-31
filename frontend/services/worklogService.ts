@@ -2,6 +2,7 @@ import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { fetchSearchPage } from './jiraSearch';
+import { fetchWithRetry } from './retryClient';
 
 export interface WorklogEntry {
 	date: string;
@@ -126,7 +127,7 @@ async function fetchAllIssueWorklogs(
 		email: config.email,
 		apiToken: config.apiToken,
 	});
-	const res = await fetch(rewritten.url, {
+	const res = await fetchWithRetry(rewritten.url, {
 		headers: rewritten.headers,
 		signal,
 	});

@@ -179,7 +179,7 @@ describe('fetchMonthWorklogs', () => {
 			},
 		);
 
-		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+		vi.spyOn(global, 'fetch').mockResolvedValue({
 			ok: false,
 			status: 500,
 			json: async () => ({}),
@@ -187,6 +187,25 @@ describe('fetchMonthWorklogs', () => {
 		await expect(
 			fetchMonthWorklogs(baseConfig, 2025, 9),
 		).rejects.toBeInstanceOf(ServiceError);
+	});
+
+	it('retries a transient 500 and recovers (retry client wiring)', async () => {
+		const fetchMock = vi
+			.spyOn(global, 'fetch')
+			.mockResolvedValueOnce({
+				ok: false,
+				status: 500,
+				json: async () => ({}),
+			} as Response)
+			.mockResolvedValue({
+				ok: true,
+				json: async () => ({ issues: [] }),
+			} as Response);
+
+		const result = await fetchMonthWorklogs(baseConfig, 2025, 9);
+
+		expect(result).toEqual([]);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
 	it('propagates a failure on the truncated-issue worklog fetch (ADA-456) instead of silently dropping it', async () => {
@@ -212,8 +231,9 @@ describe('fetchMonthWorklogs', () => {
 					],
 				}),
 			} as Response)
-			// Per-issue worklog fetch fails with 429
-			.mockResolvedValueOnce({
+			// Per-issue worklog fetch fails with 429 (persistent so the retry
+			// client keeps seeing the retryable status on every attempt)
+			.mockResolvedValue({
 				ok: false,
 				status: 429,
 				json: async () => ({}),

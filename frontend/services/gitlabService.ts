@@ -1,4 +1,5 @@
 import type { WorklogSuggestion } from '../../types/Suggestion';
+import { fetchWithRetry } from './retryClient';
 import { fromRichMessage, ServiceError } from './serviceErrors';
 
 // Match standard Jira issue keys (e.g. PROJ-12, A-1) while requiring a left
@@ -228,7 +229,7 @@ export async function fetchGitlabSuggestions(
 				after,
 				before,
 			});
-			res = await fetch(`${baseUrl}/api/v4/events?${params}`, {
+			res = await fetchWithRetry(`${baseUrl}/api/v4/events?${params}`, {
 				headers: {
 					'PRIVATE-TOKEN': gitlabToken,
 					Accept: 'application/json',

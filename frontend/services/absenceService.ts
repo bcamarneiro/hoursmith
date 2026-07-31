@@ -2,6 +2,7 @@ import type { AbsenceKind } from '../../types/absence';
 import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
 import type { AbsenceAssignment, CalendarFeed } from '../stores/useConfigStore';
+import { fetchWithRetry } from './retryClient';
 import { fromHttpResponse } from './serviceErrors';
 
 /**
@@ -453,7 +454,7 @@ export async function fetchAbsenceDaysByUser(
 			const url = corsProxy
 				? `${corsProxy.replace(/\/$/, '')}/${feed.url}`
 				: feed.url;
-			const res = await fetch(url, { signal });
+			const res = await fetchWithRetry(url, { signal });
 			if (!res.ok) throw fromHttpResponse('Absence feed', res.status);
 			const text = await res.text();
 			return {
