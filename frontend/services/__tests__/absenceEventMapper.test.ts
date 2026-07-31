@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+	mapDatesAndPublish,
 	mapDatesToAbsenceRecords,
+	mapHolidayDatesAndPublish,
 	mapHolidayDatesToRecords,
 	classifyAbsenceKind,
 	normalizeAssignments,
 } from '../absenceEventMapper';
 import type { NormalisedAssignment } from '../eventMatcher';
+import type { AbsencePublishSink } from '../absencePublisher';
 
 describe('classifyAbsenceKind', () => {
 	it('returns sick when summary contains "sick"', () => {
@@ -248,5 +251,74 @@ describe('mapHolidayDatesToRecords', () => {
 			'bob@example.com',
 		);
 		expect(records).toEqual([]);
+	});
+});
+
+describe('mapDatesAndPublish', () => {
+	it('invokes the publisher upon successful mapping', async () => {
+		const sink = vi.fn<AbsencePublishSink>(async () => {});
+
+		const result = await mapDatesAndPublish(
+			[{ date: '2026-04-07', summary: 'Bruno C - Vacation' }],
+			new Set(['bruno@example.com']),
+			undefined,
+			'provider-123',
+			sink,
+		);
+
+		expect(sink).toHaveBeenCalledTimes(1);
+		expect(sink.mock.calls[0][0]).toHaveLength(1);
+		expect(sink.mock.calls[0][0][0]).toMatchObject({
+			user_id: 'bruno@example.com',
+			provider_id: 'provider-123',
+			absence_date: '2026-04-07',
+			kind: 'vacation',
+		});
+		expect(result.published).toBe(1);
+		expect(result.failed).toBe(0);
+	});
+
+	it('is fail-safe when mapping produces nothing: no records, no sink call', async () => {
+		const sink = vi.fn<AbsencePublishSink>(async () => {});
+
+		const result = await mapDatesAndPublish([], new Set(), undefined, undefined, sink);
+
+		expect(sink).not.toHaveBeenCalled();
+		expect(result).toEqual({
+			attempted: 0,
+			published: 0,
+			failed: 0,
+			failures: [],
+		});
+	});
+});
+
+describe('mapHolidayDatesAndPublish', () => {
+	const assignments: NormalisedAssignment[] = [
+		{ pattern: 'Lisbon', userEmails: ['alice@example.com', 'bob@example.com'] },
+	];
+
+	it('invokes the publisher upon successful mapping', async () => {
+		const sink = vi.fn<AbsencePublishSink>(async () => {});
+
+		const result = await mapHolidayDatesAndPublish(
+			[{ date: '2026-05-01', summary: 'Labour Day' }],
+			assignments,
+			new Set(['alice@example.com']),
+			'bob@example.com',
+			'PT Holidays',
+			'provider-456',
+			sink,
+		);
+
+		expect(sink).toHaveBeenCalledTimes(1);
+		const published = sink.mock.calls[0][0];
+		expect(published).toHaveLength(2);
+		published.forEach((r) => {
+			expect(r.kind).toBe('holiday');
+			expect(r.absence_date).toBe('2026-05-01');
+			expect(r.provider_id).toBe('provider-456');
+		});
+		expect(result.published).toBe(2);
 	});
 });

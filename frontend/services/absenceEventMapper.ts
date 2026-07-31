@@ -13,7 +13,12 @@
  *         ↓ (provider.expand)
  *   ExpandedDateEntry[]   ← mapped by this module
  *         ↓ (eventMatcher + classifyAbsenceKind)
- *   UserAbsenceUpsert[]   ← ready for DB upsert
+ *   UserAbsenceUpsert[]   ← ready for publishing
+ *         ↓ (absencePublisher — ADA-718)
+ *   sink / user_absences pipeline
+ *
+ * The `map*AndPublish` wrappers invoke the publisher (absencePublisher) upon
+ * successful mapping, with try/catch, logging, and fail-safe fallbacks.
  *
  * @module
  */
@@ -21,6 +26,11 @@
 import type { AbsenceKind } from '../../types/absence';
 import type { UserAbsenceUpsert } from './absences';
 import { classifyAbsenceKind } from './absenceService';
+import {
+	type AbsencePublishResult,
+	type AbsencePublishSink,
+	mapAndPublish,
+} from './absencePublisher';
 import {
 	type NormalisedAssignment,
 	collectHolidayRecipients,
@@ -153,4 +163,56 @@ export function mapHolidayDatesToRecords(
 	}
 
 	return records;
+}
+
+// --- Map + publish integration (ADA-718) ---
+
+/**
+ * Map absence-feed entries and publish the resulting records on success.
+ *
+ * Wraps `mapDatesToAbsenceRecords` with the publisher: mapping errors are
+ * contained (logged, reported, never thrown) and the sink is only invoked
+ * once mapping has succeeded. See absencePublisher for the fail-safe
+ * guarantees.
+ */
+export async function mapDatesAndPublish(
+	entries: ExpandedDateEntry[],
+	matchedUsers: Set<string>,
+	label?: string,
+	providerId?: string,
+	sink?: AbsencePublishSink,
+): Promise<AbsencePublishResult> {
+	return mapAndPublish(
+		() => mapDatesToAbsenceRecords(entries, matchedUsers, label, providerId),
+		sink,
+	);
+}
+
+/**
+ * Map holiday-feed entries and publish the resulting records on success.
+ *
+ * Wraps `mapHolidayDatesToRecords` with the publisher — same fail-safe
+ * semantics as `mapDatesAndPublish`.
+ */
+export async function mapHolidayDatesAndPublish(
+	entries: ExpandedDateEntry[],
+	assignments: NormalisedAssignment[],
+	knownUsers: Set<string>,
+	currentUserEmail: string,
+	label?: string,
+	providerId?: string,
+	sink?: AbsencePublishSink,
+): Promise<AbsencePublishResult> {
+	return mapAndPublish(
+		() =>
+			mapHolidayDatesToRecords(
+				entries,
+				assignments,
+				knownUsers,
+				currentUserEmail,
+				label,
+				providerId,
+			),
+		sink,
+	);
 }
