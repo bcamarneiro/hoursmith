@@ -46,6 +46,9 @@ function makeAdmin(
 		signOutUser: vi.fn().mockResolvedValue(undefined),
 		insertAuditLog: vi.fn().mockResolvedValue(undefined),
 		recordBillingEvent: vi.fn().mockResolvedValue(true),
+		listPendingRawCommits: vi.fn().mockResolvedValue([]),
+		claimRawCommitForQueue: vi.fn().mockResolvedValue(true),
+		revertRawCommitToPending: vi.fn().mockResolvedValue(undefined),
 		...overrides,
 	};
 }

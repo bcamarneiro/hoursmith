@@ -3,6 +3,12 @@
 	"buildCommand": "npm run build:vercel",
 	"outputDirectory": "dist",
 	"regions": ["fra1"],
+	"crons": [
+		{
+			"path": "/api/queue/schedule",
+			"schedule": "*/5 * * * *"
+		}
+	],
 	"rewrites": [
 		{
 			"source": "/api/proxy/:path*",

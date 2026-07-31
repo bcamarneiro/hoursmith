@@ -17,6 +17,13 @@ export const QUEUE_NAMES = {
 	RAW_COMMITS: 'raw-commits',
 } as const;
 
+/**
+ * Job name for every `raw-commits` job (ADA-700). Producers (the cron
+ * scheduler) and consumers (the worker) agree on the name here so a rename
+ * stays a one-line change.
+ */
+export const RAW_COMMIT_JOB_NAME = 'process' as const;
+
 /** Payload of a `raw-commits` job: which `raw_commits` row to process. */
 export interface RawCommitJob {
 	rawCommitId: number;

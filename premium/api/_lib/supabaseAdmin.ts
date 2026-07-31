@@ -31,6 +31,22 @@ export interface SubscriptionRow {
 	updated_at: string;
 }
 
+/**
+ * One row of the GitLab webhook ingestion table (ADA-631/ADA-700).
+ * `id` and `created_at` are only present after the row exists in the DB.
+ */
+export interface RawCommitRow {
+	id?: number;
+	project_id: number;
+	user_username: string;
+	ref: string;
+	commit_count: number;
+	pushed_at: string;
+	payload: Record<string, unknown>;
+	status: string;
+	created_at?: string;
+}
+
 export interface SubscriptionUpsert {
 	user_id: string;
 	stripe_customer_id: string;
@@ -73,6 +89,24 @@ export interface SupabaseAdminClient {
 	 * already seen (a duplicate delivery that must not be reprocessed).
 	 */
 	recordBillingEvent(eventId: string): Promise<boolean>;
+	/**
+	 * Oldest-first snapshot of webhook rows waiting for the queue (ADA-700).
+	 * The cron scheduler calls this once per tick and enqueues one job per row.
+	 */
+	listPendingRawCommits(limit: number): Promise<RawCommitRow[]>;
+	/**
+	 * Atomically claim a `pending` row for queueing by flipping it to
+	 * `queued`. Returns `false` when the row is no longer `pending` (a
+	 * concurrent scheduler invocation already claimed it), so overlapping
+	 * cron ticks never enqueue the same row twice.
+	 */
+	claimRawCommitForQueue(id: number): Promise<boolean>;
+	/**
+	 * Undo a claim (`queued` → `pending`) when enqueueing failed, so a later
+	 * scheduler tick retries the row. At-least-once delivery; consumers must
+	 * be idempotent.
+	 */
+	revertRawCommitToPending(id: number): Promise<void>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -293,5 +327,78 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		}
 		const rows = (await res.json()) as unknown[];
 		return Array.isArray(rows) && rows.length > 0;
+	}
+
+	async listPendingRawCommits(limit: number): Promise<RawCommitRow[]> {
+		const params = new URLSearchParams({
+			status: 'eq.pending',
+			order: 'id.asc',
+			select:
+				'id,project_id,user_username,ref,commit_count,pushed_at,payload,status,created_at',
+			limit: String(limit),
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/raw_commits?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(
+				`supabaseAdmin.listPendingRawCommits failed: ${res.status}`,
+			);
+		}
+		return (await res.json()) as RawCommitRow[];
+	}
+
+	async claimRawCommitForQueue(id: number): Promise<boolean> {
+		// Guarded PATCH: the `status=eq.pending` filter means a concurrent
+		// invocation that already claimed this row updates nothing, so the
+		// response body is empty and we report `false`.
+		const params = new URLSearchParams({
+			id: `eq.${id}`,
+			status: 'eq.pending',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/raw_commits?${params.toString()}`,
+			{
+				method: 'PATCH',
+				headers: this.headers({
+					'content-type': 'application/json',
+					prefer: 'return=representation',
+				}),
+				body: JSON.stringify({ status: 'queued' }),
+			},
+		);
+		if (!res.ok) {
+			throw new Error(
+				`supabaseAdmin.claimRawCommitForQueue failed: ${res.status}`,
+			);
+		}
+		const rows = (await res.json()) as unknown[];
+		return Array.isArray(rows) && rows.length > 0;
+	}
+
+	async revertRawCommitToPending(id: number): Promise<void> {
+		// Only touch rows this invocation claimed (`status=eq.queued`); never
+		// stomp on a row a worker has already started processing.
+		const params = new URLSearchParams({
+			id: `eq.${id}`,
+			status: 'eq.queued',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/raw_commits?${params.toString()}`,
+			{
+				method: 'PATCH',
+				headers: this.headers({
+					'content-type': 'application/json',
+					prefer: 'return=minimal',
+				}),
+				body: JSON.stringify({ status: 'pending' }),
+			},
+		);
+		if (!res.ok) {
+			throw new Error(
+				`supabaseAdmin.revertRawCommitToPending failed: ${res.status}`,
+			);
+		}
 	}
 }
