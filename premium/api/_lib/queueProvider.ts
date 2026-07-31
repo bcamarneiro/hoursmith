@@ -3,14 +3,17 @@
  *
  * Central place for queue names and queue construction so producers and
  * consumers agree on names, the Redis connection, and default job options.
- * The connection is resolved from env via `redisConfig.js`; nothing here
- * touches the network until a producer actually adds a job.
+ * The connection is resolved from the secrets backend via `queueConnection.js`
+ * (which validates `redisConfig.js` output and redacts credentials from
+ * errors); nothing here touches the network until a producer actually adds a
+ * job.
  */
 
 import { Queue, type QueueOptions } from 'bullmq';
 
+import { loadQueueConnectionConfig } from './queueConnection.js';
 import { parseQueueSettings } from './queueConfig.js';
-import { type RedisEnv, redisOptions } from './redisConfig.js';
+import type { RedisEnv } from './redisConfig.js';
 
 /** Queue names shared by producers and consumers. */
 export const QUEUE_NAMES = {
@@ -41,7 +44,7 @@ export interface QueueFactoryOptions {
 export function queueOptions(env: RedisEnv = process.env): QueueOptions {
 	const settings = parseQueueSettings(env);
 	return {
-		connection: redisOptions(env),
+		connection: loadQueueConnectionConfig(env).options,
 		defaultJobOptions: {
 			// Webhook ingestion sees transient failures; retry before giving up.
 			attempts: settings.attempts,
