@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { formatDateTimeLocalValue, withLocalOffset } from '../../utils/date';
 import { isValidTimeSpentFormat } from '../../utils/timeSpent';
 import { Button } from '../ui/Button';
+import { IssueAutocomplete } from '../ui/IssueAutocomplete';
 import { CommentPresets } from './CommentPresets';
 import * as styles from './WorklogForm.module.css';
 
@@ -88,19 +89,24 @@ export const WorklogForm: React.FC<Props> = ({
 				<label htmlFor={issueKeyId}>
 					Issue Key <span className={styles.required}>*</span>
 				</label>
-				<input
-					type="text"
-					id={issueKeyId}
-					value={issueKey}
-					onChange={(e) => setIssueKey(e.target.value)}
-					placeholder="e.g., PROJ-123"
-					disabled={isEdit || isLoading}
-					className={styles.input}
-					autoCapitalize="characters"
-					autoCorrect="off"
-					spellCheck={false}
-					required
-				/>
+				{isEdit ? (
+					<input
+						type="text"
+						id={issueKeyId}
+						value={issueKey}
+						readOnly
+						disabled
+						className={styles.input}
+					/>
+				) : (
+					<IssueAutocomplete
+						id={issueKeyId}
+						value={issueKey}
+						onChange={(value) => setIssueKey(value.toUpperCase())}
+						onSelect={(issue) => setIssueKey(issue.key)}
+						placeholder="e.g., PROJ-123 or search Jira"
+					/>
+				)}
 				<small className={styles.hint}>
 					The Jira issue key (e.g., PROJ-123)
 				</small>
