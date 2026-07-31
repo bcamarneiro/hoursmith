@@ -20,6 +20,8 @@
 
 import type { RedisOptions } from 'ioredis';
 
+import { getQueueServiceCredentials, redactRedisUrl } from './secretClient.js';
+
 export type RedisEnv = Partial<Record<string, string | undefined>>;
 
 export class RedisConfigError extends Error {
@@ -51,7 +53,9 @@ export function redisOptionsFromUrl(url: string): RedisOptions {
 	try {
 		parsed = new URL(url);
 	} catch {
-		throw new RedisConfigError(`REDIS_URL is not a valid URL: "${url}"`);
+		throw new RedisConfigError(
+			`REDIS_URL is not a valid URL: "${redactRedisUrl(url)}"`,
+		);
 	}
 	if (parsed.protocol !== 'redis:' && parsed.protocol !== 'rediss:') {
 		throw new RedisConfigError(
@@ -90,32 +94,38 @@ export function redisOptionsFromUrl(url: string): RedisOptions {
  * back to `REDIS_HOST` parts. Throws `RedisConfigError` when neither is set.
  */
 export function redisOptions(env: RedisEnv = process.env): RedisOptions {
-	const url = env.REDIS_URL;
-	if (url) {
-		return { ...redisOptionsFromUrl(url), maxRetriesPerRequest: null };
+	const credentials = getQueueServiceCredentials(env);
+
+	if (credentials.url) {
+		return {
+			...redisOptionsFromUrl(credentials.url),
+			maxRetriesPerRequest: null,
+		};
 	}
 
-	const host = env.REDIS_HOST;
+	const host = credentials.host;
 	if (host) {
 		const options: RedisOptions = {
 			host,
-			port: parseIntEnv(env.REDIS_PORT, 'REDIS_PORT') ?? 6379,
+			port: parseIntEnv(credentials.port, 'REDIS_PORT') ?? 6379,
 			maxRetriesPerRequest: null,
 		};
-		const password = env.REDIS_PASSWORD;
+		const password = credentials.password;
 		if (password) {
 			options.password = password;
 		}
-		const db = parseIntEnv(env.REDIS_DB, 'REDIS_DB');
+		const db = parseIntEnv(credentials.db, 'REDIS_DB');
 		if (db !== undefined) {
 			options.db = db;
 		}
-		if (env.REDIS_TLS === 'true' || env.REDIS_TLS === '1') {
+		if (credentials.tls === 'true' || credentials.tls === '1') {
 			options.tls = {};
 		}
 		return options;
 	}
 
+	// Unreachable: getQueueServiceCredentials() already fails loudly when
+	// neither REDIS_URL nor REDIS_HOST is present. Kept as a defensive guard.
 	throw new RedisConfigError(
 		'Missing Redis configuration. Set REDIS_URL (redis:// or rediss://) or REDIS_HOST ' +
 			'(plus REDIS_PORT/REDIS_PASSWORD/REDIS_DB as needed).',
