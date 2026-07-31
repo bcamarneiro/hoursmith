@@ -176,6 +176,16 @@ describe('reencryptPayload', () => {
 		).rejects.toThrow('non-empty string');
 	});
 
+	it('fails closed when fromOptions do not match the payload (PBKDF2 iterations mismatch)', async () => {
+		const payload = await encryptedUnder(OLD_SECRET);
+		// fromOptions lacks the iterations override → 600k derivation → wrong
+		// key → GCM auth failure → fail-closed. This is the most likely first
+		// misconfiguration a real rotation job will hit.
+		await expect(
+			reencryptPayload(payload, reencryptOpts({ fromOptions: {} })),
+		).rejects.toThrow('could not be decrypted with either');
+	});
+
 	it('works with the production default iteration count', async () => {
 		const payload = await new AesCipher(OLD_SECRET).encrypt(
 			'default-iterations',

@@ -78,7 +78,7 @@ export async function reencryptPayload(
 		plaintext = await fromCipher.decrypt(payload);
 	} catch {
 		throw new Error(
-			'reencryptPayload failed: payload could not be decrypted with either the current or the previous encryption secret. Refusing to re-encrypt an unreadable payload.',
+			'reencryptPayload failed: payload could not be decrypted with either the current or the previous encryption secret (wrong secret, wrong options such as PBKDF2 iterations or AAD context, or tampered / malformed payload). Refusing to re-encrypt an unreadable payload.',
 		);
 	}
 	return toCipher.encrypt(plaintext);
