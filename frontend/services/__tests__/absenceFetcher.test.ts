@@ -240,8 +240,8 @@ describe('fetchAbsenceFeed', () => {
 
 	// -- timeout -----------------------------------------------------------
 
-	it('retries on timeout before exhausting retries', async () => {
-		// Simulate a timeout by throwing an AbortError with aborted signal.
+	it('retries on DOMException AbortError (treated as network error) before exhausting retries', async () => {
+		// Throw an AbortError-like DOMException — treated as a retryable network error.
 		let callCount = 0;
 		const fetchImpl = vi.fn(async () => {
 			callCount++;

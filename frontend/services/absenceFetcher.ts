@@ -117,16 +117,16 @@ function createTimeoutSignal(
 	const controller = new AbortController();
 
 	// Fire the abort after timeoutMs (if not already aborted).
-	const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-	// If the caller aborts, propagate it to our internal controller.
-	const onCallerAbort = () => controller.abort();
-	callerSignal?.addEventListener('abort', onCallerAbort, { once: true });
+	// Clamp to a minimum of 1 ms so timeoutMs:0 doesn't fire on the next tick.
+	const safeTimeoutMs = timeoutMs <= 0 ? 1 : timeoutMs;
+	const timer = setTimeout(() => controller.abort(), safeTimeoutMs);
 
 	// Wire the caller's signal so it fires our internal controller as well.
 	// Use AbortSignal.any() when available — it's cleaner and forwards the
 	// reason properly.
 	let combined: AbortSignal;
+	let onCallerAbort: (() => void) | undefined;
+
 	if (typeof AbortSignal.any === 'function') {
 		const sources: AbortSignal[] = [controller.signal];
 		if (callerSignal) sources.push(callerSignal);
@@ -135,23 +135,22 @@ function createTimeoutSignal(
 		// Fallback: chain through the caller's abort reason.
 		combined = controller.signal;
 		if (callerSignal) {
-			callerSignal.addEventListener(
-				'abort',
-				() => {
-					try {
-						controller.abort(callerSignal.reason);
-					} catch {
-						controller.abort();
-					}
-				},
-				{ once: true },
-			);
+			onCallerAbort = () => {
+				try {
+					controller.abort(callerSignal.reason);
+				} catch {
+					controller.abort();
+				}
+			};
+			callerSignal.addEventListener('abort', onCallerAbort, { once: true });
 		}
 	}
 
 	const clear = () => {
 		clearTimeout(timer);
-		callerSignal?.removeEventListener('abort', onCallerAbort);
+		if (callerSignal && onCallerAbort) {
+			callerSignal.removeEventListener('abort', onCallerAbort);
+		}
 	};
 
 	return { signal: combined, clear };
