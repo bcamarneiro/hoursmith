@@ -142,7 +142,7 @@ describe('BaseWorker', () => {
 		);
 
 		expect(error).toHaveBeenCalledWith(
-			'[worker:raw-commits] job failed',
+			'job failed',
 			expect.objectContaining({
 				jobId: '42',
 				jobName: '__default__',
@@ -150,6 +150,39 @@ describe('BaseWorker', () => {
 				error: 'boom',
 			}),
 		);
+
+		await worker.stop();
+	});
+
+	it('never logs job payloads in failure context (privacy invariant)', async () => {
+		const { logger, error } = makeLogger();
+		const worker = new BaseWorker('raw-commits', noopProcessor, {
+			env: { REDIS_URL: 'redis://cache' },
+			logger,
+		});
+
+		await worker.start();
+		const sensitivePayload = { apiKey: 'sk-secret-123', userId: 'u1' };
+		instances[0].emit(
+			'failed',
+			{
+				id: '99',
+				name: '__default__',
+				attemptsMade: 1,
+				data: sensitivePayload,
+			},
+			new Error('kaboom'),
+		);
+
+		// Verify safe identifiers ARE in the log context
+		const callArg = error.mock.calls[0][1] as Record<string, unknown>;
+		expect(callArg).toHaveProperty('jobId', '99');
+		expect(callArg).toHaveProperty('jobName', '__default__');
+
+		// Verify the payload is NOT in the log context
+		expect(callArg).not.toHaveProperty('data');
+		expect(callArg).not.toHaveProperty('payload');
+		expect(JSON.stringify(callArg)).not.toContain('sk-secret-123');
 
 		await worker.stop();
 	});
@@ -165,7 +198,7 @@ describe('BaseWorker', () => {
 		instances[0].emit('error', new Error('connection refused'));
 
 		expect(error).toHaveBeenCalledWith(
-			'[worker:raw-commits] worker error',
+			'worker error',
 			expect.objectContaining({ error: 'connection refused' }),
 		);
 
@@ -182,8 +215,8 @@ describe('BaseWorker', () => {
 
 		await expect(worker.start()).rejects.toThrow('no redis');
 
-		expect(worker.isRunning).toBe(false);
-		expect(instances[0].close).toHaveBeenCalledWith(false);
+	expect(worker.isRunning).toBe(false);
+	expect(instances[0].close).toHaveBeenCalledWith(true);
 	});
 
 	it('stop is a no-op before start', async () => {
@@ -236,7 +269,9 @@ describe('BaseWorker', () => {
 		});
 
 		await worker.start();
-		instances[0].close.mockReturnValue(new Promise(() => {}));
+		instances[0].close.mockImplementation((force?: boolean) =>
+		force ? Promise.resolve() : new Promise(() => {}),
+	);
 		const stopped = worker.stop();
 		vi.advanceTimersByTime(5_001);
 		await expect(stopped).resolves.toBeUndefined();

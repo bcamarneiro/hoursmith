@@ -125,7 +125,7 @@ export class BaseWorker<Payload = unknown> {
 		this.worker = worker;
 
 		worker.on('failed', (job: Job<Payload> | undefined, error: Error) => {
-			this.logger.error(`[worker:${this.queueName}] job failed`, {
+			this.logger.error('job failed', {
 				jobId: job?.id,
 				jobName: job?.name,
 				attemptsMade: job?.attemptsMade,
@@ -133,7 +133,7 @@ export class BaseWorker<Payload = unknown> {
 			});
 		});
 		worker.on('error', (error: Error) => {
-			this.logger.error(`[worker:${this.queueName}] worker error`, {
+			this.logger.error('worker error', {
 				error: error?.message ?? String(error),
 			});
 		});
@@ -148,12 +148,12 @@ export class BaseWorker<Payload = unknown> {
 
 		try {
 			await worker.waitUntilReady();
-			this.logger.info(`[worker:${this.queueName}] ready`);
+			this.logger.info('ready');
 		} catch (error) {
-			this.logger.error(`[worker:${this.queueName}] failed to connect`, {
+			this.logger.error('failed to connect', {
 				error: error instanceof Error ? error.message : String(error),
 			});
-			await this.stop();
+			await this.stop(true);
 			throw error;
 		}
 	}
@@ -191,24 +191,31 @@ export class BaseWorker<Payload = unknown> {
 	}
 
 	private async drain(worker: Worker<Payload>, force: boolean): Promise<void> {
-		const closePromise = worker.close(force).catch((error: unknown) => {
-			this.logger.error(`[worker:${this.queueName}] close failed`, {
-				error: error instanceof Error ? error.message : String(error),
-			});
-		});
 		if (force) {
-			await closePromise;
+			await worker.close(true).catch((error: unknown) => {
+				this.logger.error('close failed', {
+					error: error instanceof Error ? error.message : String(error),
+				});
+			});
 			return;
 		}
 
+		const closePromise = worker.close(false).catch((error: unknown) => {
+			this.logger.error('close failed', {
+				error: error instanceof Error ? error.message : String(error),
+			});
+		});
+
 		let timer: ReturnType<typeof setTimeout> | undefined;
+		let timedOut = false;
 		try {
 			await Promise.race([
 				closePromise,
 				new Promise<void>((resolve) => {
 					timer = setTimeout(() => {
+						timedOut = true;
 						this.logger.error(
-							`[worker:${this.queueName}] graceful shutdown timed out after ${this.shutdownTimeoutMs}ms; in-flight jobs may still be running`,
+							`graceful shutdown timed out after ${this.shutdownTimeoutMs}ms; in-flight jobs may still be running`,
 						);
 						resolve();
 					}, this.shutdownTimeoutMs);
@@ -217,6 +224,17 @@ export class BaseWorker<Payload = unknown> {
 		} finally {
 			if (timer) {
 				clearTimeout(timer);
+			}
+		}
+
+		// If graceful close timed out, force-close to prevent a zombie
+		// worker that would still be consuming jobs. Calling close(true)
+		// on an already-closed worker is a safe no-op in BullMQ.
+		if (timedOut) {
+			try {
+				await worker.close(true);
+			} catch {
+				// swallow — worker already torn down
 			}
 		}
 	}
