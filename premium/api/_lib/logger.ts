@@ -30,12 +30,11 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
 const VALID_LEVELS: readonly LogLevel[] = ['debug', 'info', 'warn', 'error'];
 
 /** Resolve the active level from env, defaulting by `NODE_ENV`. */
-export function resolveLogLevel(env: NodeJS.ProcessEnv = process.env): LogLevel {
+export function resolveLogLevel(
+	env: NodeJS.ProcessEnv = process.env,
+): LogLevel {
 	const configured = env.LOG_LEVEL?.trim().toLowerCase();
-	if (
-		configured &&
-		(VALID_LEVELS as readonly string[]).includes(configured)
-	) {
+	if (configured && (VALID_LEVELS as readonly string[]).includes(configured)) {
 		return configured as LogLevel;
 	}
 	return env.NODE_ENV === 'development' ? 'debug' : 'info';
