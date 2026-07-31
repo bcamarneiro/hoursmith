@@ -16,6 +16,12 @@
  *
  * `maxRetriesPerRequest: null` is required by BullMQ's blocking commands
  * (BRPOPLPUSH); ioredis refuses to run them under the default retry budget.
+ *
+ * Connection pool tuning is resolved here too (ADA-732): `connectTimeout`
+ * bounds how long a producer waits for a pooled connection, `keepAlive` keeps
+ * idle connections from being reaped by intermediaries, and the offline queue
+ * is disabled so an enqueue against a downed Redis fails fast instead of
+ * buffering silently (the queue client retry policy handles the retry).
  */
 
 import type { RedisOptions } from 'ioredis';
@@ -43,6 +49,64 @@ function parseIntEnv(
 		);
 	}
 	return parsed;
+}
+
+/** Parse a boolean env value, accepting `true`/`1` and `false`/`0`. */
+function parseBooleanEnv(value: string, name: string): boolean {
+	if (value === 'true' || value === '1') {
+		return true;
+	}
+	if (value === 'false' || value === '0') {
+		return false;
+	}
+	throw new RedisConfigError(
+		`${name} must be "true" or "false", got "${value}".`,
+	);
+}
+
+/**
+ * Defaults for the Redis connection pool tuning applied to every queue
+ * connection. `connectTimeout` matches ioredis's built-in default; `keepAlive`
+ * and `enableOfflineQueue` are deliberately stricter than ioredis defaults
+ * (0 = no keepalive, offline queue on) because a queue producer must fail fast
+ * rather than buffer work for a Redis that may be gone.
+ */
+const REDIS_CONNECTION_TUNING_DEFAULTS = {
+	connectTimeoutMs: 10_000,
+	keepAliveMs: 30_000,
+	enableOfflineQueue: false,
+} as const;
+
+interface RedisConnectionTuning {
+	connectTimeout: number;
+	keepAlive: number;
+	enableOfflineQueue: boolean;
+}
+
+/**
+ * Resolve connection pool tuning from the environment. Every knob is
+ * validated (`RedisConfigError`) and optional, falling back to the defaults
+ * above when unset or empty.
+ */
+export function redisConnectionTuning(
+	env: RedisEnv = process.env,
+): RedisConnectionTuning {
+	return {
+		connectTimeout:
+			parseIntEnv(env.REDIS_CONNECT_TIMEOUT_MS, 'REDIS_CONNECT_TIMEOUT_MS') ??
+			REDIS_CONNECTION_TUNING_DEFAULTS.connectTimeoutMs,
+		keepAlive:
+			parseIntEnv(env.REDIS_KEEPALIVE_MS, 'REDIS_KEEPALIVE_MS') ??
+			REDIS_CONNECTION_TUNING_DEFAULTS.keepAliveMs,
+		enableOfflineQueue:
+			env.REDIS_ENABLE_OFFLINE_QUEUE === undefined ||
+			env.REDIS_ENABLE_OFFLINE_QUEUE === ''
+				? REDIS_CONNECTION_TUNING_DEFAULTS.enableOfflineQueue
+				: parseBooleanEnv(
+						env.REDIS_ENABLE_OFFLINE_QUEUE,
+						'REDIS_ENABLE_OFFLINE_QUEUE',
+					),
+	};
 }
 
 /** Parse a Redis URL into ioredis options. Supports a `/db` path suffix. */
@@ -90,9 +154,14 @@ export function redisOptionsFromUrl(url: string): RedisOptions {
  * back to `REDIS_HOST` parts. Throws `RedisConfigError` when neither is set.
  */
 export function redisOptions(env: RedisEnv = process.env): RedisOptions {
+	const tuning = redisConnectionTuning(env);
 	const url = env.REDIS_URL;
 	if (url) {
-		return { ...redisOptionsFromUrl(url), maxRetriesPerRequest: null };
+		return {
+			...redisOptionsFromUrl(url),
+			...tuning,
+			maxRetriesPerRequest: null,
+		};
 	}
 
 	const host = env.REDIS_HOST;
@@ -100,6 +169,7 @@ export function redisOptions(env: RedisEnv = process.env): RedisOptions {
 		const options: RedisOptions = {
 			host,
 			port: parseIntEnv(env.REDIS_PORT, 'REDIS_PORT') ?? 6379,
+			...tuning,
 			maxRetriesPerRequest: null,
 		};
 		const password = env.REDIS_PASSWORD;

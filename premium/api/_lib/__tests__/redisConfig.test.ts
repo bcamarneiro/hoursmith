@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	RedisConfigError,
+	redisConnectionTuning,
 	redisOptions,
 	redisOptionsFromUrl,
 } from '../redisConfig.js';
@@ -51,6 +52,67 @@ describe('redisOptionsFromUrl', () => {
 		expect(() => redisOptionsFromUrl('redis://host/abc')).toThrow(
 			RedisConfigError,
 		);
+	});
+});
+
+describe('redisConnectionTuning', () => {
+	it('applies production defaults when nothing is set', () => {
+		expect(redisConnectionTuning({})).toEqual({
+			connectTimeout: 10_000,
+			keepAlive: 30_000,
+			enableOfflineQueue: false,
+		});
+	});
+
+	it('treats empty strings as unset', () => {
+		expect(
+			redisConnectionTuning({
+				REDIS_CONNECT_TIMEOUT_MS: '',
+				REDIS_KEEPALIVE_MS: '',
+				REDIS_ENABLE_OFFLINE_QUEUE: '',
+			}),
+		).toEqual({
+			connectTimeout: 10_000,
+			keepAlive: 30_000,
+			enableOfflineQueue: false,
+		});
+	});
+
+	it('parses numeric and boolean knobs from the env', () => {
+		expect(
+			redisConnectionTuning({
+				REDIS_CONNECT_TIMEOUT_MS: '5000',
+				REDIS_KEEPALIVE_MS: '15000',
+				REDIS_ENABLE_OFFLINE_QUEUE: 'true',
+			}),
+		).toEqual({
+			connectTimeout: 5000,
+			keepAlive: 15_000,
+			enableOfflineQueue: true,
+		});
+	});
+
+	it('accepts 1/0 as boolean spellings', () => {
+		expect(
+			redisConnectionTuning({ REDIS_ENABLE_OFFLINE_QUEUE: '1' })
+				.enableOfflineQueue,
+		).toBe(true);
+		expect(
+			redisConnectionTuning({ REDIS_ENABLE_OFFLINE_QUEUE: '0' })
+				.enableOfflineQueue,
+		).toBe(false);
+	});
+
+	it('rejects a non-numeric timeout', () => {
+		expect(() =>
+			redisConnectionTuning({ REDIS_CONNECT_TIMEOUT_MS: 'soon' }),
+		).toThrow(RedisConfigError);
+	});
+
+	it('rejects a malformed boolean', () => {
+		expect(() =>
+			redisConnectionTuning({ REDIS_ENABLE_OFFLINE_QUEUE: 'yes' }),
+		).toThrow(RedisConfigError);
 	});
 });
 
