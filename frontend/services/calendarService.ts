@@ -3,6 +3,7 @@ import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
 import type { CalendarFeed } from '../stores/useConfigStore';
 import type { CalendarMapping } from '../stores/useUserDataStore';
+import { fetchWithRetry } from './retryClient';
 import { fromHttpResponse } from './serviceErrors';
 
 const JIRA_KEY_RE = /([A-Z][A-Z0-9]+-\d+)/g;
@@ -418,7 +419,7 @@ async function fetchFeed(
 		? `${corsProxy.replace(/\/$/, '')}/${feedUrl}`
 		: feedUrl;
 
-	const res = await fetch(url, { signal });
+	const res = await fetchWithRetry(url, { signal });
 	if (!res.ok) {
 		throw fromHttpResponse('Calendar feed', res.status);
 	}

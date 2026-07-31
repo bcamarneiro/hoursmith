@@ -5,6 +5,7 @@ import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { searchAllIssues } from './jiraSearch';
+import { fetchWithRetry } from './retryClient';
 import { fromHttpResponse } from './serviceErrors';
 
 export type WorklogAuthor = JiraUser;
@@ -245,7 +246,7 @@ export async function fetchMonthWorklogs(
 						email: config.email,
 						apiToken: config.apiToken,
 					});
-					const res = await fetch(rewritten.url, {
+					const res = await fetchWithRetry(rewritten.url, {
 						headers: rewritten.headers,
 						signal,
 					});

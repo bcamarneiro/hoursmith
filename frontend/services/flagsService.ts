@@ -1,3 +1,5 @@
+import { fetchWithRetry } from './retryClient';
+
 /**
  * Frontend transport for operational flags (ADA-341).
  *
@@ -28,7 +30,7 @@ export const DEFAULT_FLAGS: PublicFlags = {
 
 export async function fetchFlags(token?: string): Promise<PublicFlags> {
 	try {
-		const res = await fetch('/api/flags', {
+		const res = await fetchWithRetry('/api/flags', {
 			headers: token ? { authorization: `Bearer ${token}` } : undefined,
 		});
 		if (!res.ok) return DEFAULT_FLAGS;

@@ -24,6 +24,7 @@
  */
 
 import { rewriteForHostedProxy } from './jiraGateway';
+import { fetchWithRetry } from './retryClient';
 import { fromHttpResponseAsync } from './serviceErrors';
 
 /**
@@ -121,7 +122,7 @@ export async function fetchSearchPage<T = unknown>(
 		email: config.email,
 		apiToken: config.apiToken,
 	});
-	const res = await fetch(rewritten.url, {
+	const res = await fetchWithRetry(rewritten.url, {
 		headers: rewritten.headers,
 		signal,
 	});
