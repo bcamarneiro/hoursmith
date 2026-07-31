@@ -126,10 +126,15 @@ describe('asymmetricEncryption', () => {
 		it('rejects decryption of tampered ciphertext', async () => {
 			const pair = await generateKeyPair();
 			const encrypted = await encryptWithPublicKey(pair.publicKey, 'secret');
-			// Flip the last base64url character.
+			// Tamper a byte in the middle of the decoded ciphertext so
+			// the change always alters a real data byte (flipping the
+			// last base64url character is a no-op ~25 % of the time
+			// when the character differs only in padding bits).
+			const mid = Math.floor(encrypted.length / 2);
 			const tampered =
-				encrypted.slice(0, -1) +
-				(encrypted[encrypted.length - 1] === 'A' ? 'B' : 'A');
+				encrypted.slice(0, mid) +
+				(encrypted[mid] === 'A' ? 'B' : 'A') +
+				encrypted.slice(mid + 1);
 			await expect(
 				decryptWithPrivateKey(pair.privateKey, tampered),
 			).rejects.toThrow();

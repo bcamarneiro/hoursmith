@@ -16,15 +16,18 @@
  * HTTP headers) without escaping.
  */
 
+import { ServiceError } from './serviceErrors';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-/** RSA-OAEP parameter set shared by encrypt, decrypt, generate, import, export. */
-const RSA_OAEP_PARAMS: RsaOaepParams = {
-	name: 'RSA-OAEP',
-	hash: 'SHA-256',
-};
+/** RSA-OAEP parameters for encrypt/decrypt operations (no hash — the hash is
+ *  bound to the key at generation/import). */
+const RSA_OAEP_PARAMS: RsaOaepParams = { name: 'RSA-OAEP' };
+
+/** RSA-OAEP parameters for key import (hash required per WebCrypto spec). */
+const RSA_IMPORT_PARAMS = { name: 'RSA-OAEP' as const, hash: 'SHA-256' as const };
 
 /** RSA-OAEP is safe for payloads up to ~190 bytes with 2048-bit keys. */
 const MAX_PLAINTEXT_BYTES = 190;
@@ -36,9 +39,10 @@ const MAX_PLAINTEXT_BYTES = 190;
 /**
  * Generate a fresh RSA-OAEP key pair.
  *
- * The returned keys are *non-extractable* — they cannot be exported with
- * {@link exportPrivateKeyToBase64} after generation. Call that function on the
- * key returned here *before* it leaves scope if you need a serialised copy.
+ * Keys are extractable so they can be serialised via
+ * {@link exportPrivateKeyToBase64} / {@link exportPublicKeyToBase64}.
+ * Callers that need to persist keys should export them immediately
+ * after generation.
  */
 export async function generateKeyPair(): Promise<CryptoKeyPair> {
 	return crypto.subtle.generateKey(
@@ -65,12 +69,18 @@ export async function encryptWithPublicKey(
 ): Promise<string> {
 	const encoded = new TextEncoder().encode(plaintext);
 	if (encoded.byteLength === 0) {
-		throw new Error('asymmetricEncryption: plaintext must not be empty');
+		throw new ServiceError({
+			kind: 'unknown',
+			source: 'asymmetricEncryption',
+			message: 'asymmetricEncryption: plaintext must not be empty',
+		});
 	}
 	if (encoded.byteLength > MAX_PLAINTEXT_BYTES) {
-		throw new Error(
-			`asymmetricEncryption: plaintext exceeds ${MAX_PLAINTEXT_BYTES} bytes (got ${encoded.byteLength})`,
-		);
+		throw new ServiceError({
+			kind: 'unknown',
+			source: 'asymmetricEncryption',
+			message: `asymmetricEncryption: plaintext exceeds ${MAX_PLAINTEXT_BYTES} bytes (got ${encoded.byteLength})`,
+		});
 	}
 	const ciphertext = await crypto.subtle.encrypt(RSA_OAEP_PARAMS, publicKey, encoded);
 	return arrayBufferToBase64url(ciphertext);
@@ -117,7 +127,7 @@ export async function importPublicKeyFromBase64(
 	return crypto.subtle.importKey(
 		'spki',
 		spki,
-		RSA_OAEP_PARAMS,
+		RSA_IMPORT_PARAMS,
 		true,
 		['encrypt'],
 	);
@@ -148,7 +158,7 @@ export async function importPrivateKeyFromBase64(
 	return crypto.subtle.importKey(
 		'pkcs8',
 		pkcs8,
-		RSA_OAEP_PARAMS,
+		RSA_IMPORT_PARAMS,
 		true,
 		['decrypt'],
 	);
