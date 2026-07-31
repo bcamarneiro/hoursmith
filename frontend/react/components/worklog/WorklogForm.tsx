@@ -6,6 +6,14 @@ import { Button } from '../ui/Button';
 import { IssueAutocomplete } from '../ui/IssueAutocomplete';
 import { CommentPresets } from './CommentPresets';
 import * as styles from './WorklogForm.module.css';
+import * as fillStyles from './RecentActivityFill.module.css';
+
+export type RecentActivityItem = {
+	issueKey: string;
+	issueSummary?: string;
+	timeSpent: string;
+	started: string;
+};
 
 type Props = {
 	initialData?: {
@@ -23,6 +31,7 @@ type Props = {
 	onCancel: () => void;
 	isEdit?: boolean;
 	isLoading?: boolean;
+	recentActivities?: RecentActivityItem[];
 };
 
 export const WorklogForm: React.FC<Props> = ({
@@ -31,6 +40,7 @@ export const WorklogForm: React.FC<Props> = ({
 	onCancel,
 	isEdit = false,
 	isLoading = false,
+	recentActivities,
 }) => {
 	const issueKeyId = useId();
 	const timeSpentId = useId();
@@ -85,6 +95,35 @@ export const WorklogForm: React.FC<Props> = ({
 
 	return (
 		<form onSubmit={handleSubmit} className={styles.form}>
+			{recentActivities && recentActivities.length > 0 && (
+				<div className={fillStyles.section}>
+					<span className={fillStyles.title}>Recent Activity</span>
+					<div className={fillStyles.list}>
+						{recentActivities.map((a, i) => (
+							<button
+								key={`${a.issueKey}-${i}`}
+								type="button"
+								className={fillStyles.item}
+								onClick={() => {
+									setIssueKey(a.issueKey);
+									setTimeSpent(a.timeSpent);
+									setStarted(a.started);
+								}}
+								title={`Fill form with ${a.issueKey} (${a.timeSpent})`}
+								aria-label={`Fill form with ${a.issueKey}, ${a.timeSpent}`}
+							>
+								<span className={fillStyles.itemKey}>{a.issueKey}</span>
+								{a.issueSummary && (
+									<span className={fillStyles.itemSummary}>
+										{a.issueSummary}
+									</span>
+								)}
+								<span className={fillStyles.itemTime}>{a.timeSpent}</span>
+							</button>
+						))}
+					</div>
+				</div>
+			)}
 			<div className={styles.formGroup}>
 				<label htmlFor={issueKeyId}>
 					Issue Key <span className={styles.required}>*</span>

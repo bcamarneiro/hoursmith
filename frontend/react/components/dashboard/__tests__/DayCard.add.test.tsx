@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DaySummary } from '../../../../../types/Suggestion';
+import type { DaySummary, WorklogSuggestion } from '../../../../../types/Suggestion';
 
 const createWorklog = vi.fn();
 
@@ -95,5 +95,95 @@ describe('DayCard — add worklog (ADA-433)', () => {
 				started: expect.stringContaining('2026-07-08T09:00'),
 			}),
 		);
+	});
+});
+
+describe('DayCard — recent activity fill (ADA-656)', () => {
+	const loggedSuggestion: WorklogSuggestion = {
+		id: 'sug-1',
+		source: 'jira-activity',
+		issueKey: 'TEAM-42',
+		issueSummary: 'Set up CI pipeline',
+		date: '2026-07-08',
+		suggestedTimeSpent: '1h 30m',
+		suggestedSeconds: 5400,
+		confidence: 'high',
+		reason: 'test reason',
+		logged: true,
+	};
+
+	beforeEach(() => {
+		createWorklog.mockReset();
+		createWorklog.mockResolvedValue({});
+	});
+
+	it('shows recent activity section when day has logged suggestions', () => {
+		renderCard(
+			makeDay({
+				suggestions: [loggedSuggestion],
+				gapSeconds: 7200,
+			}),
+		);
+
+		fireEvent.click(
+			screen.getAllByRole('button', {
+				name: 'Add a worklog for Wednesday',
+			})[0],
+		);
+
+		expect(screen.getByText('Recent Activity')).toBeDefined();
+		expect(screen.getByText('TEAM-42')).toBeDefined();
+		expect(screen.getByText('Set up CI pipeline')).toBeDefined();
+		expect(screen.getByText('1h 30m')).toBeDefined();
+	});
+
+	it('does not show recent activity section when no logged suggestions', () => {
+		renderCard(
+			makeDay({
+				suggestions: [],
+				gapSeconds: 7200,
+			}),
+		);
+
+		fireEvent.click(
+			screen.getAllByRole('button', {
+				name: 'Add a worklog for Wednesday',
+			})[0],
+		);
+
+		expect(screen.queryByText('Recent Activity')).toBeNull();
+	});
+
+	it('fills form fields when a recent activity item is clicked', () => {
+		renderCard(
+			makeDay({
+				suggestions: [loggedSuggestion],
+				gapSeconds: 7200,
+			}),
+		);
+
+		fireEvent.click(
+			screen.getAllByRole('button', {
+				name: 'Add a worklog for Wednesday',
+			})[0],
+		);
+
+		// Click the recent activity item to fill the form.
+		const fillButton = screen.getByRole('button', {
+			name: 'Fill form with TEAM-42, 1h 30m',
+		});
+		fireEvent.click(fillButton);
+
+		// The issue key input should now contain TEAM-42 (mapped to uppercase).
+		const issueInput = screen.getByPlaceholderText(
+			'e.g., PROJ-123 or search Jira',
+		) as HTMLInputElement;
+		expect(issueInput.value).toBe('TEAM-42');
+
+		// The time spent input should contain 1h 30m.
+		const timeInput = screen.getByPlaceholderText(
+			'e.g., 1h 30m',
+		) as HTMLInputElement;
+		expect(timeInput.value).toBe('1h 30m');
 	});
 });
