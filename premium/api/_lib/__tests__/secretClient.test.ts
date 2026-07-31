@@ -93,7 +93,9 @@ describe('redactRedisUrl', () => {
 		expect(redactRedisUrl('redis://cache:6379')).toBe('redis://cache:6379');
 	});
 
-	it('returns a safe placeholder for unparseable input', () => {
-		expect(redactRedisUrl('not a url')).toBe('<unparseable-url>');
+	it('returns a safe placeholder that includes a redacted snippet of the input', () => {
+		const result = redactRedisUrl('not a url');
+		expect(result).toMatch(/^<unparseable-url: "/);
+		expect(result).toContain('not a url');
 	});
 });

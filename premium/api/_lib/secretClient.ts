@@ -61,7 +61,13 @@ export function redactRedisUrl(url: string): string {
 		}
 		return parsed.toString();
 	} catch {
-		return '<unparseable-url>';
+		// Include a redacted snippet so the offending value is identifiable
+		// without leaking the raw input into logs.
+		const snippet =
+			url.length > 60
+				? `${url.slice(0, 60).replace(/\/\/[^@]*:[^@]*@/, '//***:***@')}…`
+				: url.replace(/\/\/[^@]*:[^@]*@/, '//***:***@');
+		return `<unparseable-url: "${snippet}">`;
 	}
 }
 
