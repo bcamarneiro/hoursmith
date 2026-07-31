@@ -50,10 +50,17 @@ const SECRET_PATTERNS: ReadonlyArray<{ re: RegExp; keep?: string }> = [
 	// redact the rest of the line (covers multi-pair `Cookie: a=1; b=2`).
 	// The `["'\s]*` bridge lets the pattern also match JSON-serialized
 	// headers such as `"authorization":"Bearer ..."`.
-	{ re: /(authorization["'\s]*[:=]["'\s]*)[^\n]*/gi, keep: '$1' },
-	{ re: /(cookie["'\s]*[:=]["'\s]*)[^\n]*/gi, keep: '$1' },
+	{ re: /(authorization["'\s]*[:=]["'\s]*)[^"\n]*/gi, keep: '$1' },
+	{ re: /(cookie["'\s]*[:=]["'\s]*)[^"\n]*/gi, keep: '$1' },
 	// Bare `Bearer` / `Basic` credentials anywhere in a string.
 	{ re: /\b(bearer|basic)\s+[A-Za-z0-9._\-+/=]{6,}/gi, keep: '$1 ' },
+	// x-api-key / apiKey header values and URL query tokens.
+	{ re: /(x-api-key["'\s]*[:=]["'\s]*)[^"\n]*/gi, keep: '$1' },
+	{ re: /(apiKey["'\s]*[:=]["'\s]*)[^"\n]*/gi, keep: '$1' },
+	// URL query-style `token=value` (Upstash, generic API tokens).
+	{ re: /\b(token=)[^\s&"]{6,}/gi, keep: '$1' },
+	// Upstash-style `AVNS_` tokens.
+	{ re: /AVNS_[A-Za-z0-9]{6,}/g },
 ];
 
 /** Replace every secret-shaped fragment in `text` with the redaction marker. */
@@ -63,6 +70,28 @@ function maskString(text: string): string {
 		out = out.replace(re, keep + REDACTED);
 	}
 	return out;
+}
+
+/**
+ * Sanitize a string for logging. Applies pattern masking first, then
+ * tries to parse the result as JSON — if it yields an object, recurse
+ * into it and re-stringify so that keys like `password` / `apiKey`
+ * surviving inside a pre-stringified payload are caught.
+ */
+function sanitizeString(text: string): unknown {
+	const masked = maskString(text);
+	// Fast bail-out: if no JSON structural brackets, skip parsing.
+	if (!masked.includes('{') && !masked.includes('[')) return masked;
+	try {
+		const parsed = JSON.parse(masked);
+		if (parsed !== null && typeof parsed === 'object') {
+			// Recurse with a fresh `seen` set — this is a new object tree.
+			return JSON.stringify(sanitizeValue(parsed, new WeakSet()));
+		}
+	} catch {
+		// Not valid JSON — maskString already handled it.
+	}
+	return masked;
 }
 
 /**
@@ -102,7 +131,7 @@ function sanitizeValue(value: unknown, seen: WeakSet<object>): unknown {
 	if (value === null || value === undefined) return value;
 	switch (typeof value) {
 		case 'string':
-			return maskString(value);
+			return sanitizeString(value);
 		case 'number':
 		case 'boolean':
 		case 'bigint':
@@ -137,8 +166,6 @@ function sanitizeObject(value: object, seen: WeakSet<object>): unknown {
 		return [...value].map((item) => sanitizeValue(item, seen));
 	}
 
-	if (typeof value !== 'object') return maskString(String(value));
-
 	// Plain object (or object literal) — sanitize own enumerable entries.
 	const proto = Object.getPrototypeOf(value);
 	if (proto !== Object.prototype && proto !== null) {
@@ -171,9 +198,11 @@ function sanitizeError(
 	for (const key of Object.keys(err)) {
 		if (key === 'name') continue; // exception type is safe to keep
 		if (key === 'code') {
-			out[key] = readProp(err, key); // status/error codes are benign triage data
+			const codeVal = readProp(err, key);
+			out[key] = typeof codeVal === 'string' ? maskString(codeVal) : codeVal;
 			continue;
 		}
+		if (key === 'cause') continue; // handled explicitly below — avoid seen-set clash
 		out[key] = isSecretKey(key)
 			? REDACTED
 			: sanitizeValue(readProp(err, key), seen);
