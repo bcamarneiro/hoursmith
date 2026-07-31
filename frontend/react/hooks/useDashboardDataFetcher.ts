@@ -3,7 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { RescueTimeDaySummary } from '../../../types/Suggestion';
 import { fetchCalendarSuggestions } from '../../services/calendarService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
-import { fetchJiraActivitySuggestions } from '../../services/jiraActivityService';
+import {
+	fetchRecentActivity,
+	jiraActivityItemsToSuggestions,
+} from '../../services/jiraActivityService';
 import {
 	fetchMonthWorklogs,
 	type WorklogItem,
@@ -20,6 +23,7 @@ import { useUserDataStore } from '../../stores/useUserDataStore';
 import { classifyWorklog } from '../utils/worklogClassifier';
 import { useAbsenceDays } from './useAbsenceDays';
 import { useEffectiveProxyUrl } from './useEffectiveProxyUrl';
+import { jiraActivityQueryKey } from './useJiraActivity';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
 
 interface WorklogEntry {
@@ -326,7 +330,23 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					}
 				})(),
 
-				fetchJiraActivitySuggestions(config, weekStart, weekEnd, signal)
+				// Jira activity: fetch from shared query cache. The cache holds
+				// the normalized JiraActivityItem[] shape (same key + queryFn as
+				// useJiraActivity), then suggestions are derived client-side —
+				// keeping one canonical cached shape per key.
+				queryClient
+					.fetchQuery({
+						queryKey: jiraActivityQueryKey(
+							jiraHost,
+							corsProxy,
+							weekStart,
+							weekEnd,
+						),
+						queryFn: ({ signal: s }) =>
+							fetchRecentActivity(config, weekStart, weekEnd, s),
+						staleTime: 15 * 60 * 1000,
+					})
+					.then((items) => jiraActivityItemsToSuggestions(items))
 					.catch((e) => {
 						if (!signal.aborted) setError('jira', e.message);
 						return [];
