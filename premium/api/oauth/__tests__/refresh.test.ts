@@ -49,7 +49,8 @@ function makeRequest(
 	}
 	const overrides = new Map<string, string>();
 	if (options.origin) overrides.set('origin', options.origin);
-	if (options.contentLength) overrides.set('content-length', String(options.contentLength));
+	if (options.contentLength)
+		overrides.set('content-length', String(options.contentLength));
 	const method = options.method ?? 'POST';
 	const isBodyless = method === 'GET' || method === 'HEAD';
 	const base = new Request('https://hoursmith.io/api/oauth/refresh', {
@@ -60,7 +61,8 @@ function makeRequest(
 	return {
 		method: base.method,
 		headers: {
-			get: (name: string) => overrides.get(name.toLowerCase()) ?? base.headers.get(name),
+			get: (name: string) =>
+				overrides.get(name.toLowerCase()) ?? base.headers.get(name),
 		},
 		json: () => base.json(),
 	} as unknown as Request;
@@ -128,7 +130,10 @@ describe('POST /api/oauth/refresh', () => {
 	it('returns 401 when the Authorization header is missing', async () => {
 		const deps = makeDeps();
 		const res = await handleRefresh(
-			makeRequest({ provider: 'jira_api', refresh_token: 'r' }, { token: null }),
+			makeRequest(
+				{ provider: 'jira_api', refresh_token: 'r' },
+				{ token: null },
+			),
 			deps,
 		);
 		expect(res.status).toBe(401);

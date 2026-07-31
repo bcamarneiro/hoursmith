@@ -219,9 +219,7 @@ describe('exchangeRefreshToken', () => {
 				new Promise<Response>((_resolve, reject) => {
 					const signal = init.signal as AbortSignal;
 					signal.addEventListener('abort', () => {
-						reject(
-							Object.assign(new Error('aborted'), { name: 'AbortError' }),
-						);
+						reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
 					});
 				}),
 		) as unknown as typeof fetch;
@@ -262,7 +260,13 @@ describe('token bundle helpers', () => {
 
 	it('stores a null expiry when the provider reports none', () => {
 		const bundle = buildTokenBundle(
-			{ accessToken: 'a', refreshToken: 'r', expiresIn: null, scope: null, tokenType: null },
+			{
+				accessToken: 'a',
+				refreshToken: 'r',
+				expiresIn: null,
+				scope: null,
+				tokenType: null,
+			},
 			'github',
 			NOW,
 		);
@@ -287,16 +291,15 @@ describe('token bundle helpers', () => {
 	it('rejects malformed or unknown-version payloads', () => {
 		expect(() => parseBundle('not json')).toThrow();
 		expect(() => parseBundle(JSON.stringify({ version: 99 }))).toThrow();
-		expect(
-			() =>
-				parseBundle(
-					JSON.stringify({
-						version: 1,
-						provider: 'rescuetime',
-						accessToken: 'a',
-						refreshToken: 'r',
-					}),
-				),
+		expect(() =>
+			parseBundle(
+				JSON.stringify({
+					version: 1,
+					provider: 'rescuetime',
+					accessToken: 'a',
+					refreshToken: 'r',
+				}),
+			),
 		).toThrow();
 	});
 });

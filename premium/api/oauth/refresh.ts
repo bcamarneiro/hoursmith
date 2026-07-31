@@ -217,7 +217,11 @@ export async function handleRefresh(
 	}
 
 	// 5. Encrypt the fresh bundle and store it synchronously (ADA-648).
-	const bundle = buildTokenBundle(result, input.provider, deps.nowMs ?? Date.now());
+	const bundle = buildTokenBundle(
+		result,
+		input.provider,
+		deps.nowMs ?? Date.now(),
+	);
 	try {
 		const encrypted = await cipher.encrypt(serializeBundle(bundle));
 		await storage.upsertToken(userId, {
@@ -260,7 +264,10 @@ export async function handleRefresh(
 
 type ParseResult =
 	| { ok: true; provider: RefreshProvider; refreshToken: string }
-	| { ok: false; code: 'invalid_body' | 'unsupported_provider' | 'invalid_refresh_token' };
+	| {
+			ok: false;
+			code: 'invalid_body' | 'unsupported_provider' | 'invalid_refresh_token';
+	  };
 
 function parseRefreshInput(body: unknown): ParseResult {
 	if (!body || typeof body !== 'object' || Array.isArray(body)) {

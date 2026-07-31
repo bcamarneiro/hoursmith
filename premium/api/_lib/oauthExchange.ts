@@ -310,7 +310,9 @@ function isAbortError(err: unknown): boolean {
 	);
 }
 
-function classifyErrorStatus(payload: { error?: unknown } | null): OAuthExchangeErrorCode {
+function classifyErrorStatus(
+	payload: { error?: unknown } | null,
+): OAuthExchangeErrorCode {
 	const error = pickString(payload?.error);
 	if (error === 'invalid_grant') return 'invalid_grant';
 	if (error === 'invalid_client') return 'invalid_client';
@@ -318,7 +320,9 @@ function classifyErrorStatus(payload: { error?: unknown } | null): OAuthExchange
 	return 'upstream_error';
 }
 
-async function readErrorPayload(res: Response): Promise<{ error?: unknown } | null> {
+async function readErrorPayload(
+	res: Response,
+): Promise<{ error?: unknown } | null> {
 	const raw = (await readJsonSafely(res)) as Record<string, unknown> | null;
 	if (!raw || typeof raw !== 'object') return null;
 	return raw;
