@@ -415,12 +415,20 @@ function defaultGenerateId(existing: ReadonlySet<string>): string {
 		const match = /^k([0-9]+)$/.exec(id);
 		if (match !== null) max = Math.max(max, Number(match[1]));
 	}
-	let candidate = `k${max + 1}`;
-	while (existing.has(candidate)) {
-		max += 1;
-		candidate = `k${max + 1}`;
+	// k{max+1} is guaranteed unique: the loop above scans every k-id in the
+	// set, so max is at least as large as any k-number present.  A bounded
+	// linear scan (1…max+1) replaces the original unbounded while-loop
+	// that could theoretically hang when the ring contained millions of
+	// contiguous k-ids.
+	for (let i = 1; i <= max + 1; i++) {
+		const candidate = `k${i}`;
+		if (!existing.has(candidate)) return candidate;
 	}
-	return candidate;
+	// Unreachable — max+1 was already proven unique — but the throw defends
+	// against a floating-point precision edge case with absurdly large ids.
+	throw new Error(
+		'keyRotationManager: exhausted all possible k-ids (theoretical).',
+	);
 }
 
 /** Fresh 256-bit random secret as unpadded base64url (43 chars). */
