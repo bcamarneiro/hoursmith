@@ -36,7 +36,13 @@ describe('registration', () => {
 		const dispatcher = new HookDispatcher();
 		const listener = vi.fn();
 
-		for (const bad of ['', 'Job', 'job started', 'job:started', 'a'.repeat(65)]) {
+		for (const bad of [
+			'',
+			'Job',
+			'job started',
+			'job:started',
+			'a'.repeat(65),
+		]) {
 			expect(() => dispatcher.on(bad, listener)).toThrow(
 				expect.objectContaining({ code: 'invalid-hook' }),
 			);
@@ -231,7 +237,9 @@ describe('error boundary', () => {
 
 		await dispatcher.emit('job-started', null);
 
-		expect(events).toEqual([{ hook: 'job-started', message: 'handler sees me' }]);
+		expect(events).toEqual([
+			{ hook: 'job-started', message: 'handler sees me' },
+		]);
 	});
 
 	it('never propagates a throwing error handler', async () => {
@@ -277,9 +285,9 @@ describe('error boundary', () => {
 	it('rejects invalid timeoutMs with invalid-options', () => {
 		const dispatcher = new HookDispatcher();
 
-		expect(() => dispatcher.emit('job-started', null, { timeoutMs: 0 })).toThrow(
-			expect.objectContaining({ code: 'invalid-options' }),
-		);
+		expect(() =>
+			dispatcher.emit('job-started', null, { timeoutMs: 0 }),
+		).toThrow(expect.objectContaining({ code: 'invalid-options' }));
 		expect(() =>
 			dispatcher.emit('job-started', null, { timeoutMs: Number.NaN }),
 		).toThrow(expect.objectContaining({ code: 'invalid-options' }));

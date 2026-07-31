@@ -28,9 +28,7 @@
  * for production call sites, or construct fresh instances in tests.
  */
 
-export type HookListener<T = unknown> = (
-	payload: T,
-) => void | Promise<void>;
+export type HookListener<T = unknown> = (payload: T) => void | Promise<void>;
 
 /** Per-listener result of a single dispatch. */
 export interface ListenerOutcome {
@@ -308,7 +306,9 @@ export class HookDispatcher {
 		// caller's stack has returned before any listener runs.
 		await Promise.resolve();
 		const outcomes = await Promise.all(
-			snapshot.map((listener) => this.deliver(listener, hook, payload, timeoutMs)),
+			snapshot.map((listener) =>
+				this.deliver(listener, hook, payload, timeoutMs),
+			),
 		);
 		const fulfilled = outcomes.filter((outcome) => outcome.ok).length;
 		return {
@@ -359,7 +359,11 @@ export class HookDispatcher {
 		}
 	}
 
-	private reportError(hook: string, error: Error, listener: HookListener): void {
+	private reportError(
+		hook: string,
+		error: Error,
+		listener: HookListener,
+	): void {
 		if (this.errorHandler === null) {
 			return;
 		}
