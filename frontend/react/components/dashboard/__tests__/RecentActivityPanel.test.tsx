@@ -23,6 +23,34 @@ vi.mock('../../../hooks/useEffectiveProxyUrl', () => ({
 	useEffectiveProxyUrl: () => '',
 }));
 
+// CSS modules are not resolved by vitest; provide identity exports so
+// class names appear in the DOM for assertion.
+vi.mock('../RecentActivityPanel.module.css', () => ({
+	panel: 'panel',
+	title: 'title',
+	header: 'header',
+	summary: 'summary',
+	status: 'status',
+	statusError: 'statusError',
+	note: 'note',
+	noteLink: 'noteLink',
+	list: 'list',
+	dayGroup: 'dayGroup',
+	dayHeader: 'dayHeader',
+	dayLabel: 'dayLabel',
+	dayLabelWeekend: 'dayLabelWeekend',
+	dayCount: 'dayCount',
+	dayList: 'dayList',
+	row: 'row',
+	issueKey: 'issueKey',
+	issueSummary: 'issueSummary',
+	badges: 'badges',
+	badge: 'badge',
+	badgeTransitions: 'badgeTransitions',
+	badgeComments: 'badgeComments',
+	num: 'num',
+}));
+
 const WEEK_START = '2025-10-13';
 const WEEK_END = '2025-10-19';
 
@@ -41,6 +69,13 @@ function wrapper({ children }: { children: ReactNode }) {
 function renderPanel() {
 	return render(
 		<RecentActivityPanel weekStart={WEEK_START} weekEnd={WEEK_END} />,
+		{ wrapper },
+	);
+}
+
+function renderPanelWithWeek(weekStart: string, weekEnd: string) {
+	return render(
+		<RecentActivityPanel weekStart={weekStart} weekEnd={weekEnd} />,
 		{ wrapper },
 	);
 }
@@ -207,5 +242,106 @@ describe('RecentActivityPanel', () => {
 		await waitFor(() => expect(screen.getByText('Cached issue')).toBeTruthy());
 		// The panel must reuse the cached activity items, not fetch again.
 		expect(mockedFetch).toHaveBeenCalledTimes(1);
+	});
+
+	it('applies weekend styling to days that fall on Saturday or Sunday', async () => {
+		const items: JiraActivityItem[] = [
+			{
+				issueKey: 'PROJ-1',
+				issueSummary: 'Weekday work',
+				date: '2025-10-15', // Wednesday
+				transitions: 1,
+				comments: 0,
+			},
+			{
+				issueKey: 'PROJ-2',
+				issueSummary: 'Weekend work',
+				date: '2025-10-19', // Sunday
+				transitions: 0,
+				comments: 1,
+			},
+		];
+		mockedFetch.mockResolvedValue(items);
+
+		renderPanel();
+
+		await waitFor(() => {
+			expect(screen.getByText('Wed, Oct 15')).toBeTruthy();
+		});
+		expect(screen.getByText('Sun, Oct 19')).toBeTruthy();
+
+		const sunLabel = screen.getByText('Sun, Oct 19');
+		expect(sunLabel.classList.contains('dayLabelWeekend')).toBe(true);
+
+		const wedLabel = screen.getByText('Wed, Oct 15');
+		expect(wedLabel.classList.contains('dayLabelWeekend')).toBe(false);
+	});
+
+	it('uses singular "1 issue" when only one distinct issue appears', async () => {
+		const items: JiraActivityItem[] = [
+			{
+				issueKey: 'PROJ-1',
+				issueSummary: 'First change',
+				date: '2025-10-15',
+				transitions: 1,
+				comments: 0,
+			},
+			{
+				issueKey: 'PROJ-1',
+				issueSummary: 'Second change same issue',
+				date: '2025-10-16',
+				transitions: 0,
+				comments: 2,
+			},
+		];
+		mockedFetch.mockResolvedValue(items);
+
+		renderPanel();
+
+		await waitFor(() => {
+			expect(screen.getByText('First change')).toBeTruthy();
+		});
+
+		// Header should read "1 issue" (singular), not "1 issues" or "2 issues".
+		expect(
+			screen.getByText(
+				(_content, element) => element?.textContent === '1 issue',
+			),
+		).toBeTruthy();
+		expect(
+			screen.queryByText(
+				(_content, element) => element?.textContent === '1 issues',
+			),
+		).toBeNull();
+	});
+
+	it('refetches when the week changes', async () => {
+		const items: JiraActivityItem[] = [
+			{
+				issueKey: 'PROJ-1',
+				issueSummary: 'Week A item',
+				date: '2025-10-15',
+				transitions: 1,
+				comments: 0,
+			},
+		];
+		mockedFetch.mockResolvedValue(items);
+
+		const { rerender } = renderPanelWithWeek('2025-10-13', '2025-10-19');
+
+		await waitFor(() => {
+			expect(screen.getByText('Week A item')).toBeTruthy();
+		});
+		expect(mockedFetch).toHaveBeenCalledTimes(1);
+
+		// Re-render with the following week — the query key changes so
+		// useJiraActivity must issue a fresh fetch.
+		rerender(
+			<RecentActivityPanel weekStart="2025-10-20" weekEnd="2025-10-26" />,
+		);
+
+		await waitFor(() => {
+			expect(mockedFetch).toHaveBeenCalledTimes(2);
+		});
 	});
 });

@@ -78,6 +78,11 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 		return [...groups.entries()];
 	}, [items]);
 
+	const distinctIssueCount = useMemo(
+		() => new Set(items.map((i) => i.issueKey)).size,
+		[items],
+	);
+
 	if (!jiraConfigured) {
 		return (
 			<section className={styles.panel} aria-label="Recent activity">
@@ -117,6 +122,11 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 					<Button variant="secondary" onClick={() => void refetch()}>
 						Retry
 					</Button>
+					{copy.action && (
+						<Link className={styles.noteLink} to={copy.action.to}>
+							{copy.action.label}
+						</Link>
+					)}
 				</output>
 			</section>
 		);
@@ -136,8 +146,8 @@ export const RecentActivityPanel: React.FC<RecentActivityPanelProps> = ({
 			<div className={styles.header}>
 				<h3 className={styles.title}>Recent activity</h3>
 				<span className={styles.summary}>
-					<span className={styles.num}>{items.length}</span> issue
-					{items.length === 1 ? '' : 's'}
+					<span className={styles.num}>{distinctIssueCount}</span> issue
+					{distinctIssueCount === 1 ? '' : 's'}
 				</span>
 			</div>
 			<ul className={styles.list}>
