@@ -78,22 +78,39 @@ describe('JiraUserSchema', () => {
 		expect(() => JiraUserSchema.parse(validUser)).not.toThrow();
 	});
 
-	it('parses an empty object (all fields optional)', () => {
-		expect(() => JiraUserSchema.parse({})).not.toThrow();
+	it('rejects an empty object (accountId required)', () => {
+		expect(() => JiraUserSchema.parse({})).toThrow();
+	});
+
+	it('preserves unknown keys (passthrough)', () => {
+		const parsed = JiraUserSchema.parse({
+			...validUser,
+			avatarUrls: { '48x48': 'https://…' },
+		});
+		expect(parsed.avatarUrls).toEqual({ '48x48': 'https://…' });
 	});
 
 	it('rejects a non-email emailAddress', () => {
 		expect(() =>
-			JiraUserSchema.parse({ emailAddress: 'not-an-email' }),
+			JiraUserSchema.parse({ ...validUser, emailAddress: 'not-an-email' }),
 		).toThrow();
 	});
 
 	it('rejects a non-URL self', () => {
-		expect(() => JiraUserSchema.parse({ self: 'not-a-url' })).toThrow();
+		expect(() =>
+			JiraUserSchema.parse({ ...validUser, self: 'not-a-url' }),
+		).toThrow();
 	});
 
 	it('rejects a non-string accountId', () => {
-		expect(() => JiraUserSchema.parse({ accountId: 123 })).toThrow();
+		expect(() =>
+			JiraUserSchema.parse({ ...validUser, accountId: 123 }),
+		).toThrow();
+	});
+
+	it('rejects missing accountId', () => {
+		const { accountId: _, ...rest } = validUser;
+		expect(() => JiraUserSchema.parse(rest)).toThrow();
 	});
 });
 
@@ -140,7 +157,7 @@ describe('JiraWorklogSchema', () => {
 	const validWorklog = {
 		self: 'https://site.atlassian.net/rest/api/2/issue/10042/worklog/20001',
 		id: '20001',
-		author: { displayName: 'Ana Silva' },
+		author: { accountId: 'abc', displayName: 'Ana Silva' },
 		comment: 'Original Worklog Date was: 2025/06/20',
 		created: '2025-06-22T09:00:00.000+0000',
 		started: '2025-06-20T09:00:00.000+0000',
@@ -158,18 +175,44 @@ describe('JiraWorklogSchema', () => {
 		expect(() => JiraWorklogSchema.parse(wl)).not.toThrow();
 	});
 
-	it('parses a minimal worklog (all fields optional)', () => {
-		expect(() => JiraWorklogSchema.parse({})).not.toThrow();
+	it('rejects an empty object (timeSpentSeconds required)', () => {
+		expect(() => JiraWorklogSchema.parse({})).toThrow();
+	});
+
+	it('preserves unknown keys (passthrough)', () => {
+		const parsed = JiraWorklogSchema.parse({
+			...validWorklog,
+			customField: 'extra',
+		});
+		expect(parsed.customField).toBe('extra');
 	});
 
 	it('rejects non-numeric timeSpentSeconds', () => {
 		expect(() =>
-			JiraWorklogSchema.parse({ timeSpentSeconds: '7200' }),
+			JiraWorklogSchema.parse({ ...validWorklog, timeSpentSeconds: '7200' }),
+		).toThrow();
+	});
+
+	it('rejects missing timeSpentSeconds', () => {
+		const { timeSpentSeconds: _, ...rest } = validWorklog;
+		expect(() => JiraWorklogSchema.parse(rest)).toThrow();
+	});
+
+	it('rejects invalid created date format', () => {
+		expect(() =>
+			JiraWorklogSchema.parse({ ...validWorklog, created: 'not-a-date' }),
+		).toThrow();
+	});
+
+	it('rejects invalid started date format', () => {
+		expect(() =>
+			JiraWorklogSchema.parse({ ...validWorklog, started: 'yesterday' }),
 		).toThrow();
 	});
 
 	it('JiraWorklogArraySchema parses an array', () => {
-		const parsed = JiraWorklogArraySchema.parse([validWorklog, {}]);
+		const secondWl = { ...validWorklog, timeSpentSeconds: 3600 };
+		const parsed = JiraWorklogArraySchema.parse([validWorklog, secondWl]);
 		expect(parsed).toHaveLength(2);
 	});
 
@@ -189,6 +232,11 @@ describe('JiraSiteSchema', () => {
 
 	it('parses a valid site config', () => {
 		expect(() => JiraSiteSchema.parse(validSite)).not.toThrow();
+	});
+
+	it('preserves unknown keys (passthrough)', () => {
+		const parsed = JiraSiteSchema.parse({ ...validSite, label: 'Work' });
+		expect(parsed.label).toBe('Work');
 	});
 
 	it('rejects a missing url', () => {
@@ -264,9 +312,29 @@ describe('UserAbsenceSchema', () => {
 		).not.toThrow();
 	});
 
+	it('preserves unknown keys (passthrough)', () => {
+		const parsed = UserAbsenceSchema.parse({
+			...validAbsence,
+			customField: 42,
+		});
+		expect(parsed.customField).toBe(42);
+	});
+
 	it('rejects a bad absenceDate format', () => {
 		expect(() =>
-			UserAbsenceSchema.parse({ ...validAbsence, absenceDate: '20/06/2025' }),
+			UserAbsenceSchema.parse({
+				...validAbsence,
+				absenceDate: '20/06/2025',
+			}),
+		).toThrow();
+	});
+
+	it('rejects an invalid date in absenceDate (fails regex)', () => {
+		expect(() =>
+			UserAbsenceSchema.parse({
+				...validAbsence,
+				absenceDate: '2025-99-99',
+			}),
 		).toThrow();
 	});
 
@@ -285,6 +353,24 @@ describe('UserAbsenceSchema', () => {
 	it('rejects empty userId', () => {
 		expect(() =>
 			UserAbsenceSchema.parse({ ...validAbsence, userId: '' }),
+		).toThrow();
+	});
+
+	it('rejects invalid createdAt format', () => {
+		expect(() =>
+			UserAbsenceSchema.parse({
+				...validAbsence,
+				createdAt: '2025-06-01',
+			}),
+		).toThrow();
+	});
+
+	it('rejects invalid updatedAt format', () => {
+		expect(() =>
+			UserAbsenceSchema.parse({
+				...validAbsence,
+				updatedAt: 'not-a-date',
+			}),
 		).toThrow();
 	});
 });

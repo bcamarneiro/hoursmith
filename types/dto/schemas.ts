@@ -10,7 +10,7 @@
  *
  * Naming convention:
  *  - `<Name>Schema`          — the Zod schema
- *  - `<Name>`                — inferred TypeScript type (named export)
+ *  - `<Name>Dto`             — inferred TypeScript type (named export)
  *  - `<Name>ArraySchema`     — array-of-<Name> wrapper for batch endpoints
  *
  * Bundle impact: zod is tree-shakeable; only schemas that are actually
@@ -37,11 +37,11 @@ import { z } from 'zod';
  */
 export const JiraUserSchema = z.object({
 	self: z.string().url().optional(),
-	accountId: z.string().optional(),
+	accountId: z.string(),
 	emailAddress: z.string().email().optional(),
 	displayName: z.string().optional(),
 	active: z.boolean().optional(),
-});
+}).passthrough();
 export type JiraUserDto = z.infer<typeof JiraUserSchema>;
 
 /**
@@ -99,17 +99,17 @@ export const JiraWorklogSchema = z.object({
 	author: JiraUserSchema.optional(),
 	updateAuthor: JiraUserSchema.optional(),
 	comment: z.union([z.string(), z.record(z.string(), z.unknown())]).optional(),
-	created: z.string().optional(),
-	updated: z.string().optional(),
-	started: z.string().optional(),
+	created: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?[+-]\d{4}$/).optional(),
+	updated: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?[+-]\d{4}$/).optional(),
+	started: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?[+-]\d{4}$/).optional(),
 	timeSpent: z.string().optional(),
-	timeSpentSeconds: z.number().optional(),
+	timeSpentSeconds: z.number(),
 	issueId: z.string().optional(),
 	issueKey: z.string().optional(),
-});
+}).passthrough();
 export type JiraWorklogDto = z.infer<typeof JiraWorklogSchema>;
 
-/** Array form for `GET …/worklog` which returns `{ worklogs: [...] }`. */
+/** Array of worklogs, e.g. the `worklogs` field from `GET …/worklog` responses. */
 export const JiraWorklogArraySchema = z.array(JiraWorklogSchema);
 
 // ── Config / settings shapes ─────────────────────────────────────────
@@ -128,7 +128,7 @@ export const JiraSiteSchema = z.object({
 	url: z.string().url(),
 	email: z.string().email(),
 	apiToken: z.string().min(1),
-});
+}).passthrough();
 export type JiraSiteDto = z.infer<typeof JiraSiteSchema>;
 
 // ── Absence / calendar shapes ────────────────────────────────────────
@@ -158,11 +158,17 @@ export const UserAbsenceSchema = z.object({
 	id: z.string().min(1),
 	userId: z.string().min(1),
 	providerId: z.string().nullable(),
-	absenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	absenceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(
+		(val) => {
+			const d = new Date(val);
+			return !Number.isNaN(d.getTime()) && d.toISOString().startsWith(val);
+		},
+		{ message: 'Invalid calendar date' },
+	),
 	kind: AbsenceKindSchema,
 	reason: z.string(),
 	metadata: z.record(z.string(), z.unknown()),
-	createdAt: z.string(),
-	updatedAt: z.string(),
-});
+	createdAt: z.string().datetime(),
+	updatedAt: z.string().datetime(),
+}).passthrough();
 export type UserAbsenceDto = z.infer<typeof UserAbsenceSchema>;
