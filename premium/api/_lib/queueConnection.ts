@@ -68,7 +68,7 @@ export function redactQueueUrl(url: string): string {
 		}
 		return parsed.toString();
 	} catch {
-		const masked = url.replace(/\/\/[^@/]*:[^@/]*@/, '//***:***@');
+		const masked = url.replace(/\/\/[^:@/\s]*:[^@/\s]*/, '//***:***');
 		return `<unparseable-url: "${masked}">`;
 	}
 }
@@ -105,7 +105,7 @@ export function loadQueueConnectionConfig(
 				const redacted = error.message.split(url).join(redactQueueUrl(url));
 				throw new QueueConnectionError(redacted);
 			}
-			throw error;
+			throw new QueueConnectionError(redactQueueUrl(String(error)));
 		}
 	}
 
@@ -117,7 +117,7 @@ export function loadQueueConnectionConfig(
 			if (error instanceof RedisConfigError) {
 				throw new QueueConnectionError(error.message);
 			}
-			throw error;
+			throw new QueueConnectionError(redactQueueUrl(String(error)));
 		}
 	}
 
@@ -135,7 +135,7 @@ export function describeQueueConnection(config: QueueConnectionConfig): string {
 	const protocol = config.tls ? 'rediss' : 'redis';
 	const db = config.db !== undefined ? `/${config.db}` : '';
 	const features = [
-		...((config.tls ? ['TLS'] : []) as string[]),
+		...(config.tls ? ['TLS'] : []),
 		config.hasPassword ? 'password set' : 'no password',
 	];
 	return `${protocol}://${config.host}:${config.port}${db} (${features.join(', ')})`;

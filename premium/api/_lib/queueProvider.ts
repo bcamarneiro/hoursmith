@@ -3,7 +3,7 @@
  *
  * Central place for queue names and queue construction so producers and
  * consumers agree on names, the Redis connection, and default job options.
- * The connection is resolved from env via `redisConfig.js`; nothing here
+ * The connection is resolved from env via `queueConnection.js`; nothing here
  * touches the network until a producer actually adds a job.
  */
 
