@@ -61,7 +61,7 @@ export const RecentActivity: React.FC<Props> = ({ isOpen, onClose }) => {
 				issueMap = new Map();
 				grouped.set(s.issueKey, issueMap);
 			}
-			// Use the entry with the highest suggestedSeconds if same date appears
+			// Keep entry with longest reason (more detail) when same date appears
 			const prev = issueMap.get(s.date);
 			if (
 				!prev ||
