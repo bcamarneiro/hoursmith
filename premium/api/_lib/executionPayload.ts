@@ -109,8 +109,7 @@ const CALENDAR_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 const SCHEDULE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-const IANA_TZ_RE =
-	/^[A-Za-z_]+(?:\/[A-Za-z_][A-Za-z0-9_]+)*$/;
+const IANA_TZ_RE = /^[A-Za-z_]+(?:\/[A-Za-z_][A-Za-z0-9_]+)*$/;
 
 const FOR_DURATION_RE = /^P\d+[DHM]$/;
 
@@ -316,15 +315,7 @@ function parseReconcileScope(scope: unknown): ReconcileScope | undefined {
 
 	// reject unknown scope keys
 	for (const key of Object.keys(record)) {
-		if (
-			![
-				'userId',
-				'teamId',
-				'since',
-				'for',
-				'includeDeleted',
-			].includes(key)
-		) {
+		if (!['userId', 'teamId', 'since', 'for', 'includeDeleted'].includes(key)) {
 			throw new ExecutionPayloadError(
 				`reconcile scope has unknown key "${key}".`,
 			);
@@ -378,9 +369,7 @@ function parseReportExportScope(scope: unknown): ReportExportScope {
 	}
 
 	const rawFormat = requireString(record, 'format');
-	if (
-		!(REPORT_EXPORT_FORMATS as readonly string[]).includes(rawFormat)
-	) {
+	if (!(REPORT_EXPORT_FORMATS as readonly string[]).includes(rawFormat)) {
 		throw new ExecutionPayloadError(
 			`scope.format must be one of ${REPORT_EXPORT_FORMATS.map((f) => `"${f}"`).join(', ')}, got ${JSON.stringify(rawFormat)}.`,
 		);

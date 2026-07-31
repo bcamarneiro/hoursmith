@@ -14,7 +14,7 @@ import { Queue, type QueueOptions } from 'bullmq';
 
 import { parseQueueSettings } from './queueConfig.js';
 import { loadQueueConnectionConfig } from './queueConnection.js';
-import { type RedisEnv } from './redisConfig.js';
+import type { RedisEnv } from './redisConfig.js';
 
 /** Queue names shared by producers and consumers. */
 export const QUEUE_NAMES = {

@@ -155,7 +155,9 @@ export function parseJobData(input: unknown): JobWireData {
 }
 
 /** Throw unless `value` is the current wire format version. */
-export function assertWireFormatVersion(value: unknown): asserts value is WireFormatVersion {
+export function assertWireFormatVersion(
+	value: unknown,
+): asserts value is WireFormatVersion {
 	if (value !== WIRE_FORMAT_VERSION) {
 		throw new WireFormatError(
 			`unsupported wire format version ${String(value)} (expected ${WIRE_FORMAT_VERSION})`,
@@ -217,11 +219,7 @@ function isValidIsoUtcTimestamp(value: string): boolean {
 
 /** True when `value` is a non-negative safe integer. */
 function isNonNegativeSafeInteger(value: unknown): value is number {
-	return (
-		typeof value === 'number' &&
-		Number.isSafeInteger(value) &&
-		value >= 0
-	);
+	return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 /** True when `value` is an absolute https URL. */
@@ -234,46 +232,76 @@ function isHttpsUrl(value: string): boolean {
 	}
 }
 
-function parseReportExportArtifact(input: Record<string, unknown>): ReportExportArtifact {
+function parseReportExportArtifact(
+	input: Record<string, unknown>,
+): ReportExportArtifact {
 	const reportUrl = input.reportUrl;
 	if (typeof reportUrl !== 'string' || !isHttpsUrl(reportUrl)) {
-		throw new WireFormatError('result.artifact.reportUrl must be an absolute https URL');
+		throw new WireFormatError(
+			'result.artifact.reportUrl must be an absolute https URL',
+		);
 	}
 	const fileName = input.fileName;
-	if (typeof fileName !== 'string' || fileName.length === 0 || fileName.length > MAX_FILE_NAME_LENGTH) {
-		throw new WireFormatError('result.artifact.fileName must be a non-empty string');
+	if (
+		typeof fileName !== 'string' ||
+		fileName.length === 0 ||
+		fileName.length > MAX_FILE_NAME_LENGTH
+	) {
+		throw new WireFormatError(
+			'result.artifact.fileName must be a non-empty string',
+		);
 	}
 	const contentType = input.contentType;
 	if (typeof contentType !== 'string' || contentType.length === 0) {
-		throw new WireFormatError('result.artifact.contentType must be a non-empty string');
+		throw new WireFormatError(
+			'result.artifact.contentType must be a non-empty string',
+		);
 	}
 	const byteSize = input.byteSize;
 	if (!isNonNegativeSafeInteger(byteSize)) {
-		throw new WireFormatError('result.artifact.byteSize must be a non-negative integer');
+		throw new WireFormatError(
+			'result.artifact.byteSize must be a non-negative integer',
+		);
 	}
 	return { reportUrl, fileName, contentType, byteSize };
 }
 
-function parseReconcileSummary(input: Record<string, unknown>): ReconcileSummary {
+function parseReconcileSummary(
+	input: Record<string, unknown>,
+): ReconcileSummary {
 	const scanned = input.scanned;
 	if (!isNonNegativeSafeInteger(scanned)) {
-		throw new WireFormatError('result.summary.scanned must be a non-negative integer');
+		throw new WireFormatError(
+			'result.summary.scanned must be a non-negative integer',
+		);
 	}
 	const replayed = input.replayed;
 	if (!isNonNegativeSafeInteger(replayed)) {
-		throw new WireFormatError('result.summary.replayed must be a non-negative integer');
+		throw new WireFormatError(
+			'result.summary.replayed must be a non-negative integer',
+		);
 	}
 	return { scanned, replayed };
 }
 
-function parseExecutionErrorInfo(input: Record<string, unknown>): ExecutionErrorInfo {
+function parseExecutionErrorInfo(
+	input: Record<string, unknown>,
+): ExecutionErrorInfo {
 	const code = input.code;
 	if (typeof code !== 'string' || !ERROR_CODE_RE.test(code)) {
-		throw new WireFormatError('result.error.code must be SCREAMING_SNAKE (e.g. JIRA_API_ERROR)');
+		throw new WireFormatError(
+			'result.error.code must be SCREAMING_SNAKE (e.g. JIRA_API_ERROR)',
+		);
 	}
 	const message = input.message;
-	if (typeof message !== 'string' || message.length === 0 || message.length > MAX_ERROR_MESSAGE_LENGTH) {
-		throw new WireFormatError('result.error.message must be a non-empty string');
+	if (
+		typeof message !== 'string' ||
+		message.length === 0 ||
+		message.length > MAX_ERROR_MESSAGE_LENGTH
+	) {
+		throw new WireFormatError(
+			'result.error.message must be a non-empty string',
+		);
 	}
 	const retryable = input.retryable;
 	if (typeof retryable !== 'boolean') {
@@ -298,18 +326,28 @@ export function parseExecutionResult(input: unknown): ExecutionResult {
 		throw new WireFormatError('result.executionId must be a UUID v4');
 	}
 	const kind = input.kind;
-	if (typeof kind !== 'string' || !EXECUTION_KINDS.includes(kind as ExecutionKind)) {
-		throw new WireFormatError(`result.kind must be one of: ${EXECUTION_KINDS.join(', ')}`);
+	if (
+		typeof kind !== 'string' ||
+		!EXECUTION_KINDS.includes(kind as ExecutionKind)
+	) {
+		throw new WireFormatError(
+			`result.kind must be one of: ${EXECUTION_KINDS.join(', ')}`,
+		);
 	}
 	const status = input.status;
-	if (typeof status !== 'string' || !EXECUTION_STATUSES.includes(status as ExecutionStatus)) {
+	if (
+		typeof status !== 'string' ||
+		!EXECUTION_STATUSES.includes(status as ExecutionStatus)
+	) {
 		throw new WireFormatError('result.status must be "success" or "failed"');
 	}
 	const kindValue = kind as ExecutionKind;
 	if (status === 'failed') {
 		const failedAt = input.failedAt;
 		if (typeof failedAt !== 'string' || !isValidIsoUtcTimestamp(failedAt)) {
-			throw new WireFormatError('result.failedAt must be a real ISO-8601 UTC timestamp');
+			throw new WireFormatError(
+				'result.failedAt must be a real ISO-8601 UTC timestamp',
+			);
 		}
 		const error = input.error;
 		if (!isRecord(error)) {
@@ -325,13 +363,17 @@ export function parseExecutionResult(input: unknown): ExecutionResult {
 	}
 	const completedAt = input.completedAt;
 	if (typeof completedAt !== 'string' || !isValidIsoUtcTimestamp(completedAt)) {
-		throw new WireFormatError('result.completedAt must be a real ISO-8601 UTC timestamp');
+		throw new WireFormatError(
+			'result.completedAt must be a real ISO-8601 UTC timestamp',
+		);
 	}
 	const contract = EXECUTION_RESULT_CONTRACTS[kindValue];
 	if (contract.successPayload === 'artifact') {
 		const artifact = input.artifact;
 		if (!isRecord(artifact)) {
-			throw new WireFormatError('result.artifact must be an object for report-export results');
+			throw new WireFormatError(
+				'result.artifact must be an object for report-export results',
+			);
 		}
 		return {
 			executionId,
@@ -343,7 +385,9 @@ export function parseExecutionResult(input: unknown): ExecutionResult {
 	}
 	const summary = input.summary;
 	if (!isRecord(summary)) {
-		throw new WireFormatError('result.summary must be an object for reconcile results');
+		throw new WireFormatError(
+			'result.summary must be an object for reconcile results',
+		);
 	}
 	return {
 		executionId,
