@@ -204,7 +204,9 @@ function decodeEnvelope(payload: string): {
 	try {
 		bytes = base64ToBytes(payload.slice(PREFIX.length));
 	} catch {
-		throw new CryptoPayloadError('aesCrypto.decrypt: payload is not valid base64.');
+		throw new CryptoPayloadError(
+			'aesCrypto.decrypt: payload is not valid base64.',
+		);
 	}
 	const header = 1 + SALT_BYTES + IV_BYTES;
 	if (bytes.length < header + TAG_BYTES) {
