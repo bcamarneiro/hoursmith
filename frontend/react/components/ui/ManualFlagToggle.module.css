@@ -31,7 +31,7 @@
 	outline: none;
 }
 
-.track[aria-disabled='true'] {
+.track[aria-disabled="true"] {
 	opacity: 0.5;
 	cursor: not-allowed;
 }

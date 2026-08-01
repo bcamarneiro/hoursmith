@@ -32,21 +32,14 @@ describe('ManualFlagToggle', () => {
 
 	it('does not call onChange when disabled', () => {
 		const onChange = vi.fn();
-		render(
-			<ManualFlagToggle checked={false} onChange={onChange} disabled />,
-		);
+		render(<ManualFlagToggle checked={false} onChange={onChange} disabled />);
 		fireEvent.click(screen.getByRole('switch'));
 		expect(onChange).not.toHaveBeenCalled();
 	});
 
 	it('renders with aria-disabled when disabled', () => {
-		render(
-			<ManualFlagToggle checked={false} onChange={() => {}} disabled />,
-		);
-		expect(screen.getByRole('switch')).toHaveAttribute(
-			'aria-disabled',
-			'true',
-		);
+		render(<ManualFlagToggle checked={false} onChange={() => {}} disabled />);
+		expect(screen.getByRole('switch')).toHaveAttribute('aria-disabled', 'true');
 	});
 
 	it('renders the label text', () => {
@@ -62,10 +55,7 @@ describe('ManualFlagToggle', () => {
 
 	it('uses aria-label when no label prop is provided', () => {
 		render(<ManualFlagToggle checked={false} onChange={() => {}} />);
-		expect(screen.getByRole('switch')).toHaveAttribute(
-			'aria-label',
-			'Flag',
-		);
+		expect(screen.getByRole('switch')).toHaveAttribute('aria-label', 'Flag');
 	});
 
 	it('toggles via Space key', () => {
@@ -84,9 +74,7 @@ describe('ManualFlagToggle', () => {
 
 	it('does not toggle on key press when disabled', () => {
 		const onChange = vi.fn();
-		render(
-			<ManualFlagToggle checked={false} onChange={onChange} disabled />,
-		);
+		render(<ManualFlagToggle checked={false} onChange={onChange} disabled />);
 		fireEvent.keyDown(screen.getByRole('switch'), { key: ' ' });
 		expect(onChange).not.toHaveBeenCalled();
 	});
