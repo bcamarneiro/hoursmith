@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import type { RescueTimeDaySummary } from '../../../types/Suggestion';
 import { fetchCalendarSuggestions } from '../../services/calendarService';
+import { triggerCalendarDateListIntegration } from '../../services/calendarTriggerService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
 import {
 	fetchRecentActivity,
@@ -433,6 +434,12 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 				daySummaries: summaries,
 				lastFetchedAt: new Date().toISOString(),
 			});
+
+			// ADA-627: fire-and-forget trigger when calendar date-list
+			// data was successfully integrated this refresh cycle.
+			if (calendarSuggestions.length > 0) {
+				triggerCalendarDateListIntegration();
+			}
 		}
 
 		run();
