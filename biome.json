@@ -6,6 +6,21 @@
 			"recommended": true
 		}
 	},
+	"overrides": [
+		{
+			"includes": ["design_handoff_hoursmith/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noDescendingSpecificity": "off"
+					},
+					"suspicious": {
+						"noEmptyBlock": "off"
+					}
+				}
+			}
+		}
+	],
 	"assist": {
 		"actions": {
 			"source": {

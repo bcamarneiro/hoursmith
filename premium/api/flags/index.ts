@@ -29,7 +29,7 @@
 import { verifyJwt } from '../_lib/auth.js';
 import { emailFromToken } from '../_lib/authEmail.js';
 import { writeEdgeConfig } from '../_lib/edgeConfig.js';
-import { resolveFlags, type PublicFlags } from '../_lib/flags.js';
+import { resolveFlags, } from '../_lib/flags.js';
 
 export const config = {
 	runtime: 'edge',

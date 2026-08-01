@@ -613,10 +613,10 @@ textarea.inp {
 	margin-top: 7px;
 	line-height: 1.5;
 }
-.fg small code,
 .fg-hint code,
 .sec-sub code,
-.mono-inline {
+.mono-inline,
+.fg small code {
 	font-family: var(--p-num);
 	font-size: 0.9em;
 	background: #efe9dd;
