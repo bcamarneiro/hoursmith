@@ -67,11 +67,18 @@ export const ToastContainer: React.FC = () => {
 
 	if (toasts.length === 0) return null;
 
+	const ariaRole = (type: ToastType) =>
+		type === 'error' ? 'alert' : 'status';
+
 	return createPortal(
-		<div className={styles.container}>
+		<div className={styles.container} aria-live="polite">
 			{toasts.map((t) => (
-				<div key={t.id} className={`${styles.toast} ${TYPE_STYLES[t.type]}`}>
-					<span className={styles.icon}>
+				<div
+					key={t.id}
+					className={`${styles.toast} ${TYPE_STYLES[t.type]}`}
+					role={ariaRole(t.type)}
+				>
+					<span className={styles.icon} aria-hidden="true">
 						{t.type === 'success' && '\u2713'}
 						{t.type === 'error' && '\u2717'}
 						{t.type === 'info' && '\u2139'}
@@ -81,6 +88,7 @@ export const ToastContainer: React.FC = () => {
 						<button
 							type="button"
 							className={styles.action}
+							aria-label={t.action.label}
 							onClick={() => {
 								t.action?.onClick();
 								setToasts((prev) => prev.filter((x) => x.id !== t.id));
@@ -92,6 +100,7 @@ export const ToastContainer: React.FC = () => {
 					<button
 						type="button"
 						className={styles.dismiss}
+						aria-label="Dismiss"
 						onClick={() =>
 							setToasts((prev) => prev.filter((x) => x.id !== t.id))
 						}
