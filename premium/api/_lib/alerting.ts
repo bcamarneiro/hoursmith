@@ -200,6 +200,7 @@ export async function sendAlertNotifications(
 			settings.slackWebhookUrl,
 			{ text: formatSlackText(payload.queue, payload.failures, settings) },
 			fetchImpl,
+			settings.webhookTimeoutMs,
 		);
 	}
 	if (settings.emailWebhookUrl && settings.emailRecipients.length > 0) {
@@ -211,6 +212,7 @@ export async function sendAlertNotifications(
 				text: formatEmailBody(payload.queue, payload.failures, settings),
 			},
 			fetchImpl,
+			settings.webhookTimeoutMs,
 		);
 	}
 	return results;
@@ -266,7 +268,9 @@ export async function evaluateAndDispatch(
 		{ queue, failures: decision.windowFailures },
 		deps.fetchImpl ?? fetch,
 	);
-	markAlertSent(state, queue, now);
+	if (results.slack || results.email) {
+		markAlertSent(state, queue, now);
+	}
 	return {
 		alerted: true,
 		decision: { ...decision, reason: decision.reason ?? null },
@@ -278,13 +282,18 @@ async function postJson(
 	url: string,
 	body: Record<string, unknown>,
 	fetchImpl: FetchLike,
+	timeoutMs: number,
 ): Promise<boolean> {
 	try {
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), timeoutMs);
 		const res = await fetchImpl(url, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(body),
+			signal: controller.signal,
 		});
+		clearTimeout(timer);
 		return res.ok;
 	} catch {
 		return false;

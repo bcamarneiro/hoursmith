@@ -241,6 +241,18 @@ describe('sendAlertNotifications', () => {
 		expect(results).toEqual({ slack: false, email: false });
 		expect(fetchImpl).not.toHaveBeenCalled();
 	});
+
+	it('passes an AbortSignal to fetch so a hung webhook cannot stall dispatch', async () => {
+		const fetchImpl = vi.fn().mockResolvedValue(okResponse());
+		await sendAlertNotifications(
+			settings({ slackWebhookUrl: 'https://hooks.slack.com/x' }),
+			{ queue: 'raw-commits', failures: [event({})] },
+			fetchImpl,
+		);
+		expect(fetchImpl).toHaveBeenCalledTimes(1);
+		const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+		expect(init.signal).toBeInstanceOf(AbortSignal);
+	});
 });
 
 describe('evaluateAndDispatch', () => {
@@ -340,6 +352,53 @@ describe('evaluateAndDispatch', () => {
 		);
 		expect(outcome.alerted).toBe(false);
 		expect(outcome.decision.count).toBe(2);
+	});
+
+	it('does not advance cooldown when every channel fails', async () => {
+		const fetchImpl = vi
+			.fn()
+			.mockResolvedValue({ ok: false, status: 500 } as Response);
+		const state: AlertState = { lastAlertAtByQueue: {} };
+		const outcome = await evaluateAndDispatch(
+			[event({}), event({}), event({})],
+			'raw-commits',
+			state,
+			settings({
+				minFailures: 3,
+				slackWebhookUrl: 'https://hooks.slack.com/x',
+				emailRecipients: ['ops@hoursmith.dev'],
+				emailWebhookUrl: 'https://mail.hoursmith.dev/send',
+			}),
+			{ now, fetchImpl },
+		);
+		expect(outcome.alerted).toBe(true);
+		expect(outcome.slack).toBe(false);
+		expect(outcome.email).toBe(false);
+		expect(state.lastAlertAtByQueue).toEqual({});
+	});
+
+	it('still advances cooldown when at least one channel succeeds', async () => {
+		const fetchImpl = vi
+			.fn()
+			.mockResolvedValueOnce(okResponse()) // slack
+			.mockResolvedValueOnce({ ok: false, status: 500 } as Response); // email
+		const state: AlertState = { lastAlertAtByQueue: {} };
+		const outcome = await evaluateAndDispatch(
+			[event({}), event({}), event({})],
+			'raw-commits',
+			state,
+			settings({
+				minFailures: 3,
+				slackWebhookUrl: 'https://hooks.slack.com/x',
+				emailRecipients: ['ops@hoursmith.dev'],
+				emailWebhookUrl: 'https://mail.hoursmith.dev/send',
+			}),
+			{ now, fetchImpl },
+		);
+		expect(outcome.alerted).toBe(true);
+		expect(outcome.slack).toBe(true);
+		expect(outcome.email).toBe(false);
+		expect(state.lastAlertAtByQueue['raw-commits']).toBe(now);
 	});
 });
 

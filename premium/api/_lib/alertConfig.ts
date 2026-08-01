@@ -43,6 +43,8 @@ export interface AlertSettings {
 	emailRecipients: string[];
 	/** HTTP endpoint that relays an alert email. Empty disables the email channel. */
 	emailWebhookUrl: string;
+	/** Fetch timeout in ms for webhook POST requests (prevents stalled dispatch). */
+	webhookTimeoutMs: number;
 }
 
 export const ALERT_SETTINGS_DEFAULTS: AlertSettings = {
@@ -53,6 +55,7 @@ export const ALERT_SETTINGS_DEFAULTS: AlertSettings = {
 	slackWebhookUrl: '',
 	emailRecipients: [],
 	emailWebhookUrl: '',
+	webhookTimeoutMs: 10_000,
 };
 
 type AlertSettingKey = keyof AlertSettings;
@@ -95,6 +98,7 @@ export const ALERT_SETTINGS_SCHEMA: readonly AlertSettingSchemaEntry[] = [
 	{ env: 'ALERT_MIN_FAILURES', key: 'minFailures', kind: 'int', min: 1 },
 	{ env: 'ALERT_WINDOW_MS', key: 'windowMs', kind: 'int', min: 1 },
 	{ env: 'ALERT_COOLDOWN_MS', key: 'cooldownMs', kind: 'int', min: 0 },
+	{ env: 'ALERT_WEBHOOK_TIMEOUT_MS', key: 'webhookTimeoutMs', kind: 'int', min: 1 },
 	{ env: 'ALERT_ERROR_PATTERNS', key: 'errorPatterns', kind: 'patternList' },
 	{ env: 'ALERT_SLACK_WEBHOOK_URL', key: 'slackWebhookUrl', kind: 'string' },
 	{ env: 'ALERT_EMAIL_TO', key: 'emailRecipients', kind: 'recipientList' },
@@ -162,6 +166,22 @@ export function parseAlertSettings(env: AlertEnv = process.env): AlertSettings {
 				break;
 			}
 			case 'string': {
+				// Validate webhook URLs look like real URLs.
+				if (entry.key === 'slackWebhookUrl' || entry.key === 'emailWebhookUrl') {
+					try {
+						const url = new URL(raw);
+						if (url.protocol !== 'https:') {
+							throw new AlertConfigError(
+								`${entry.env} must start with https://, got "${raw}".`,
+							);
+						}
+					} catch (e) {
+						if (e instanceof AlertConfigError) throw e;
+						throw new AlertConfigError(
+							`${entry.env} is not a valid URL: "${raw}".`,
+						);
+					}
+				}
 				// Schema entries pair a string kind with a string key.
 				settings[entry.key as StringSettingKeys] = raw;
 				break;

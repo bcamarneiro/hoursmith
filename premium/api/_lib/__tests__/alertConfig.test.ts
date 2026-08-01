@@ -65,6 +65,7 @@ describe('parseAlertSettings', () => {
 			slackWebhookUrl: 'https://hooks.slack.com/services/T1/B2/x',
 			emailRecipients: ['ops@hoursmith.dev', 'oncall@hoursmith.dev'],
 			emailWebhookUrl: 'https://mail.hoursmith.dev/send',
+			webhookTimeoutMs: 10_000,
 		});
 	});
 
@@ -100,5 +101,28 @@ describe('parseAlertSettings', () => {
 			'503 Service Unavailable',
 			'timeout.*504',
 		]);
+	});
+
+	it('rejects a malformed Slack webhook URL', () => {
+		expect(() =>
+			parseAlertSettings({ ALERT_SLACK_WEBHOOK_URL: 'not-a-url' }),
+		).toThrow('ALERT_SLACK_WEBHOOK_URL is not a valid URL');
+	});
+
+	it('rejects a non-https webhook URL', () => {
+		expect(() =>
+			parseAlertSettings({ ALERT_SLACK_WEBHOOK_URL: 'http://hooks.slack.com/x' }),
+		).toThrow('ALERT_SLACK_WEBHOOK_URL must start with https://');
+	});
+
+	it('rejects a malformed email webhook URL', () => {
+		expect(() =>
+			parseAlertSettings({ ALERT_EMAIL_WEBHOOK_URL: 'not-a-url' }),
+		).toThrow('ALERT_EMAIL_WEBHOOK_URL is not a valid URL');
+	});
+
+	it('applies a webhookTimeoutMs override', () => {
+		const settings = parseAlertSettings({ ALERT_WEBHOOK_TIMEOUT_MS: '5000' });
+		expect(settings.webhookTimeoutMs).toBe(5000);
 	});
 });
