@@ -23,6 +23,10 @@ import { corsHeaders } from '../_lib/cors.js';
 import { getEntitlement } from '../_lib/entitlement.js';
 import { forwardToJira } from '../_lib/jiraForward.js';
 import { checkRateLimit } from '../_lib/rateLimit.js';
+// transformRequest is *not* used here — the proxy streams the request body
+// directly to Jira (via input.request.body in jiraForward), so consuming it
+// beforehand would break forwarding. The root middleware.ts handles CORS +
+// content-type gates globally for this endpoint.
 
 // Pin to Frankfurt for GDPR residency. Mirrors vercel.json.
 export const config = {

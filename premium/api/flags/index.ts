@@ -15,6 +15,7 @@
 
 import { emailFromToken } from '../_lib/authEmail.js';
 import { resolveFlags } from '../_lib/flags.js';
+import { transformRequest } from '../_lib/requestTransformer.js';
 
 export const config = {
 	runtime: 'edge',
@@ -37,6 +38,9 @@ export async function handleFlags(
 	if (request.method !== 'GET') {
 		return jsonResponse(405, { error: 'method_not_allowed' });
 	}
+
+	// Validate request shape via the shared transformer (future: query params).
+	const _parsed = await transformRequest(request);
 
 	const resolve = deps.resolveFlags ?? resolveFlags;
 	const resolveEmail = deps.emailFromToken ?? emailFromToken;
