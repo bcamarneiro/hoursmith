@@ -31,7 +31,12 @@ function validHandler(
 
 describe('PluginHookName', () => {
 	it('declares every hook in the union, in declaration order', () => {
-		expect(PLUGIN_HOOKS).toEqual(['lifecycle', 'webhook', 'request', 'schedule']);
+		expect(PLUGIN_HOOKS).toEqual([
+			'lifecycle',
+			'webhook',
+			'request',
+			'schedule',
+		]);
 	});
 
 	it('type guard accepts every declared hook', () => {
@@ -69,18 +74,18 @@ describe('validatePluginHandler', () => {
 		expect(() => validatePluginHandler(validHandler({ name: '' }))).toThrow(
 			PluginHandlerError,
 		);
-		expect(() => validatePluginHandler(validHandler({ name: undefined }))).toThrow(
-			PluginHandlerError,
-		);
+		expect(() =>
+			validatePluginHandler(validHandler({ name: undefined })),
+		).toThrow(PluginHandlerError);
 	});
 
 	it('rejects a non-kebab-case name', () => {
-		expect(() => validatePluginHandler(validHandler({ name: 'AuditEvents' }))).toThrow(
-			PluginHandlerError,
-		);
-		expect(() => validatePluginHandler(validHandler({ name: 'audit events' }))).toThrow(
-			PluginHandlerError,
-		);
+		expect(() =>
+			validatePluginHandler(validHandler({ name: 'AuditEvents' })),
+		).toThrow(PluginHandlerError);
+		expect(() =>
+			validatePluginHandler(validHandler({ name: 'audit events' })),
+		).toThrow(PluginHandlerError);
 	});
 
 	it('rejects an over-long name', () => {
@@ -124,9 +129,9 @@ describe('validatePluginHandler', () => {
 	});
 
 	it('rejects an invalid timeoutMs', () => {
-		expect(() =>
-			validatePluginHandler(validHandler({ timeoutMs: 0 })),
-		).toThrow(PluginHandlerError);
+		expect(() => validatePluginHandler(validHandler({ timeoutMs: 0 }))).toThrow(
+			PluginHandlerError,
+		);
 		expect(() =>
 			validatePluginHandler(
 				validHandler({ timeoutMs: HANDLER_CONTRACT.maxTimeoutMs + 1 }),
@@ -150,10 +155,7 @@ describe('validatePluginHandler', () => {
 
 describe('normalizePluginHandler', () => {
 	it('applies defaults for priority and timeoutMs', () => {
-		const registration = normalizePluginHandler(
-			'jira-export',
-			validHandler(),
-		);
+		const registration = normalizePluginHandler('jira-export', validHandler());
 		expect(registration).toMatchObject({
 			pluginId: 'jira-export',
 			name: 'audit-events',

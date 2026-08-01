@@ -22,11 +22,7 @@
  */
 
 /** Hook points a plugin handler may be registered for. */
-export type PluginHookName =
-	| 'lifecycle'
-	| 'webhook'
-	| 'request'
-	| 'schedule';
+export type PluginHookName = 'lifecycle' | 'webhook' | 'request' | 'schedule';
 
 /** Every valid hook name, in declaration order. Used by validation. */
 export const PLUGIN_HOOKS: readonly PluginHookName[] = [
@@ -100,15 +96,17 @@ export interface PluginHandler<TEvent = unknown, TResult = unknown> {
 }
 
 /** A validated handler as stored by a registry/dispatcher. */
-export type RegisteredPluginHandler<TEvent = unknown, TResult = unknown> =
-	Readonly<{
-		pluginId: string;
-		name: string;
-		hook: PluginHookName;
-		priority: number;
-		timeoutMs: number;
-		handle: PluginHandlerFn<TEvent, TResult>;
-	}>;
+export type RegisteredPluginHandler<
+	TEvent = unknown,
+	TResult = unknown,
+> = Readonly<{
+	pluginId: string;
+	name: string;
+	hook: PluginHookName;
+	priority: number;
+	timeoutMs: number;
+	handle: PluginHandlerFn<TEvent, TResult>;
+}>;
 
 export type PluginHandlerErrorCode =
 	| 'invalid-handler'
@@ -155,8 +153,14 @@ function invalidHandler(message: string): never {
 	throw new PluginHandlerError('invalid-handler', message);
 }
 
-function assertObject(handler: unknown): asserts handler is Record<string, unknown> {
-	if (handler === null || typeof handler !== 'object' || Array.isArray(handler)) {
+function assertObject(
+	handler: unknown,
+): asserts handler is Record<string, unknown> {
+	if (
+		handler === null ||
+		typeof handler !== 'object' ||
+		Array.isArray(handler)
+	) {
 		invalidHandler('plugin handler must be an object');
 	}
 }
