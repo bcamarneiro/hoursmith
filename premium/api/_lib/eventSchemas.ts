@@ -39,10 +39,22 @@ export const POLAR_EVENT_TYPES = [
 ] as const;
 export type PolarEventType = (typeof POLAR_EVENT_TYPES)[number];
 
+/** Known Polar subscription status values (matches subscriptionLifecycle.ts POLAR_STATUS_MAP keys). */
+export const POLAR_STATUS_KEYS = [
+	'active',
+	'past_due',
+	'canceled',
+	'incomplete',
+	'trialing',
+	'unpaid',
+	'incomplete_expired',
+] as const;
+export type PolarStatusKey = (typeof POLAR_STATUS_KEYS)[number];
+
 /** The slice of the Polar subscription payload we depend on. */
 export const polarSubscriptionDataSchema = z.object({
 	id: z.string(),
-	status: z.string(),
+	status: z.enum(POLAR_STATUS_KEYS),
 	product_id: z.string().nullable().optional(),
 	current_period_end: z.string().nullable().optional(),
 	modified_at: z.string().nullable().optional(),

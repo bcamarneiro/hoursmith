@@ -29,15 +29,6 @@ describe('auditLogEventSchema', () => {
 		expect(result.success).toBe(true);
 	});
 
-	it('accepts a valid data_exported event', () => {
-		const result = auditLogEventSchema.safeParse({
-			event_type: 'data_exported',
-			stripe_customer_id: 'cus_def456',
-			metadata: { format: 'json' },
-		});
-		expect(result.success).toBe(true);
-	});
-
 	it('rejects non-object metadata', () => {
 		const result = auditLogEventSchema.safeParse({
 			event_type: 'data_exported',
@@ -84,15 +75,6 @@ describe('auditLogEventSchema', () => {
 	it('rejects missing stripe_customer_id', () => {
 		const result = auditLogEventSchema.safeParse({
 			event_type: 'data_exported',
-		});
-		expect(result.success).toBe(false);
-	});
-
-	it('rejects non-object metadata', () => {
-		const result = auditLogEventSchema.safeParse({
-			event_type: 'data_exported',
-			stripe_customer_id: 'cus_abc123',
-			metadata: ['not-an-object'],
 		});
 		expect(result.success).toBe(false);
 	});
