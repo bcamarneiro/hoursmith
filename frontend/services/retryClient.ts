@@ -199,6 +199,121 @@ export class RequestQueue {
 }
 
 // ---------------------------------------------------------------------------
+// Structured error logging
+// ---------------------------------------------------------------------------
+
+/** Phases the retry client reports to the logger. */
+export type RetryLogPhase =
+	| 'queued'
+	| 'attempt'
+	| 'retryable'
+	| 'exhausted'
+	| 'success'
+	| 'non-retryable'
+	| 'network-retry'
+	| 'aborted';
+
+/** A single structured log entry emitted by the retry client. */
+export interface RetryLogEntry {
+	phase: RetryLogPhase;
+	/** 0-based attempt number (0 = initial request). */
+	attempt: number;
+	/** HTTP status when the phase is about a response. */
+	status?: number;
+	/** Backoff delay before the next retry, in ms. */
+	delayMs?: number;
+	/** Error message for network failures. */
+	error?: string;
+	/** Idempotency key in use, when applicable. */
+	idempotencyKey?: string;
+	/** Total requests dispatched so far (initial + retries). */
+	totalAttempts: number;
+}
+
+/**
+ * Pluggable logger so callers can route retry telemetry to their own
+ * infrastructure (console, Sentry, Datadog, etc.) without pulling in a
+ * heavyweight dependency.  The default writes compact messages to `console`.
+ */
+export interface RetryLogger {
+	info(entry: RetryLogEntry): void;
+	warn(entry: RetryLogEntry): void;
+}
+
+const consoleLogger: RetryLogger = {
+	info(entry) {
+		console.info(`[retryClient] ${formatLog(entry)}`);
+	},
+	warn(entry) {
+		console.warn(`[retryClient] ${formatLog(entry)}`);
+	},
+};
+
+function formatLog(e: RetryLogEntry): string {
+	const parts = [`attempt=${e.attempt}`];
+	if (e.status !== undefined) parts.push(`status=${e.status}`);
+	if (e.delayMs !== undefined) parts.push(`delay=${e.delayMs}ms`);
+	if (e.idempotencyKey) parts.push(`key=${e.idempotencyKey.slice(0, 8)}…`);
+	if (e.error) parts.push(`error="${e.error}"`);
+	return `${e.phase} ${parts.join(' ')}`;
+}
+
+let activeLogger: RetryLogger = consoleLogger;
+
+/** Replace the default console logger. Mostly useful in tests. */
+export function setRetryLogger(logger: RetryLogger): void {
+	activeLogger = logger;
+}
+
+/** Reset the logger back to the console default. Exported for test teardown. */
+export function _resetRetryLogger(): void {
+	activeLogger = consoleLogger;
+}
+
+// ---------------------------------------------------------------------------
+// Idempotency
+// ---------------------------------------------------------------------------
+
+/** Methods that mutate server state — the only ones that need a key. */
+const IDEMPOTENT_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/** Header name the retry client injects for mutating requests. */
+export const IDEMPOTENCY_HEADER = 'Idempotency-Key';
+
+/**
+ * True when `method` is a mutating HTTP verb.
+ * GET / HEAD / OPTIONS are safe to replay without a key and are never
+ * instrumented with one.
+ */
+export function isIdempotentMethod(method: string): boolean {
+	return IDEMPOTENT_METHODS.has(method.toUpperCase());
+}
+
+/**
+ * Generate a random idempotency key.
+ *
+ * Uses `crypto.randomUUID()` when available (modern browsers + Node ≥ 19);
+ * falls back to a timestamp + random-hex scheme so the library still works
+ * in older runtimes.  The key is a v4 UUID or a 32‑char hex string.
+ */
+export function generateIdempotencyKey(): string {
+	if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+		return crypto.randomUUID();
+	}
+	// Fallback: 16 random bytes → hex + timestamp suffix.
+	const bytes = new Uint8Array(16);
+	if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+		crypto.getRandomValues(bytes);
+	} else {
+		for (let i = 0; i < 16; i++) {
+			bytes[i] = Math.floor(Math.random() * 256);
+		}
+	}
+	const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+	return `${hex}-${Date.now().toString(36)}`;
+}
+
+// ---------------------------------------------------------------------------
 // Module-level state (shared across calls for cross-request pacing)
 // ---------------------------------------------------------------------------
 
@@ -289,29 +404,140 @@ export async function fetchWithRetry(
 	const signal = init?.signal ?? undefined;
 	const q = getQueue(cfg);
 
+	// Resolve the HTTP method for idempotency-key decisions.
+	const method = (init?.method ?? 'GET').toUpperCase();
+	const needsKey = isIdempotentMethod(method);
+	// Reuse an existing key from headers or generate a fresh one.
+	// The key is resolved once before queueing so all retries share it.
+	let idempotencyKey: string | undefined;
+	if (needsKey) {
+		idempotencyKey =
+			(init?.headers as Record<string, string> | undefined)?.[
+				IDEMPOTENCY_HEADER
+			] ?? (init?.headers as Headers | undefined)?.get(IDEMPOTENCY_HEADER) ??
+			undefined;
+		if (!idempotencyKey) {
+			idempotencyKey = generateIdempotencyKey();
+			// Merge the key into the init headers — shallow copy so we don't
+			// mutate the caller's object.
+			const existingHeaders = init?.headers
+				? new Headers(init.headers as HeadersInit)
+				: new Headers();
+			existingHeaders.set(IDEMPOTENCY_HEADER, idempotencyKey);
+			init = { ...init, headers: existingHeaders };
+		}
+	}
+
+	activeLogger.info({
+		phase: 'queued',
+		attempt: 0,
+		idempotencyKey,
+		totalAttempts: 0,
+	});
+
 	return q.run(async () => {
 		let lastError: unknown = null;
 
 		for (let attempt = 0; attempt <= cfg.maxRetries; attempt++) {
-			if (signal?.aborted) throw abortError(signal);
+			if (signal?.aborted) {
+				activeLogger.warn({
+					phase: 'aborted',
+					attempt,
+					idempotencyKey,
+					totalAttempts: attempt,
+				});
+				throw abortError(signal);
+			}
+
+			activeLogger.info({
+				phase: 'attempt',
+				attempt,
+				idempotencyKey,
+				totalAttempts: attempt,
+			});
 
 			try {
 				const res = await fetch(input, init);
 
-				if (res.ok || !isRetryableStatus(res.status, cfg.retryableStatuses)) {
+				if (res.ok) {
+					activeLogger.info({
+						phase: 'success',
+						attempt,
+						status: res.status,
+						idempotencyKey,
+						totalAttempts: attempt + 1,
+					});
 					return res;
 				}
-				if (attempt >= cfg.maxRetries) return res;
+
+				if (!isRetryableStatus(res.status, cfg.retryableStatuses)) {
+					activeLogger.info({
+						phase: 'non-retryable',
+						attempt,
+						status: res.status,
+						idempotencyKey,
+						totalAttempts: attempt + 1,
+					});
+					return res;
+				}
+
+				if (attempt >= cfg.maxRetries) {
+					activeLogger.warn({
+						phase: 'exhausted',
+						attempt,
+						status: res.status,
+						idempotencyKey,
+						totalAttempts: attempt + 1,
+					});
+					return res;
+				}
 
 				const retryAfter = parseRetryAfter(res.headers.get('retry-after'));
-				await sleep(calculateBackoffDelayMs(attempt, cfg, retryAfter), signal);
+				const delay = calculateBackoffDelayMs(attempt, cfg, retryAfter);
+				activeLogger.info({
+					phase: 'retryable',
+					attempt,
+					status: res.status,
+					delayMs: delay,
+					idempotencyKey,
+					totalAttempts: attempt + 1,
+				});
+				await sleep(delay, signal);
 			} catch (err) {
-				if (isAbortError(err)) throw err;
+				if (isAbortError(err)) {
+					activeLogger.warn({
+						phase: 'aborted',
+						attempt,
+						idempotencyKey,
+						totalAttempts: attempt + 1,
+					});
+					throw err;
+				}
 
 				lastError = err;
-				if (!cfg.retryOnNetworkError || attempt >= cfg.maxRetries) throw err;
+				const msg = err instanceof Error ? err.message : String(err);
 
-				await sleep(calculateBackoffDelayMs(attempt, cfg, null), signal);
+				if (!cfg.retryOnNetworkError || attempt >= cfg.maxRetries) {
+					activeLogger.warn({
+						phase: 'exhausted',
+						attempt,
+						error: msg,
+						idempotencyKey,
+						totalAttempts: attempt + 1,
+					});
+					throw err;
+				}
+
+				const delay = calculateBackoffDelayMs(attempt, cfg, null);
+				activeLogger.info({
+					phase: 'network-retry',
+					attempt,
+					error: msg,
+					delayMs: delay,
+					idempotencyKey,
+					totalAttempts: attempt + 1,
+				});
+				await sleep(delay, signal);
 			}
 		}
 
@@ -329,6 +555,7 @@ export async function fetchWithRetry(
 export function _resetRetryClient(): void {
 	activeConfig = { ...DEFAULT_RETRY_CONFIG };
 	queue = null;
+	activeLogger = consoleLogger;
 }
 
 // ---------------------------------------------------------------------------
