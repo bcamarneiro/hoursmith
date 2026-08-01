@@ -70,7 +70,11 @@ export const ToastContainer: React.FC = () => {
 	return createPortal(
 		<div className={styles.container}>
 			{toasts.map((t) => (
-				<div key={t.id} className={`${styles.toast} ${TYPE_STYLES[t.type]}`}>
+				<div
+					key={t.id}
+					className={`${styles.toast} ${TYPE_STYLES[t.type]}`}
+					role={t.type === 'error' ? 'alert' : 'status'}
+				>
 					<span className={styles.icon}>
 						{t.type === 'success' && '\u2713'}
 						{t.type === 'error' && '\u2717'}
@@ -92,6 +96,7 @@ export const ToastContainer: React.FC = () => {
 					<button
 						type="button"
 						className={styles.dismiss}
+						aria-label="Dismiss notification"
 						onClick={() =>
 							setToasts((prev) => prev.filter((x) => x.id !== t.id))
 						}
