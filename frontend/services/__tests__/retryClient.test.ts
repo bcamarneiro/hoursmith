@@ -711,13 +711,9 @@ describe('structured logging', () => {
 			config,
 		);
 
-		// Advance timers for both backoff delays.
-		await vi.advanceTimersByTimeAsync(100);
-		await vi.advanceTimersByTimeAsync(200);
-
-		// Use a try/catch to avoid vitest unhandled-rejection false positives
-		// with fake timers.
-		await promise.then(
+		// Attach the reject handler BEFORE advancing timers so Vitest
+		// never sees this rejection as unhandled while fake timers run.
+		const handled = promise.then(
 			() => {
 				throw new Error('expected fetchWithRetry to reject');
 			},
@@ -725,6 +721,10 @@ describe('structured logging', () => {
 				expect(err).toBe(networkError);
 			},
 		);
+
+		await vi.advanceTimersByTimeAsync(100);
+		await vi.advanceTimersByTimeAsync(200);
+		await handled;
 
 		const phases = logEntries.map((e) => e.phase);
 		expect(phases).toContain('network-retry');

@@ -309,7 +309,9 @@ export function generateIdempotencyKey(): string {
 			bytes[i] = Math.floor(Math.random() * 256);
 		}
 	}
-	const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+	const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(
+		'',
+	);
 	return `${hex}-${Date.now().toString(36)}`;
 }
 
@@ -414,7 +416,8 @@ export async function fetchWithRetry(
 		idempotencyKey =
 			(init?.headers as Record<string, string> | undefined)?.[
 				IDEMPOTENCY_HEADER
-			] ?? (init?.headers as Headers | undefined)?.get(IDEMPOTENCY_HEADER) ??
+			] ??
+			(init?.headers as Headers | undefined)?.get(IDEMPOTENCY_HEADER) ??
 			undefined;
 		if (!idempotencyKey) {
 			idempotencyKey = generateIdempotencyKey();
