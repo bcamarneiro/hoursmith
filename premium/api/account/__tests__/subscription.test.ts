@@ -40,6 +40,7 @@ function makeAdmin(
 		signOutUser: vi.fn().mockResolvedValue(undefined),
 		insertAuditLog: vi.fn(),
 		recordBillingEvent: vi.fn().mockResolvedValue(true),
+		insertRawCommit: vi.fn(),
 		...overrides,
 	};
 }

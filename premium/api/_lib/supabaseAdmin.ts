@@ -324,6 +324,6 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 			throw new Error(`supabaseAdmin.insertRawCommit failed: ${res.status}`);
 		}
 		const [inserted] = (await res.json()) as RawCommitRow[];
-		return { id: inserted.id! };
+		return { id: (inserted as { id: number }).id };
 	}
 }
