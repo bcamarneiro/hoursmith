@@ -25,10 +25,20 @@
  * (ADA-728) so it can be consumed independently of the registry.
  */
 
-import { type PluginDescriptor, type RegisteredPlugin, normalizeDescriptor, StaticRegistryError } from './pluginContract.js';
+import {
+	type PluginDescriptor,
+	type RegisteredPlugin,
+	normalizeDescriptor,
+	StaticRegistryError,
+} from './pluginContract.js';
 
 // Re-export the contract so existing consumers aren't broken.
-export { type PluginDescriptor, type RegisteredPlugin, StaticRegistryError, type StaticRegistryErrorCode } from './pluginContract.js';
+export {
+	type PluginDescriptor,
+	type RegisteredPlugin,
+	StaticRegistryError,
+	type StaticRegistryErrorCode,
+} from './pluginContract.js';
 
 /** Deep-freeze a clone so callers get a safe, immutable snapshot. */
 function freezeSnapshot<T>(value: T): T {
