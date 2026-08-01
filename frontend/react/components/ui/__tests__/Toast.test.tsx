@@ -10,10 +10,12 @@ import { ToastContainer, toast } from '../Toast';
 
 describe('Toast dismissal', () => {
 	beforeEach(() => {
+		vi.useFakeTimers({ shouldAdvanceTime: true });
 		vi.spyOn(window.location, 'reload').mockImplementation(() => {});
 	});
 
 	afterEach(() => {
+		vi.useRealTimers();
 		vi.restoreAllMocks();
 	});
 
@@ -37,15 +39,19 @@ describe('Toast dismissal', () => {
 			toast.error('Second failure');
 		});
 
-		const dismissButtons = screen.getAllByRole('button', {
-			name: 'Dismiss notification',
+		const dismissFirst = screen.getByRole('button', {
+			name: 'Dismiss: First failure',
 		});
-		expect(dismissButtons).toHaveLength(2);
+		const dismissSecond = screen.getByRole('button', {
+			name: 'Dismiss: Second failure',
+		});
 
-		act(() => dismissButtons[0].click());
+		act(() => dismissFirst.click());
 
 		expect(screen.getByRole('alert')).toHaveTextContent('Second failure');
 		expect(screen.queryByText('First failure')).not.toBeInTheDocument();
+		// Second toast's dismiss button still has its unique label
+		expect(dismissSecond).toBeInTheDocument();
 	});
 
 	it('keeps the session intact without a forced reload after dismissal', () => {
@@ -56,7 +62,9 @@ describe('Toast dismissal', () => {
 		const hrefBefore = window.location.href;
 
 		act(() =>
-			screen.getByRole('button', { name: 'Dismiss notification' }).click(),
+			screen
+				.getByRole('button', { name: 'Dismiss: Sync failed' })
+				.click(),
 		);
 
 		expect(screen.queryByRole('alert')).not.toBeInTheDocument();

@@ -18,6 +18,7 @@
 		"test:e2e": "playwright test",
 		"test:e2e:smoke": "playwright test e2e/smoke.spec.ts",
 		"test:e2e:premium": "playwright test e2e/premium-smoke.spec.ts",
+		"test:e2e:safe-navigation": "playwright test e2e/safe-navigation.spec.ts",
 		"test:e2e:ui": "playwright test --ui",
 		"test:e2e:headed": "playwright test --headed",
 		"lint": "biome lint .",

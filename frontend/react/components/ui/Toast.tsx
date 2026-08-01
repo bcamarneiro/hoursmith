@@ -96,7 +96,7 @@ export const ToastContainer: React.FC = () => {
 					<button
 						type="button"
 						className={styles.dismiss}
-						aria-label="Dismiss notification"
+						aria-label={`Dismiss: ${t.message}`}
 						onClick={() =>
 							setToasts((prev) => prev.filter((x) => x.id !== t.id))
 						}
