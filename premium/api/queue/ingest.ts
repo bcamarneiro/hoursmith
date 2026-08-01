@@ -2,8 +2,9 @@
  * GitLab Push Hook ingestion endpoint.
  *
  * `POST /api/queue/ingest` accepts a GitLab Push Hook JSON payload,
- * validates it, and persists a row to `raw_commits` for downstream
- * async processing. Returns 202 Accepted with the inserted row id.
+ * validates it, persists a row to `raw_commits`, and enqueues a
+ * BullMQ job for downstream async processing (profile linking,
+ * commit-user linking). Returns 202 Accepted with the inserted row id.
  *
  * Only `refs/heads/` (branch pushes) are accepted — tag pushes and
  * other refs are rejected with 400.
@@ -12,20 +13,32 @@
  * is intentionally NOT auth-protected. Security relies on webhook URL
  * secrecy and optional IP allowlisting (future improvement).
  *
- * Linear: ADA-631.
+ * Linear: ADA-631, ADA-633.
  */
 
 import {
 	defaultSupabaseAdmin,
 	type SupabaseAdminClient,
 } from '../_lib/supabaseAdmin.js';
+import type { RawCommitJob } from '../_lib/queueProvider.js';
 
 export const config = {
 	runtime: 'edge',
 };
 
+export interface EnqueuePayload {
+	rawCommitId: number;
+	projectId: number;
+	userUsername: string;
+	ref: string;
+}
+
+export type EnqueueFn = (payload: EnqueuePayload) => Promise<void>;
+
 export interface IngestDeps {
 	admin?: SupabaseAdminClient;
+	/** Enqueue a job for downstream processing. Injected so tests can stub it. */
+	enqueue?: EnqueueFn;
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -110,6 +123,26 @@ export async function handleIngest(
 			status: 'pending',
 		});
 
+		const enqueue = deps.enqueue ?? defaultEnqueue;
+		// Fire-and-forget: the row is persisted; enqueue failure is logged but
+		// does not fail the webhook response.
+		enqueue({
+			rawCommitId: id,
+			projectId,
+			userUsername: userUsername as string,
+			ref: ref as string,
+		}).catch((enqueueErr: Error) => {
+			console.log(
+				JSON.stringify({
+					ts: new Date().toISOString(),
+					svc: 'hoursmith-ingest',
+					event: 'enqueue_failed',
+					rawCommitId: id,
+					note: enqueueErr.message,
+				}),
+			);
+		});
+
 		console.log(
 			JSON.stringify({
 				ts: new Date().toISOString(),
@@ -133,6 +166,18 @@ export async function handleIngest(
 		);
 		return jsonResponse(500, { error: 'internal_error' });
 	}
+}
+
+/**
+ * Default enqueue implementation that creates a BullMQ job via the
+ * process-wide `raw-commits` queue singleton.  Lazy-imports so that
+ * tests and serverless endpoints that inject their own `enqueue` never
+ * touch BullMQ.
+ */
+async function defaultEnqueue(payload: EnqueuePayload): Promise<void> {
+	const { getRawCommitsQueue } = await import('../_lib/queueProvider.js');
+	const queue = getRawCommitsQueue();
+	await queue.add('raw-commits', payload satisfies RawCommitJob);
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
