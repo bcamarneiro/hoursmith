@@ -649,9 +649,7 @@ describe('structured logging', () => {
 		const phases = logEntries.map((e) => e.phase);
 		expect(phases).toContain('retryable');
 		expect(phases).toContain('success');
-		const retryableEntries = logEntries.filter(
-			(e) => e.phase === 'retryable',
-		);
+		const retryableEntries = logEntries.filter((e) => e.phase === 'retryable');
 		expect(retryableEntries[0].status).toBe(503);
 		expect(retryableEntries[1].status).toBe(429);
 	});
@@ -681,10 +679,7 @@ describe('structured logging', () => {
 	});
 
 	it('emits non-retryable and returns immediately for client errors', async () => {
-		vi.stubGlobal(
-			'fetch',
-			vi.fn().mockResolvedValue(jsonResponse(404)),
-		);
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(404)));
 
 		const res = await fetchWithRetry(
 			'https://jira.example/rest/api/2/myself',
@@ -715,9 +710,21 @@ describe('structured logging', () => {
 			undefined,
 			config,
 		);
+
+		// Advance timers for both backoff delays.
 		await vi.advanceTimersByTimeAsync(100);
 		await vi.advanceTimersByTimeAsync(200);
-		await expect(promise).rejects.toBe(networkError);
+
+		// Use a try/catch to avoid vitest unhandled-rejection false positives
+		// with fake timers.
+		await promise.then(
+			() => {
+				throw new Error('expected fetchWithRetry to reject');
+			},
+			(err: unknown) => {
+				expect(err).toBe(networkError);
+			},
+		);
 
 		const phases = logEntries.map((e) => e.phase);
 		expect(phases).toContain('network-retry');
@@ -752,20 +759,23 @@ describe('structured logging', () => {
 
 describe('idempotency', () => {
 	describe('isIdempotentMethod', () => {
-		it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
-			'returns true for %s',
-			(method) => {
-				expect(isIdempotentMethod(method)).toBe(true);
-				expect(isIdempotentMethod(method.toLowerCase())).toBe(true);
-			},
-		);
+		it.each([
+			'POST',
+			'PUT',
+			'PATCH',
+			'DELETE',
+		] as const)('returns true for %s', (method) => {
+			expect(isIdempotentMethod(method)).toBe(true);
+			expect(isIdempotentMethod(method.toLowerCase())).toBe(true);
+		});
 
-		it.each(['GET', 'HEAD', 'OPTIONS'] as const)(
-			'returns false for safe method %s',
-			(method) => {
-				expect(isIdempotentMethod(method)).toBe(false);
-			},
-		);
+		it.each([
+			'GET',
+			'HEAD',
+			'OPTIONS',
+		] as const)('returns false for safe method %s', (method) => {
+			expect(isIdempotentMethod(method)).toBe(false);
+		});
 	});
 
 	describe('generateIdempotencyKey', () => {
@@ -841,9 +851,13 @@ describe('idempotency', () => {
 				.mockResolvedValue(jsonResponse(200, { ok: true }));
 			vi.stubGlobal('fetch', fetchMock);
 
-			await fetchWithRetry('https://jira.example/rest/api/2/myself', undefined, {
-				maxRetries: 0,
-			});
+			await fetchWithRetry(
+				'https://jira.example/rest/api/2/myself',
+				undefined,
+				{
+					maxRetries: 0,
+				},
+			);
 
 			expect(fetchMock).toHaveBeenCalledTimes(1);
 			const headers = fetchMock.mock.calls[0][1]?.headers as
