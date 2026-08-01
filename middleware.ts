@@ -13,8 +13,14 @@
  * handlers in the Edge runtime).  For per-handler body/query validation,
  * import `transformRequest` from `premium/api/_lib/requestTransformer.ts`.
  *
+ * CORS policy is delegated to `premium/api/_lib/cors.ts` so there is a single
+ * source of truth across middleware and handler responses.  The 415 error
+ * response includes CORS headers so preflight-aware clients see a proper error.
+ *
  * Linear: ADA-756 (integration of ADA-754 + ADA-753 transformers).
  */
+
+import { corsHeaders } from './premium/api/_lib/cors.js';
 
 /** HTTP methods that conventionally carry a JSON payload. */
 const PAYLOAD_METHODS = new Set(['POST', 'PUT', 'PATCH']);
@@ -31,10 +37,14 @@ export default async function middleware(
 	if (PAYLOAD_METHODS.has(request.method)) {
 		const ct = request.headers.get('content-type');
 		if (ct && !ct.includes('application/json')) {
-			return jsonResponse(415, {
-				error: 'unsupported_content_type',
-				detail: 'This endpoint accepts application/json only.',
-			});
+			return jsonResponse(
+				415,
+				{
+					error: 'unsupported_content_type',
+					detail: 'This endpoint accepts application/json only.',
+				},
+				request.headers.get('origin'),
+			);
 		}
 	}
 
@@ -45,36 +55,25 @@ export default async function middleware(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Set of origins allowed for CORS.  Mirrors `api/_lib/cors.ts`. */
-const ALLOWED_ORIGINS = new Set([
-	'https://hoursmith.io',
-	'https://www.hoursmith.io',
-	'https://staging.hoursmith.io',
-	'http://localhost:5173',
-	'http://localhost:5174',
-	'http://127.0.0.1:5173',
-	'http://127.0.0.1:5174',
-]);
-
 function corsPreflightResponse(request: Request): Response {
 	const origin = request.headers.get('origin');
-	const acao = origin && (ALLOWED_ORIGINS.has(origin) ? origin : '');
-
-	const headers: Record<string, string> = {
-		'access-control-allow-methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-		'access-control-allow-headers':
-			'authorization, content-type, x-jira-base, x-jira-auth',
-		'access-control-max-age': '86400',
-	};
-	if (acao) headers['access-control-allow-origin'] = acao;
-
-	return new Response(null, { status: 204, headers });
+	return new Response(null, {
+		status: 204,
+		headers: corsHeaders(origin),
+	});
 }
 
-function jsonResponse(status: number, body: Record<string, unknown>): Response {
+function jsonResponse(
+	status: number,
+	body: Record<string, unknown>,
+	origin: string | null = null,
+): Response {
 	return new Response(JSON.stringify(body), {
 		status,
-		headers: { 'content-type': 'application/json' },
+		headers: {
+			'content-type': 'application/json',
+			...corsHeaders(origin),
+		},
 	});
 }
 

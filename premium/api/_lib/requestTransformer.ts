@@ -68,9 +68,35 @@ export interface TransformErrorDetail {
 	reason: string;
 }
 
-export type TransformResult<TBody = Record<string, unknown>> =
-	| TransformSuccess<TBody>
+export type TransformResult<TSchema extends RequestSchema | undefined = undefined> =
+	| TransformSuccess<InferBody<TSchema>>
 	| TransformError;
+
+// ---------------------------------------------------------------------------
+// Type inference from schema to body shape
+// ---------------------------------------------------------------------------
+
+/** Map a FieldDef to its TypeScript value type. */
+type InferField<T extends FieldDef> = T['type'] extends 'string'
+	? string
+	: T['type'] extends 'number'
+		? number
+		: T['type'] extends 'boolean'
+			? boolean
+			: unknown;
+
+/** Infer the body object shape from a BodySchema. */
+type InferBodyFromSchema<B extends BodySchema> = {
+	[K in keyof B]: InferField<B[K]>;
+};
+
+/** Extract the body type from a RequestSchema (or fall back to Record<string, unknown>). */
+type InferBody<TSchema extends RequestSchema | undefined> =
+	TSchema extends { body: infer B }
+		? B extends BodySchema
+			? InferBodyFromSchema<B>
+			: Record<string, unknown>
+		: Record<string, unknown>;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -95,7 +121,7 @@ export type TransformResult<TBody = Record<string, unknown>> =
 export async function transformRequest<const TSchema extends RequestSchema>(
 	request: Request,
 	schema?: TSchema,
-): Promise<TransformResult> {
+): Promise<TransformResult<TSchema>> {
 	const query: Record<string, string | number | boolean> = {};
 
 	// --- Query params -------------------------------------------------------
@@ -107,7 +133,18 @@ export async function transformRequest<const TSchema extends RequestSchema>(
 		][]) {
 			const raw = url.searchParams.get(key);
 			if (raw !== null) {
-				query[key] = castValue(raw, def);
+				const casted = castValue(raw, def);
+				if (!typeMatches(casted, def.type)) {
+					return {
+						ok: false,
+						status: 400,
+						error: 'invalid_query_param',
+						details: [
+							{ field: key, reason: `expected_${def.type}` },
+						],
+					};
+				}
+				query[key] = casted;
 			} else if (def.required) {
 				return {
 					ok: false,
@@ -172,7 +209,7 @@ export async function transformRequest<const TSchema extends RequestSchema>(
 		rawBody as Record<string, unknown>,
 		schema.body,
 		query,
-	);
+	) as TransformResult<TSchema>;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +245,15 @@ function validateAndCastBody(
 		}
 
 		if (def.cast && typeof raw === 'string') {
-			cast[key] = castValue(raw, def);
+			const casted = castValue(raw, def);
+			// If cast=true and the result doesn't match the target type,
+			// coercion failed — surface it as a validation error instead of
+			// silently passing a wrong-typed value.
+			if (!typeMatches(casted, def.type)) {
+				errors.push({ field: key, reason: `expected_${def.type}` });
+			} else {
+				cast[key] = casted;
+			}
 		} else if (!typeMatches(raw, def.type)) {
 			errors.push({ field: key, reason: `expected_${def.type}` });
 		} else {

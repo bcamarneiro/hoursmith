@@ -186,7 +186,7 @@ export async function handleCheckout(
 		});
 	}
 
-	const rawTier = validation.body?.tier as string;
+	const rawTier = validation.body?.tier;
 	const tier = parseTier(rawTier);
 	if (!tier) {
 		logCheckout({
@@ -246,7 +246,7 @@ export async function handleCheckout(
 	return jsonResponse(200, { url });
 }
 
-function parseTier(raw: unknown): CheckoutTier | null {
+function parseTier(raw: string | undefined): CheckoutTier | null {
 	if (typeof raw !== 'string') return null;
 	if (raw === 'hosted') return 'hosted';
 	if (raw === 'lead' && LEAD_TIER_ENABLED) return 'lead';
