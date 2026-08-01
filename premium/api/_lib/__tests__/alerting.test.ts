@@ -50,23 +50,26 @@ describe('matchesErrorPattern', () => {
 	});
 
 	it('matches case-insensitively against the error message', () => {
-		expect(matchesErrorPattern(event({ errorMessage: 'connect ECONNRESET' }), ['econnreset'])).toBe(
-			true,
-		);
-	});
-
-	it('matches on regex special characters', () => {
 		expect(
-			matchesErrorPattern(event({ errorMessage: 'gateway timeout after 502 Bad Gateway' }), [
-				'timeout.*502',
+			matchesErrorPattern(event({ errorMessage: 'connect ECONNRESET' }), [
+				'econnreset',
 			]),
 		).toBe(true);
 	});
 
+	it('matches on regex special characters', () => {
+		expect(
+			matchesErrorPattern(
+				event({ errorMessage: 'gateway timeout after 502 Bad Gateway' }),
+				['timeout.*502'],
+			),
+		).toBe(true);
+	});
+
 	it('returns false when no pattern matches', () => {
-		expect(matchesErrorPattern(event({ errorMessage: 'ECONNRESET' }), ['timeout'])).toBe(
-			false,
-		);
+		expect(
+			matchesErrorPattern(event({ errorMessage: 'ECONNRESET' }), ['timeout']),
+		).toBe(false);
 	});
 });
 
@@ -103,7 +106,10 @@ describe('evaluateFailures', () => {
 
 	it('only counts failures that match the configured patterns', () => {
 		const decision = evaluateFailures(
-			[event({ errorMessage: 'ECONNRESET' }), event({ errorMessage: 'ETIMEDOUT' })],
+			[
+				event({ errorMessage: 'ECONNRESET' }),
+				event({ errorMessage: 'ETIMEDOUT' }),
+			],
 			settings({ minFailures: 2, errorPatterns: ['ECONNRESET'] }),
 			now,
 		);
@@ -114,23 +120,42 @@ describe('evaluateFailures', () => {
 
 describe('cooldown', () => {
 	it('allows the first alert for a queue', () => {
-		expect(isCooldownElapsed({ lastAlertAtByQueue: {} }, 'raw-commits', settings(), now)).toBe(
-			true,
-		);
+		expect(
+			isCooldownElapsed(
+				{ lastAlertAtByQueue: {} },
+				'raw-commits',
+				settings(),
+				now,
+			),
+		).toBe(true);
 	});
 
 	it('suppresses alerts inside the cooldown window', () => {
-		const state: AlertState = { lastAlertAtByQueue: { 'raw-commits': now - 60_000 } };
-		expect(isCooldownElapsed(state, 'raw-commits', settings({ cooldownMs: 900_000 }), now)).toBe(
-			false,
-		);
+		const state: AlertState = {
+			lastAlertAtByQueue: { 'raw-commits': now - 60_000 },
+		};
+		expect(
+			isCooldownElapsed(
+				state,
+				'raw-commits',
+				settings({ cooldownMs: 900_000 }),
+				now,
+			),
+		).toBe(false);
 	});
 
 	it('allows alerts after the cooldown window elapses', () => {
-		const state: AlertState = { lastAlertAtByQueue: { 'raw-commits': now - 900_000 } };
-		expect(isCooldownElapsed(state, 'raw-commits', settings({ cooldownMs: 900_000 }), now)).toBe(
-			true,
-		);
+		const state: AlertState = {
+			lastAlertAtByQueue: { 'raw-commits': now - 900_000 },
+		};
+		expect(
+			isCooldownElapsed(
+				state,
+				'raw-commits',
+				settings({ cooldownMs: 900_000 }),
+				now,
+			),
+		).toBe(true);
 	});
 
 	it('records the alert time for a queue', () => {
@@ -248,7 +273,10 @@ describe('evaluateAndDispatch', () => {
 			[event({}), event({})],
 			'raw-commits',
 			state,
-			settings({ minFailures: 3, slackWebhookUrl: 'https://hooks.slack.com/x' }),
+			settings({
+				minFailures: 3,
+				slackWebhookUrl: 'https://hooks.slack.com/x',
+			}),
 			{ now, fetchImpl },
 		);
 		expect(outcome.alerted).toBe(false);
@@ -258,7 +286,9 @@ describe('evaluateAndDispatch', () => {
 
 	it('suppresses a second alert inside the cooldown window', async () => {
 		const fetchImpl = vi.fn().mockResolvedValue(okResponse());
-		const state: AlertState = { lastAlertAtByQueue: { 'raw-commits': now - 60_000 } };
+		const state: AlertState = {
+			lastAlertAtByQueue: { 'raw-commits': now - 60_000 },
+		};
 		const outcome = await evaluateAndDispatch(
 			[event({}), event({}), event({})],
 			'raw-commits',
@@ -302,7 +332,10 @@ describe('evaluateAndDispatch', () => {
 			],
 			'raw-commits',
 			state,
-			settings({ minFailures: 3, slackWebhookUrl: 'https://hooks.slack.com/x' }),
+			settings({
+				minFailures: 3,
+				slackWebhookUrl: 'https://hooks.slack.com/x',
+			}),
 			{ now, fetchImpl },
 		);
 		expect(outcome.alerted).toBe(false);

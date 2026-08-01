@@ -247,7 +247,8 @@ export async function evaluateAndDispatch(
 			...noop,
 			decision: {
 				...decision,
-				reason: 'Threshold reached but no notification channels are configured.',
+				reason:
+					'Threshold reached but no notification channels are configured.',
 			},
 		};
 	}
