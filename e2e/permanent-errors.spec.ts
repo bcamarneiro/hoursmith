@@ -38,8 +38,8 @@ test.describe('Permanent error handling', () => {
 		// Navigate away to verify the user can safely leave the error state.
 		await page
 			.getByRole('navigation')
-			.getByRole('link', { name: 'Dashboard' })
+			.getByRole('link', { name: 'My Week' })
 			.click();
-		await expect(page).toHaveURL(/\/dashboard/);
+		await expect(page).toHaveURL(/\/my-week/);
 	});
 });
