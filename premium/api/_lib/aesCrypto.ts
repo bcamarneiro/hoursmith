@@ -27,6 +27,12 @@
  * Linear: ADA-677.
  */
 
+import {
+	CryptoDecryptError,
+	CryptoKeyError,
+	CryptoPayloadError,
+} from './cryptoErrors.js';
+
 const PREFIX = 'aes256gcm:';
 const FORMAT_VERSION = 1;
 const SALT_BYTES = 16;
@@ -75,7 +81,7 @@ export class AesCipher {
 
 	constructor(secret: string, options: AesCipherOptions = {}) {
 		if (typeof secret !== 'string' || secret.length === 0) {
-			throw new Error(
+			throw new CryptoKeyError(
 				'aesCrypto: encryption secret must be a non-empty string.',
 			);
 		}
@@ -126,7 +132,7 @@ export class AesCipher {
 				ciphertext,
 			);
 		} catch {
-			throw new Error(
+			throw new CryptoDecryptError(
 				'aesCrypto.decrypt failed: authentication failed (wrong secret, wrong context, or tampered payload).',
 			);
 		}
@@ -190,20 +196,22 @@ function decodeEnvelope(payload: string): {
 	ciphertext: Uint8Array<ArrayBuffer>;
 } {
 	if (!payload.startsWith(PREFIX)) {
-		throw new Error(`aesCrypto.decrypt: payload must start with "${PREFIX}".`);
+		throw new CryptoPayloadError(
+			`aesCrypto.decrypt: payload must start with "${PREFIX}".`,
+		);
 	}
 	let bytes: Uint8Array<ArrayBuffer>;
 	try {
 		bytes = base64ToBytes(payload.slice(PREFIX.length));
 	} catch {
-		throw new Error('aesCrypto.decrypt: payload is not valid base64.');
+		throw new CryptoPayloadError('aesCrypto.decrypt: payload is not valid base64.');
 	}
 	const header = 1 + SALT_BYTES + IV_BYTES;
 	if (bytes.length < header + TAG_BYTES) {
-		throw new Error('aesCrypto.decrypt: payload is truncated.');
+		throw new CryptoPayloadError('aesCrypto.decrypt: payload is truncated.');
 	}
 	if (bytes[0] !== FORMAT_VERSION) {
-		throw new Error(
+		throw new CryptoPayloadError(
 			`aesCrypto.decrypt: unsupported payload version ${bytes[0]}.`,
 		);
 	}

@@ -9,6 +9,11 @@
 
 import { describe, expect, it } from 'vitest';
 import { AesCipher, makeAesCipher } from '../aesCrypto.js';
+import {
+	CryptoDecryptError,
+	CryptoKeyError,
+	CryptoPayloadError,
+} from '../cryptoErrors.js';
 
 const SECRET = 'super-secret-test-key-123';
 
@@ -151,5 +156,39 @@ describe('aesCrypto', () => {
 		const cipher = new AesCipher(SECRET); // 600k PBKDF2 iterations
 		const payload = await cipher.encrypt('default-iterations');
 		await expect(cipher.decrypt(payload)).resolves.toBe('default-iterations');
+	});
+
+	it('throws CryptoKeyError for an empty secret', () => {
+		expect(() => new AesCipher('')).toThrow(CryptoKeyError);
+	});
+
+	it('throws CryptoDecryptError on GCM authentication failures', async () => {
+		const payload = await fastCipher().encrypt('typed-error');
+		await expect(
+			fastCipher('wrong-secret-key-456').decrypt(payload),
+		).rejects.toBeInstanceOf(CryptoDecryptError);
+		await expect(fastCipher().decrypt(tamper(payload))).rejects.toBeInstanceOf(
+			CryptoDecryptError,
+		);
+	});
+
+	it('throws CryptoPayloadError on malformed payloads', async () => {
+		const cipher = fastCipher();
+		await expect(cipher.decrypt('not-an-aes-payload')).rejects.toBeInstanceOf(
+			CryptoPayloadError,
+		);
+		await expect(
+			cipher.decrypt('aes256gcm:@@not-base64@@'),
+		).rejects.toBeInstanceOf(CryptoPayloadError);
+	});
+
+	it('throws CryptoPayloadError on unsupported versions', async () => {
+		const cipher = fastCipher();
+		const payload = await cipher.encrypt('version-check');
+		const bytes = base64ToBytes(payload.slice('aes256gcm:'.length));
+		bytes[0] = 99;
+		await expect(
+			cipher.decrypt(`aes256gcm:${bytesToBase64(bytes)}`),
+		).rejects.toBeInstanceOf(CryptoPayloadError);
 	});
 });
