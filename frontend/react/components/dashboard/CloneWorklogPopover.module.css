@@ -149,6 +149,21 @@
 	background: var(--color-surface-sunken);
 }
 
+.cancelButton:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.error {
+	margin: 0;
+	padding: var(--space-2) var(--space-3);
+	background: var(--color-error-subtle, #fef2f2);
+	color: var(--color-error, #dc2626);
+	border-radius: var(--radius-md);
+	font-size: var(--text-sm);
+	border: 1px solid var(--color-error-border, #fecaca);
+}
+
 .cloneButton {
 	background: var(--color-primary);
 	color: white;

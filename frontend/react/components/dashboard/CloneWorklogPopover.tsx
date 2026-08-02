@@ -14,6 +14,10 @@ type Props = {
 	sourceDate: string;
 	onClone: (dates: string[]) => void;
 	onCancel: () => void;
+	/** Disables the Clone button and shows a loading indicator during the clone operation. */
+	isLoading?: boolean;
+	/** An error message to display inline inside the popover (e.g. after a clone failure). */
+	error?: string | null;
 };
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -24,6 +28,8 @@ export function CloneWorklogPopover({
 	sourceDate,
 	onClone,
 	onCancel,
+	isLoading = false,
+	error = null,
 }: Props) {
 	const [sourceYear, sourceMonth] = useMemo(() => {
 		const [y, m] = sourceDate.split('-').map(Number);
@@ -124,6 +130,8 @@ export function CloneWorklogPopover({
 				})}
 			</div>
 
+			{error && <p className={styles.error}>{error}</p>}
+
 			{sortedSelected.length > 0 && (
 				<div className={styles.chips}>
 					{sortedSelected.map((iso) => (
@@ -147,6 +155,7 @@ export function CloneWorklogPopover({
 						type="button"
 						className={styles.cancelButton}
 						onClick={onCancel}
+						disabled={isLoading}
 					>
 						Cancel
 					</button>
@@ -154,9 +163,9 @@ export function CloneWorklogPopover({
 						type="button"
 						className={styles.cloneButton}
 						onClick={() => onClone(sortedSelected)}
-						disabled={selected.size === 0}
+						disabled={selected.size === 0 || isLoading}
 					>
-						Clone → {selected.size}
+						{isLoading ? 'Cloning...' : `Clone → ${selected.size}`}
 					</button>
 				</div>
 			</div>

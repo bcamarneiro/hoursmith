@@ -75,4 +75,20 @@ describe('CloneWorklogPopover', () => {
 		expect(onClone).toHaveBeenCalledTimes(1);
 		expect(onClone).toHaveBeenCalledWith(['2026-07-15', '2026-07-16']);
 	});
+
+	it('disables Clone and Cancel buttons during loading and shows Cloning...', () => {
+		renderPopover({ isLoading: true });
+		fireEvent.click(screen.getByRole('button', { name: '2026-07-16' }));
+
+		const cloneBtn = screen.getByRole('button', { name: 'Cloning...' });
+		expect(cloneBtn.hasAttribute('disabled')).toBe(true);
+
+		const cancelBtn = screen.getByRole('button', { name: 'Cancel' });
+		expect(cancelBtn.hasAttribute('disabled')).toBe(true);
+	});
+
+	it('renders an error message when error prop is set', () => {
+		renderPopover({ error: 'Network error' });
+		expect(screen.getByText('Network error')).toBeTruthy();
+	});
 });
