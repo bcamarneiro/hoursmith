@@ -235,9 +235,7 @@ export const DayCard = memo<Props>(function DayCard({
 				);
 			}
 		} catch (e) {
-			setCloneError(
-				e instanceof Error ? e.message : 'Clone failed',
-			);
+			setCloneError(e instanceof Error ? e.message : 'Clone failed');
 			toast.error(e instanceof Error ? e.message : 'Clone failed');
 			setCloneSource(null);
 		}

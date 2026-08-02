@@ -115,8 +115,6 @@ describe('DayCard — clone worklog', () => {
 		await act(async () => {});
 
 		// Modal should be closed (the popover is gone)
-		expect(
-			screen.queryByRole('button', { name: /Clone →/ }),
-		).toBeNull();
+		expect(screen.queryByRole('button', { name: /Clone →/ })).toBeNull();
 	});
 });
