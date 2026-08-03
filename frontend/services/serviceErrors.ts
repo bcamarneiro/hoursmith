@@ -201,10 +201,15 @@ export function isServiceError(value: unknown): value is ServiceError {
 export function validateServiceError(
 	error: ServiceError,
 ): Array<{ field: string; expected: string; actual: unknown }> {
-	const errors: Array<{ field: string; expected: string; actual: unknown }> = [];
+	const errors: Array<{ field: string; expected: string; actual: unknown }> =
+		[];
 
 	if (typeof error.kind !== 'string') {
-		errors.push({ field: 'kind', expected: 'string', actual: typeof error.kind });
+		errors.push({
+			field: 'kind',
+			expected: 'string',
+			actual: typeof error.kind,
+		});
 	} else if (
 		![
 			'unauthorized',
@@ -217,15 +222,27 @@ export function validateServiceError(
 			'unknown',
 		].includes(error.kind)
 	) {
-		errors.push({ field: 'kind', expected: 'ServiceErrorKind', actual: error.kind });
+		errors.push({
+			field: 'kind',
+			expected: 'ServiceErrorKind',
+			actual: error.kind,
+		});
 	}
 
 	if (error.status !== undefined && typeof error.status !== 'number') {
-		errors.push({ field: 'status', expected: 'number | undefined', actual: typeof error.status });
+		errors.push({
+			field: 'status',
+			expected: 'number | undefined',
+			actual: typeof error.status,
+		});
 	}
 
 	if (typeof error.source !== 'string') {
-		errors.push({ field: 'source', expected: 'string', actual: typeof error.source });
+		errors.push({
+			field: 'source',
+			expected: 'string',
+			actual: typeof error.source,
+		});
 	}
 
 	if (

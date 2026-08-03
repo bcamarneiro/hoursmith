@@ -292,7 +292,10 @@ describe('normalizeError', () => {
 	});
 
 	it('maps an object with status to a ServiceError', () => {
-		const normalized = normalizeError('Jira', { status: 403, message: 'forbidden' });
+		const normalized = normalizeError('Jira', {
+			status: 403,
+			message: 'forbidden',
+		});
 		expect(normalized.kind).toBe('forbidden');
 		expect(normalized.status).toBe(403);
 		expect(normalized.source).toBe('Jira');
