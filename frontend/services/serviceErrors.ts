@@ -178,6 +178,128 @@ function looksLikeCorsFailure(message: string): boolean {
 }
 
 /**
+ * Type guard: checks if an arbitrary value is a valid `ServiceError`.
+ * Validates all required fields and their expected data types.
+ */
+export function isServiceError(value: unknown): value is ServiceError {
+	if (!(value instanceof Error)) return false;
+	const candidate = value as unknown as Record<string, unknown>;
+	return (
+		candidate.name === 'ServiceError' &&
+		typeof candidate.kind === 'string' &&
+		(candidate.status === undefined || typeof candidate.status === 'number') &&
+		typeof candidate.source === 'string' &&
+		(candidate.entitlementCode === undefined ||
+			typeof candidate.entitlementCode === 'string')
+	);
+}
+
+/**
+ * Validates that a `ServiceError` has all required fields with correct types.
+ * Returns validation errors if any, or an empty array if valid.
+ */
+export function validateServiceError(
+	error: ServiceError,
+): Array<{ field: string; expected: string; actual: unknown }> {
+	const errors: Array<{ field: string; expected: string; actual: unknown }> = [];
+
+	if (typeof error.kind !== 'string') {
+		errors.push({ field: 'kind', expected: 'string', actual: typeof error.kind });
+	} else if (
+		![
+			'unauthorized',
+			'forbidden',
+			'not-found',
+			'rate-limited',
+			'server-error',
+			'network',
+			'invalid-token',
+			'unknown',
+		].includes(error.kind)
+	) {
+		errors.push({ field: 'kind', expected: 'ServiceErrorKind', actual: error.kind });
+	}
+
+	if (error.status !== undefined && typeof error.status !== 'number') {
+		errors.push({ field: 'status', expected: 'number | undefined', actual: typeof error.status });
+	}
+
+	if (typeof error.source !== 'string') {
+		errors.push({ field: 'source', expected: 'string', actual: typeof error.source });
+	}
+
+	if (
+		error.entitlementCode !== undefined &&
+		typeof error.entitlementCode !== 'string'
+	) {
+		errors.push({
+			field: 'entitlementCode',
+			expected: 'EntitlementCode | undefined',
+			actual: typeof error.entitlementCode,
+		});
+	} else if (
+		error.entitlementCode !== undefined &&
+		!ENTITLEMENT_CODES.includes(error.entitlementCode as EntitlementCode)
+	) {
+		errors.push({
+			field: 'entitlementCode',
+			expected: 'valid EntitlementCode',
+			actual: error.entitlementCode,
+		});
+	}
+
+	return errors;
+}
+
+/**
+ * Normalizes an arbitrary error into a `ServiceError` with the canonical schema.
+ * Maps raw error fields to the target schema, preserving the original error info.
+ */
+export function normalizeError(source: string, error: unknown): ServiceError {
+	if (error instanceof ServiceError) {
+		return error;
+	}
+
+	if (error instanceof Error) {
+		return fromNetworkError(source, error);
+	}
+
+	if (typeof error === 'string') {
+		return new ServiceError({
+			kind: 'unknown',
+			source,
+			message: error,
+		});
+	}
+
+	if (
+		typeof error === 'object' &&
+		error !== null &&
+		'status' in error &&
+		typeof (error as Record<string, unknown>).status === 'number'
+	) {
+		const obj = error as Record<string, unknown>;
+		const status = obj.status as number;
+		const message =
+			typeof obj.message === 'string'
+				? obj.message
+				: `${source} error (HTTP ${status})`;
+		return new ServiceError({
+			kind: classifyHttpStatus(status),
+			status,
+			source,
+			message,
+		});
+	}
+
+	return new ServiceError({
+		kind: 'unknown',
+		source,
+		message: `Unknown error from ${source}: ${String(error)}`,
+	});
+}
+
+/**
  * The single error→user-copy mapper (ADA-475). Consumers should call this
  * instead of flattening to `error.message` or substring-matching `'401'`.
  *

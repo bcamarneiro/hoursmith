@@ -7,7 +7,11 @@ import {
 	fromHttpResponseAsync,
 	fromNetworkError,
 	fromRichMessage,
+	isServiceError,
+	normalizeError,
 	ServiceError,
+	type EntitlementCode,
+	validateServiceError,
 } from '../serviceErrors';
 
 describe('classifyHttpStatus', () => {
@@ -201,5 +205,110 @@ describe('describeServiceError', () => {
 	it('falls back on a legacy "401" string error', () => {
 		const copy = describeServiceError(new Error('Jira API error: 401'));
 		expect(copy.message).toMatch(/api token/i);
+	});
+});
+
+describe('isServiceError', () => {
+	it('returns true for a valid ServiceError', () => {
+		const err = fromHttpResponse('Jira', 401);
+		expect(isServiceError(err)).toBe(true);
+	});
+
+	it('returns false for a plain Error', () => {
+		expect(isServiceError(new Error('plain'))).toBe(false);
+	});
+
+	it('returns false for a string', () => {
+		expect(isServiceError('error')).toBe(false);
+	});
+
+	it('returns false for null/undefined', () => {
+		expect(isServiceError(null)).toBe(false);
+		expect(isServiceError(undefined)).toBe(false);
+	});
+});
+
+describe('validateServiceError', () => {
+	it('returns empty array for a valid ServiceError', () => {
+		const err = fromHttpResponse('Jira', 401);
+		expect(validateServiceError(err)).toEqual([]);
+	});
+
+	it('returns empty array for a ServiceError with entitlementCode', () => {
+		const err = fromHttpResponse('Jira', 401, '', 'invalid_token');
+		expect(validateServiceError(err)).toEqual([]);
+	});
+
+	it('detects invalid kind', () => {
+		const err = new ServiceError({
+			kind: 'invalid' as unknown as ServiceError['kind'],
+			source: 'Test',
+			message: 'test',
+		});
+		const errors = validateServiceError(err);
+		expect(errors.some((e) => e.field === 'kind')).toBe(true);
+	});
+
+	it('detects invalid status type', () => {
+		const err = new ServiceError({
+			kind: 'unknown',
+			status: 'not-a-number' as unknown as number,
+			source: 'Test',
+			message: 'test',
+		});
+		const errors = validateServiceError(err);
+		expect(errors.some((e) => e.field === 'status')).toBe(true);
+	});
+
+	it('detects invalid entitlementCode', () => {
+		const err = new ServiceError({
+			kind: 'unknown',
+			source: 'Test',
+			message: 'test',
+			entitlementCode: 'bogus' as unknown as EntitlementCode,
+		});
+		const errors = validateServiceError(err);
+		expect(errors.some((e) => e.field === 'entitlementCode')).toBe(true);
+	});
+});
+
+describe('normalizeError', () => {
+	it('returns ServiceError as-is', () => {
+		const err = fromHttpResponse('Jira', 401);
+		expect(normalizeError('Jira', err)).toBe(err);
+	});
+
+	it('wraps a plain Error as a network error', () => {
+		const err = new Error('network failed');
+		const normalized = normalizeError('Jira', err);
+		expect(normalized.kind).toBe('network');
+		expect(normalized.source).toBe('Jira');
+	});
+
+	it('wraps a string as an unknown error', () => {
+		const normalized = normalizeError('Jira', 'something went wrong');
+		expect(normalized.kind).toBe('unknown');
+		expect(normalized.message).toBe('something went wrong');
+	});
+
+	it('maps an object with status to a ServiceError', () => {
+		const normalized = normalizeError('Jira', { status: 403, message: 'forbidden' });
+		expect(normalized.kind).toBe('forbidden');
+		expect(normalized.status).toBe(403);
+		expect(normalized.source).toBe('Jira');
+	});
+
+	it('handles object with status but no message', () => {
+		const normalized = normalizeError('Calendar', { status: 500 });
+		expect(normalized.kind).toBe('server-error');
+		expect(normalized.status).toBe(500);
+		expect(normalized.message).toContain('Calendar error (HTTP 500)');
+	});
+
+	it('handles unknown error types', () => {
+		const normalized = normalizeError('Test', { foo: 'bar' });
+		expect(normalized.kind).toBe('unknown');
+		expect(normalized.source).toBe('Test');
+		expect(normalized.message).toContain('Unknown error');
 	});
 });
