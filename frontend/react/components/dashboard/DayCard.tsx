@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import type { DaySummary, LoggedWorklog } from '../../../../types/Suggestion';
+import { useConfigStore } from '../../../stores/useConfigStore';
 import { useDashboardStore } from '../../../stores/useDashboardStore';
 import { useWorklogOperations } from '../../hooks/useWorklogOperations';
 import { getAbsenceKindLabel } from '../../utils/absence';
@@ -10,6 +11,7 @@ import {
 	withLocalOffset,
 } from '../../utils/date';
 import { formatHours, formatJiraTimeSpent } from '../../utils/format';
+import { distributeSuggestionsToFillGap } from '../../../services/suggestionMerger';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
 import { toast } from '../ui/Toast';
@@ -105,6 +107,21 @@ export const DayCard = memo<Props>(function DayCard({
 		comment: string;
 		started: string;
 	} | null>(null);
+
+	// Fill Day preview — stores the proposed params before the user confirms.
+	const [fillDayPreview, setFillDayPreview] = useState<
+		| Array<{
+				issueKey: string;
+				timeSpent: string;
+				comment: string;
+				started: string;
+				suggestedSeconds: number;
+				issueSummary?: string;
+		  }>
+		| null
+	>(null);
+	const [isFilling, setIsFilling] = useState(false);
+	const timeRounding = useConfigStore((s) => s.config.timeRounding);
 
 	// Open a blank worklog form prefilled with this day's date (09:00) and the
 	// remaining gap as the suggested duration, so a user with no suggestions can
@@ -295,6 +312,96 @@ export const DayCard = memo<Props>(function DayCard({
 		}
 	};
 
+	// "Fill day" — preview the distribution, then create worklogs on confirm.
+	const handleFillDayClick = () => {
+		if (loggableSuggestions.length === 0) {
+			toast.error('Map suggestions to Jira issues before filling');
+			return;
+		}
+
+		// Compute the proposed redistribution of times to fill the gap.
+		const scaled = distributeSuggestionsToFillGap(
+			loggableSuggestions,
+			day.gapSeconds,
+			timeRounding,
+		);
+
+		// Build a preview with the scaled params.
+		const preview = scaled.map((s) => ({
+			issueKey: s.issueKey,
+			timeSpent: s.suggestedTimeSpent,
+			comment: '',
+			started: withLocalOffset(`${s.date}T09:00`),
+			suggestedSeconds: s.suggestedSeconds,
+			issueSummary: s.issueSummary,
+		}));
+
+		setFillDayPreview(preview);
+	};
+
+	const handleFillDayConfirm = async () => {
+		if (!fillDayPreview || fillDayPreview.length === 0) return;
+
+		setIsFilling(true);
+		try {
+			const params = fillDayPreview.map((p) => ({
+				issueKey: p.issueKey,
+				timeSpent: p.timeSpent,
+				comment: p.comment,
+				started: p.started,
+			}));
+
+			const result = await createMultipleWorklogs(params);
+
+			// Mark successful suggestions as logged
+			const failedKeys = new Set(result.failed);
+			const successIds = loggableSuggestions
+				.filter((s) => !failedKeys.has(s.issueKey))
+				.map((s) => s.id);
+			const successCount = successIds.length;
+
+			if (successCount > 0) {
+				markMultipleSuggestionsLogged(successIds);
+				fillDayGap(day.date);
+			}
+
+			setFillDayPreview(null);
+
+			if (result.failed.length === 0) {
+				toast.success(
+					`Filled ${DAY_NAMES[day.dayOfWeek]} — ${result.success} worklog${result.success === 1 ? '' : 's'} created`,
+					{
+						action: {
+							label: 'Undo',
+							onClick: () => {
+								Promise.all(
+									result.created.map((w) =>
+										deleteWorklog(w.issueKey, w.worklogId),
+									),
+								).then(() => {
+									unmarkMultipleSuggestionsLogged(successIds);
+								});
+							},
+						},
+					},
+				);
+			} else {
+				toast.error(
+					`Filled ${result.success} of ${params.length}: failed ${result.failed.join(', ')}`,
+				);
+			}
+		} catch (e) {
+			toast.error(e instanceof Error ? e.message : 'Fill day failed');
+		} finally {
+			setIsFilling(false);
+		}
+	};
+
+	const totalPreviewSeconds = useMemo(
+		() => fillDayPreview?.reduce((sum, p) => sum + p.suggestedSeconds, 0) ?? 0,
+		[fillDayPreview],
+	);
+
 	return (
 		<div
 			className={`${styles.card} ${isToday ? styles.today : ''} ${day.isWeekend ? styles.weekend : ''} ${isFocused ? styles.focused : ''} ${isClosed && !expanded ? styles.closed : ''}`}
@@ -325,10 +432,11 @@ export const DayCard = memo<Props>(function DayCard({
 						<button
 							type="button"
 							className={styles.fillButton}
-							onClick={() => fillDayGap(day.date)}
+							onClick={handleFillDayClick}
+							disabled={isFilling}
 							aria-label={`Fill remaining gap for ${DAY_NAMES[day.dayOfWeek]}`}
 						>
-							Fill day
+							{isFilling ? 'Filling...' : 'Fill day'}
 						</button>
 					)}
 					{activeSuggestions.length > 0 && (
@@ -589,6 +697,55 @@ export const DayCard = memo<Props>(function DayCard({
 					onConfirm={handleDeleteConfirm}
 					onCancel={() => setDeleteTarget(null)}
 				/>
+			)}
+
+			{fillDayPreview && (
+				<Modal
+					isOpen
+					onClose={() => setFillDayPreview(null)}
+					title={`Fill day — ${DAY_NAMES[day.dayOfWeek]} ${formatDate(day.date)}`}
+				>
+					<div className={styles.fillPreviewContent}>
+						<p className={styles.fillPreviewDesc}>
+							The following worklogs will be created to fill the remaining{' '}
+							{formatHours(day.gapSeconds)} gap:
+						</p>
+						<div className={styles.fillPreviewList}>
+							{fillDayPreview.map((p, i) => (
+								<div key={`${p.issueKey}-${i}`} className={styles.fillPreviewItem}>
+									<span className={styles.fillPreviewKey}>{p.issueKey}</span>
+									{p.issueSummary && (
+										<span className={styles.fillPreviewSummary}>
+											{p.issueSummary}
+										</span>
+									)}
+									<span className={styles.fillPreviewTime}>{p.timeSpent}</span>
+								</div>
+							))}
+						</div>
+						<div className={styles.fillPreviewTotal}>
+							Total: {formatHours(totalPreviewSeconds)} /{' '}
+							{formatHours(day.gapSeconds)}
+						</div>
+						<div className={styles.fillPreviewActions}>
+							<button
+								type="button"
+								className={styles.cancelButton}
+								onClick={() => setFillDayPreview(null)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className={styles.confirmButton}
+								onClick={handleFillDayConfirm}
+								disabled={isFilling}
+							>
+								{isFilling ? 'Filling...' : 'Fill'}
+							</button>
+						</div>
+					</div>
+				</Modal>
 			)}
 		</div>
 	);

@@ -440,3 +440,115 @@
 	font-style: italic;
 	opacity: 0.85;
 }
+
+/* Fill Day preview modal content */
+.fillPreviewContent {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.fillPreviewDesc {
+	font-size: var(--text-sm);
+	color: var(--color-text-secondary);
+	margin: 0;
+}
+
+.fillPreviewList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	padding: var(--space-3);
+	background: var(--color-surface-sunken);
+	max-height: 360px;
+	overflow-y: auto;
+}
+
+.fillPreviewItem {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius-sm);
+	background: var(--color-surface);
+	font-size: var(--text-sm);
+}
+
+.fillPreviewKey {
+	font-weight: var(--font-semibold);
+	color: var(--color-text);
+	white-space: nowrap;
+}
+
+.fillPreviewSummary {
+	color: var(--color-text-tertiary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	min-width: 0;
+}
+
+.fillPreviewTime {
+	color: var(--color-text-secondary);
+	white-space: nowrap;
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	margin-left: auto;
+}
+
+.fillPreviewTotal {
+	font-size: var(--text-sm);
+	font-weight: var(--font-semibold);
+	color: var(--color-text);
+	font-family: var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	padding: 0 var(--space-2);
+}
+
+.fillPreviewActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--space-2);
+}
+
+.confirmButton {
+	background: var(--color-primary);
+	color: white;
+	border: none;
+	border-radius: var(--radius-md);
+	padding: var(--space-2) var(--space-5);
+	font-size: var(--text-sm);
+	font-weight: var(--font-semibold);
+	cursor: pointer;
+	transition: opacity var(--transition-fast);
+}
+
+.confirmButton:hover {
+	opacity: 0.9;
+}
+
+.confirmButton:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.cancelButton {
+	background: none;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	padding: var(--space-2) var(--space-5);
+	font-size: var(--text-sm);
+	font-weight: var(--font-semibold);
+	color: var(--color-text-secondary);
+	cursor: pointer;
+	transition: all var(--transition-fast);
+}
+
+.cancelButton:hover {
+	background: var(--color-surface-hover);
+	color: var(--color-text);
+}
