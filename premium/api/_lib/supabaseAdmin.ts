@@ -74,6 +74,13 @@ export interface SupabaseAdminClient {
 	 * already seen (a duplicate delivery that must not be reprocessed).
 	 */
 	recordBillingEvent(eventId: string): Promise<boolean>;
+	/**
+	 * Upsert association records into the `associations` table. Used by the
+	 * association webhook for linking external entities (calendar events,
+	 * git commits, RescueTime activities) to Jira issues. Idempotent on
+	 * (user_id, external_source, issue_key) via the unique index.
+	 */
+	upsertAssociations(records: Record<string, unknown>[]): Promise<void>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -294,5 +301,22 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		}
 		const rows = (await res.json()) as unknown[];
 		return Array.isArray(rows) && rows.length > 0;
+	}
+
+	async upsertAssociations(records: Record<string, unknown>[]): Promise<void> {
+		if (records.length === 0) return;
+		const res = await fetch(`${this.url}/rest/v1/associations`, {
+			method: 'POST',
+			headers: this.headers({
+				'content-type': 'application/json',
+				prefer: 'resolution=merge-duplicates,return=minimal',
+			}),
+			body: JSON.stringify(records),
+		});
+		if (!res.ok) {
+			throw new Error(
+				`supabaseAdmin.upsertAssociations failed: ${res.status}`,
+			);
+		}
 	}
 }
