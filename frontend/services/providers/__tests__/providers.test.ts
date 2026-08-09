@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   createCalendarParser,
+  detectParser,
   expandIcsEventDates,
   icsParser,
+  jsonParser,
   parseIcsDate,
   parseIcsEvents,
+  parseJsonEvents,
   parseRRule,
   unfoldLines,
 } from '../index';
@@ -481,5 +484,245 @@ describe('barrel exports', () => {
       exdates: [],
     };
     expect(expandIcsEventDates(event, '2026-04-01', '2026-04-30')).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// jsonParser
+// ---------------------------------------------------------------------------
+
+const singleDayJson = JSON.stringify([
+  { summary: 'Vacation', dtstart: '2026-04-07', dtend: '2026-04-08' },
+]);
+
+const multiDayJson = JSON.stringify([
+  { summary: 'Sick leave', dtstart: '2026-04-11', dtend: '2026-04-14' },
+]);
+
+const recurringJson = JSON.stringify([
+  {
+    summary: 'Bruno C - Vacation',
+    dtstart: '2026-06-01',
+    dtend: '2026-06-04',
+    rrule: 'FREQ=WEEKLY;COUNT=2',
+  },
+]);
+
+const exdateJson = JSON.stringify([
+  {
+    summary: 'Bruno C - Off',
+    dtstart: '2026-06-01',
+    dtend: '2026-06-02',
+    rrule: 'FREQ=DAILY;COUNT=5',
+    exdates: ['2026-06-03'],
+  },
+]);
+
+const multipleEventsJson = JSON.stringify([
+  { summary: 'Event 1', dtstart: '2026-04-07', dtend: '2026-04-08' },
+  { summary: 'Event 2', dtstart: '2026-04-09', dtend: '2026-04-10' },
+]);
+
+describe('parseJsonEvents', () => {
+  it('parses a single event from a JSON array', () => {
+    const events = parseJsonEvents(singleDayJson);
+    expect(events).toHaveLength(1);
+    expect(events[0].summary).toBe('Vacation');
+    expect(events[0].dtstart).toBe('2026-04-07');
+    expect(events[0].dtend).toBe('2026-04-08');
+    expect(events[0].rrule).toBe('');
+    expect(events[0].exdates).toEqual([]);
+  });
+
+  it('parses multi-day events', () => {
+    const events = parseJsonEvents(multiDayJson);
+    expect(events).toHaveLength(1);
+    expect(events[0].summary).toBe('Sick leave');
+    expect(events[0].dtstart).toBe('2026-04-11');
+    expect(events[0].dtend).toBe('2026-04-14');
+  });
+
+  it('parses events with an rrule', () => {
+    const events = parseJsonEvents(recurringJson);
+    expect(events).toHaveLength(1);
+    expect(events[0].rrule).toBe('FREQ=WEEKLY;COUNT=2');
+  });
+
+  it('parses events with exdates', () => {
+    const events = parseJsonEvents(exdateJson);
+    expect(events).toHaveLength(1);
+    expect(events[0].exdates).toEqual(['2026-06-03']);
+  });
+
+  it('parses multiple events from a JSON array', () => {
+    const events = parseJsonEvents(multipleEventsJson);
+    expect(events).toHaveLength(2);
+    expect(events[0].summary).toBe('Event 1');
+    expect(events[1].summary).toBe('Event 2');
+  });
+
+  it('returns [] for invalid JSON', () => {
+    expect(parseJsonEvents('not json')).toEqual([]);
+    expect(parseJsonEvents('{broken}')).toEqual([]);
+    expect(parseJsonEvents('')).toEqual([]);
+  });
+
+  it('returns [] for non-array, non-object JSON values', () => {
+    expect(parseJsonEvents('null')).toEqual([]);
+    expect(parseJsonEvents('"string"')).toEqual([]);
+    expect(parseJsonEvents('42')).toEqual([]);
+  });
+
+  it('skips items missing required fields', () => {
+    const json = JSON.stringify([
+      { summary: 'Valid', dtstart: '2026-04-07', dtend: '2026-04-08' },
+      { summary: '', dtstart: '2026-04-09', dtend: '2026-04-10' },
+      { dtstart: '2026-04-11', dtend: '2026-04-12' },
+      { summary: 'No dates', dtstart: '', dtend: '' },
+    ]);
+    const events = parseJsonEvents(json);
+    expect(events).toHaveLength(1);
+    expect(events[0].summary).toBe('Valid');
+  });
+
+  it('trims whitespace from summary and dates', () => {
+    const json = JSON.stringify([
+      {
+        summary: '  Vacation  ',
+        dtstart: '  2026-04-07  ',
+        dtend: '  2026-04-08  ',
+      },
+    ]);
+    const events = parseJsonEvents(json);
+    expect(events).toHaveLength(1);
+    expect(events[0].summary).toBe('Vacation');
+    expect(events[0].dtstart).toBe('2026-04-07');
+    expect(events[0].dtend).toBe('2026-04-08');
+  });
+
+  it('tolerates a single JSON object (wraps it in an array)', () => {
+    const json = JSON.stringify({
+      summary: 'Vacation',
+      dtstart: '2026-04-07',
+      dtend: '2026-04-08',
+    });
+    const events = parseJsonEvents(json);
+    expect(events).toHaveLength(1);
+    expect(events[0].summary).toBe('Vacation');
+  });
+
+  it('filters out exdates that are empty strings', () => {
+    const json = JSON.stringify([
+      {
+        summary: 'Event',
+        dtstart: '2026-04-07',
+        dtend: '2026-04-08',
+        exdates: ['2026-04-09', '', '2026-04-10'],
+      },
+    ]);
+    const events = parseJsonEvents(json);
+    expect(events[0].exdates).toEqual(['2026-04-09', '2026-04-10']);
+  });
+});
+
+describe('jsonParser', () => {
+  it('parses JSON text via the jsonParser object', () => {
+    const events = jsonParser.parse(singleDayJson);
+    expect(events).toHaveLength(1);
+    expect(events[0].summary).toBe('Vacation');
+  });
+
+  it('expands events via the jsonParser object', () => {
+    const event: ParsedCalendarEvent = {
+      summary: 'Test',
+      dtstart: '2026-04-07',
+      dtend: '2026-04-08',
+      rrule: '',
+      exdates: [],
+    };
+    const result = jsonParser.expand(event, '2026-04-01', '2026-04-30');
+    expect(result).toHaveLength(1);
+    expect(result[0].date).toBe('2026-04-07');
+  });
+
+  it('expands recurring events', () => {
+    const event: ParsedCalendarEvent = {
+      summary: 'Weekly',
+      dtstart: '2026-06-01',
+      dtend: '2026-06-02',
+      rrule: 'FREQ=WEEKLY;COUNT=3',
+      exdates: [],
+    };
+    const result = jsonParser.expand(event, '2026-06-01', '2026-06-30');
+    expect(result).toHaveLength(3);
+    expect(result[0].date).toBe('2026-06-01');
+    expect(result[1].date).toBe('2026-06-08');
+    expect(result[2].date).toBe('2026-06-15');
+  });
+
+  it('expands events with exclusions', () => {
+    const event: ParsedCalendarEvent = {
+      summary: 'Off',
+      dtstart: '2026-06-01',
+      dtend: '2026-06-02',
+      rrule: 'FREQ=DAILY;COUNT=5',
+      exdates: ['2026-06-03'],
+    };
+    const result = jsonParser.expand(event, '2026-06-01', '2026-06-10');
+    expect(result.map((r) => r.date)).toEqual([
+      '2026-06-01', '2026-06-02', '2026-06-04', '2026-06-05',
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectParser
+// ---------------------------------------------------------------------------
+
+describe('detectParser', () => {
+  it('returns jsonParser for JSON array payloads', () => {
+    const parser = detectParser(singleDayJson);
+    expect(parser).toBe(jsonParser);
+  });
+
+  it('returns jsonParser for JSON object payloads', () => {
+    const parser = detectParser('{"summary":"test","dtstart":"2026-04-07","dtend":"2026-04-08"}');
+    expect(parser).toBe(jsonParser);
+  });
+
+  it('returns icsParser for ICS payloads', () => {
+    const parser = detectParser('BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR');
+    expect(parser).toBe(icsParser);
+  });
+
+  it('returns icsParser for ambiguous text', () => {
+    const parser = detectParser('some random text');
+    expect(parser).toBe(icsParser);
+  });
+
+  it('returns icsParser for empty string', () => {
+    const parser = detectParser('');
+    expect(parser).toBe(icsParser);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// jsonParser + detectParser integration: round-trip
+// ---------------------------------------------------------------------------
+
+describe('jsonParser integration', () => {
+  it('parses and expands through detectParser', () => {
+    const parser = detectParser(singleDayJson);
+    const events = parser.parse(singleDayJson);
+    expect(events).toHaveLength(1);
+    const dates = parser.expand(events[0], '2026-04-01', '2026-04-30');
+    expect(dates).toHaveLength(1);
+    expect(dates[0].date).toBe('2026-04-07');
+  });
+
+  it('handles multi-event JSON feeds', () => {
+    const parser = detectParser(multipleEventsJson);
+    const events = parser.parse(multipleEventsJson);
+    expect(events).toHaveLength(2);
   });
 });

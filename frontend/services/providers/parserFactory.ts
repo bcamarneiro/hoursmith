@@ -1,4 +1,5 @@
 import { icsParser } from './icsParser';
+import { jsonParser } from './jsonParser';
 import type { CalendarParser, FeedType } from './types';
 
 /**
@@ -8,5 +9,18 @@ import type { CalendarParser, FeedType } from './types';
  * specific parsers in the future (e.g. a GCal JSON parser).
  */
 export function createCalendarParser(_feedType: FeedType): CalendarParser {
+  return icsParser;
+}
+
+/**
+ * Auto-detect the parser to use based on the raw payload content.
+ * - JSON arrays/objects → jsonParser
+ * - Anything else (including BEGIN:VCALENDAR, ambiguous, or empty) → icsParser
+ */
+export function detectParser(raw: string): CalendarParser {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    return jsonParser;
+  }
   return icsParser;
 }
