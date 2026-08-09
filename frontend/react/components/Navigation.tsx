@@ -11,6 +11,7 @@ import * as styles from './Navigation.module.css';
  */
 const NAV_ITEMS: ReadonlyArray<{ to: string; label: string }> = [
 	{ to: '/my-week', label: 'My Week' },
+	{ to: '/standup', label: 'Standup' },
 	{ to: '/reports', label: 'Reports' },
 	{ to: '/pricing', label: 'Pricing' },
 	{ to: '/settings', label: 'Settings' },
