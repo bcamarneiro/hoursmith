@@ -21,6 +21,7 @@ import {
 	maintenanceMode,
 	paywallPublic,
 	resolveFlags,
+	writeFlags,
 } from '../flags.js';
 
 beforeEach(() => {
@@ -107,5 +108,137 @@ describe('resolveFlags', () => {
 		expect(mine.maintenanceMode).toBe(false);
 		const other = await resolveFlags('z@z.com', env);
 		expect(other.paywallOpenForMe).toBe(false);
+	});
+});
+
+describe('writeFlags', () => {
+	const ORIGINAL_ENV = process.env;
+
+	beforeEach(() => {
+		process.env = { ...ORIGINAL_ENV };
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(null, { status: 200 })),
+		);
+	});
+
+	afterEach(() => {
+		process.env = ORIGINAL_ENV;
+		vi.unstubAllGlobals();
+	});
+
+	it('returns edge_config_not_configured when env vars are missing', async () => {
+		delete process.env.VERCEL_API_TOKEN;
+		delete process.env.EDGE_CONFIG;
+		expect(await writeFlags({ maintenanceMode: true })).toBe(
+			'edge_config_not_configured',
+		);
+	});
+
+	it('returns edge_config_not_configured when only token is set', async () => {
+		process.env.VERCEL_API_TOKEN = 'tok';
+		delete process.env.EDGE_CONFIG;
+		expect(await writeFlags({ maintenanceMode: true })).toBe(
+			'edge_config_not_configured',
+		);
+	});
+
+	it('sends an upsert PATCH to the Vercel API', async () => {
+		process.env.VERCEL_API_TOKEN = 'tok_xxx';
+		process.env.EDGE_CONFIG =
+			'https://edge-config.vercel.com/ecfg_abc123';
+		const fetchMock = vi.fn(async (_url: string, opts: RequestInit) => {
+			const body = JSON.parse(opts.body as string);
+			expect(body).toEqual({
+				items: [
+					{ operation: 'upsert', key: 'maintenance_mode', value: true },
+				],
+			});
+			expect(opts.method).toBe('PATCH');
+			expect((opts.headers as Record<string, string>).authorization).toBe(
+				'Bearer tok_xxx',
+			);
+			return new Response(null, { status: 200 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		expect(await writeFlags({ maintenanceMode: true })).toBeNull();
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		const calledUrl = fetchMock.mock.calls[0][0];
+		expect(calledUrl).toContain('ecfg_abc123');
+	});
+
+	it('skips paywallOpenForMe (computed per-user, not stored)', async () => {
+		process.env.VERCEL_API_TOKEN = 'tok';
+		process.env.EDGE_CONFIG =
+			'https://edge-config.vercel.com/ecfg_skip';
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		// Only paywallOpenForMe in the patch → no items → no fetch
+		expect(
+			await writeFlags({ paywallOpenForMe: false }),
+		).toBeNull();
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it('returns error string when the Vercel API responds non-OK', async () => {
+		process.env.VERCEL_API_TOKEN = 'tok';
+		process.env.EDGE_CONFIG =
+			'https://edge-config.vercel.com/ecfg_bad';
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response('nope', { status: 403 })),
+		);
+		expect(await writeFlags({ maintenanceMode: true })).toBe(
+			'edge_config_write_failed: 403',
+		);
+	});
+
+	it('handles fetch throwing a network error', async () => {
+		process.env.VERCEL_API_TOKEN = 'tok';
+		process.env.EDGE_CONFIG =
+			'https://edge-config.vercel.com/ecfg_net';
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => {
+				throw new Error('getaddrinfo ENOTFOUND');
+			}),
+		);
+		const result = await writeFlags({ maintenanceMode: true });
+		expect(result).toMatch(/^edge_config_write_error:/);
+	});
+
+	it('maps multiple flags to their correct edge keys', async () => {
+		process.env.VERCEL_API_TOKEN = 'tok';
+		process.env.EDGE_CONFIG =
+			'https://edge-config.vercel.com/ecfg_multi';
+		const fetchMock = vi.fn(async (_url: string, opts: RequestInit) => {
+			const body = JSON.parse(opts.body as string);
+			expect(body.items).toEqual([
+				{ operation: 'upsert', key: 'paywall_public', value: true },
+				{
+					operation: 'upsert',
+					key: 'announcement_banner',
+					value: 'Hi!',
+				},
+			]);
+			return new Response(null, { status: 200 });
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		expect(
+			await writeFlags({
+				paywallPublic: true,
+				announcementBanner: 'Hi!',
+			}),
+		).toBeNull();
+	});
+
+	it('returns null for an empty patch (nothing to write)', async () => {
+		process.env.VERCEL_API_TOKEN = 'tok';
+		process.env.EDGE_CONFIG =
+			'https://edge-config.vercel.com/ecfg_empty';
+		const fetchMock = vi.fn();
+		vi.stubGlobal('fetch', fetchMock);
+		expect(await writeFlags({})).toBeNull();
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
