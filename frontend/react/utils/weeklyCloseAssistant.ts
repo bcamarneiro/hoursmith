@@ -22,6 +22,7 @@ export interface WeeklyCloseAssistantModel {
 	status: WeeklyCloseStatus;
 	headline: string;
 	detail: string;
+	gapHours: number;
 	progress: {
 		completed: number;
 		total: number;
@@ -185,6 +186,7 @@ export function buildWeeklyCloseAssistantModel({
 		status: overallStatus,
 		headline,
 		detail,
+		gapHours: totalGapHours,
 		progress: {
 			completed,
 			total,
