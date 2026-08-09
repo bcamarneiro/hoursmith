@@ -26,6 +26,9 @@ const defaultConfig = {
 	includeAbsenceInCsv: true,
 	includeCsvProvenance: false,
 	analyticsOptOut: false,
+	aiDetectionEnabled: false,
+	aiDetectionApiKey: '',
+	aiDetectionEndpoint: '',
 };
 
 describe('settingsBackup', () => {
