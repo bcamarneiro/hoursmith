@@ -263,6 +263,49 @@ function getQueue(config: RetryConfig): RequestQueue {
 }
 
 // ---------------------------------------------------------------------------
+// Structured retry-event logging (ADA-736)
+// ---------------------------------------------------------------------------
+
+import { logStructuredRetry, type StructuredRetryEvent } from './retryLogging';
+
+/** Extract a safe (path+query) URL from a RequestInfo for log events. */
+function safeUrl(input: RequestInfo): string {
+	if (typeof input === 'string') return sanitiseUrl(input);
+	if (input instanceof Request) return sanitiseUrl(input.url);
+	return 'unknown';
+}
+
+function sanitiseUrl(raw: string): string {
+	// Strip origin so tokens embedded in URLs aren't logged.
+	try {
+		const u = new URL(raw);
+		return `${u.pathname}${u.search}`;
+	} catch {
+		return raw;
+	}
+}
+
+function buildRetryEvent(
+	kind: StructuredRetryEvent['event'],
+	input: RequestInfo,
+	attempt: number,
+	maxRetries: number,
+	delayMs: number,
+	status?: number,
+	error?: string,
+): StructuredRetryEvent {
+	return {
+		event: kind,
+		url: safeUrl(input),
+		attempt,
+		maxRetries,
+		delayMs,
+		...(status !== undefined ? { status } : {}),
+		...(error !== undefined ? { error } : {}),
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
@@ -301,17 +344,51 @@ export async function fetchWithRetry(
 				if (res.ok || !isRetryableStatus(res.status, cfg.retryableStatuses)) {
 					return res;
 				}
-				if (attempt >= cfg.maxRetries) return res;
+				if (attempt >= cfg.maxRetries) {
+					logStructuredRetry(
+						buildRetryEvent('retry_exhausted', input, attempt, cfg.maxRetries, 0, res.status),
+					);
+					return res;
+				}
 
 				const retryAfter = parseRetryAfter(res.headers.get('retry-after'));
-				await sleep(calculateBackoffDelayMs(attempt, cfg, retryAfter), signal);
+				const delayMs = calculateBackoffDelayMs(attempt, cfg, retryAfter);
+				logStructuredRetry(
+					buildRetryEvent('retry_attempt', input, attempt, cfg.maxRetries, delayMs, res.status),
+				);
+				await sleep(delayMs, signal);
 			} catch (err) {
 				if (isAbortError(err)) throw err;
 
 				lastError = err;
-				if (!cfg.retryOnNetworkError || attempt >= cfg.maxRetries) throw err;
+				if (!cfg.retryOnNetworkError || attempt >= cfg.maxRetries) {
+					logStructuredRetry(
+						buildRetryEvent(
+							'retry_exhausted',
+							input,
+							attempt,
+							cfg.maxRetries,
+							0,
+							undefined,
+							err instanceof Error ? err.message : String(err),
+						),
+					);
+					throw err;
+				}
 
-				await sleep(calculateBackoffDelayMs(attempt, cfg, null), signal);
+				const delayMs = calculateBackoffDelayMs(attempt, cfg, null);
+				logStructuredRetry(
+					buildRetryEvent(
+						'retry_attempt',
+						input,
+						attempt,
+						cfg.maxRetries,
+						delayMs,
+						undefined,
+						err instanceof Error ? err.message : String(err),
+					),
+				);
+				await sleep(delayMs, signal);
 			}
 		}
 
