@@ -4,7 +4,7 @@ import { logger } from '../react/utils/logger';
 import type { CalendarMapping } from '../stores/useUserDataStore';
 import { fromHttpResponse } from './serviceErrors';
 
-const JIRA_KEY_RE = /([A-Z][A-Z0-9]+-\\d+)/g;
+const JIRA_KEY_RE = /([A-Z][A-Z0-9]+-\d+)/g;
 const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
@@ -56,7 +56,7 @@ interface TokenResponse {
 	token_type: string;
 }
 
-function isAbortError(error: unknown): boolean {
+function _isAbortError(error: unknown): boolean {
 	return (
 		(error instanceof DOMException && error.name === 'AbortError') ||
 		(error instanceof Error && error.name === 'AbortError')
