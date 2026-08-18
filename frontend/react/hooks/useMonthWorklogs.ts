@@ -92,6 +92,7 @@ export function useMonthWorklogs(
 					currentUserOnly,
 					jqlFilter: options.jqlFilter,
 					onProgress: onProgress ?? undefined,
+					scope: options.scope,
 				},
 				signal,
 			),
@@ -158,6 +159,7 @@ export function useMonthWorklogs(
 						{
 							currentUserOnly,
 							jqlFilter: options.jqlFilter,
+							scope: options.scope,
 						},
 						signal,
 					),
@@ -180,6 +182,9 @@ export function useMonthWorklogs(
 		// it, so a jira→tempo flip must re-run this effect or adjacent months stay
 		// prefetched under the previous source's key.
 		source,
+		// Scope picks the per-user vs team Tempo endpoint (ADA-545); prefetching
+		// under a stale scope would cache one user's rows as the team's.
+		options.scope,
 	]);
 
 	return result;

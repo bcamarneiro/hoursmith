@@ -606,7 +606,7 @@ export const ReportsPage: React.FC = () => {
 							source,
 						),
 						queryFn: ({ signal }) =>
-							readMonth(source, config, year, month, {}, signal),
+							readMonth(source, config, year, month, { scope: 'team' }, signal),
 						staleTime: 15 * 60 * 1000,
 					}),
 				),

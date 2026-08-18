@@ -1,9 +1,13 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { rewriteForHostedProxy } from '../../services/jiraGateway';
+import { toTempoWriteInput } from '../../services/tempoWriteService';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import type { EnrichedJiraWorklog } from '../../stores/useTimesheetStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
+import { useUIStore } from '../../stores/useUIStore';
+import { writeCreate, writeDelete, writeUpdate } from './worklogWriteRouter';
 
 /**
  * Which month a worklog belongs to, in the same 0-indexed shape used by the
@@ -70,6 +74,15 @@ function toJiraDatetime(dateStr: string): string {
 
 export function useWorklogOperations() {
 	const config = useConfigStore((state) => state.config);
+	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	// Writes follow reads. Scope is 'personal' because a user only ever creates,
+	// edits or deletes their OWN worklogs — there is no team-scoped write.
+	const writeSource = getWorklogSource({
+		tempoMode: config.tempoMode,
+		tempoApiToken: config.tempoApiToken,
+		tempoSuspected,
+		scope: 'personal',
+	});
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const setData = useTimesheetStore((state) => state.setData);
@@ -139,18 +152,27 @@ export function useWorklogOperations() {
 				throw new Error(`Issue ${params.issueKey} not found`);
 			}
 
-			// Create the worklog
+			// Create the worklog. On a Tempo-managed instance this must go to
+			// Tempo: a Jira-native POST is authored by the human, so the reads
+			// (which filter on the Tempo app account) would never show it, or it
+			// would double-count once Tempo imports it (ADA-544).
 			const worklogUrl = buildUrl(
 				`/rest/api/2/issue/${params.issueKey}/worklog`,
 			);
-			const newWorklog = await makeRequest(worklogUrl, {
-				method: 'POST',
-				body: JSON.stringify({
-					timeSpent: params.timeSpent,
-					comment: params.comment,
-					started: toJiraDatetime(params.started),
-				}),
-			});
+			const newWorklog = (await writeCreate(
+				writeSource,
+				config,
+				() =>
+					makeRequest(worklogUrl, {
+						method: 'POST',
+						body: JSON.stringify({
+							timeSpent: params.timeSpent,
+							comment: params.comment,
+							started: toJiraDatetime(params.started),
+						}),
+					}),
+				toTempoWriteInput(params),
+			)) as EnrichedJiraWorklog;
 
 			// Add the new worklog to the store with issue info
 			const enrichedWorklog: EnrichedJiraWorklog = {
@@ -200,14 +222,21 @@ export function useWorklogOperations() {
 			const worklogUrl = buildUrl(
 				`/rest/api/2/issue/${issueKey}/worklog/${worklogId}`,
 			);
-			const updatedWorklog = await makeRequest(worklogUrl, {
-				method: 'PUT',
-				body: JSON.stringify({
-					timeSpent: params.timeSpent,
-					comment: params.comment,
-					started: toJiraDatetime(params.started),
-				}),
-			});
+			const updatedWorklog = (await writeUpdate(
+				writeSource,
+				config,
+				() =>
+					makeRequest(worklogUrl, {
+						method: 'PUT',
+						body: JSON.stringify({
+							timeSpent: params.timeSpent,
+							comment: params.comment,
+							started: toJiraDatetime(params.started),
+						}),
+					}),
+				worklogId,
+				toTempoWriteInput({ ...params, issueKey }),
+			)) as EnrichedJiraWorklog;
 
 			// Update in the store
 			const currentData = useTimesheetStore.getState().data;
@@ -368,9 +397,13 @@ export function useWorklogOperations() {
 			const worklogUrl = buildUrl(
 				`/rest/api/2/issue/${issueKey}/worklog/${worklogId}`,
 			);
-			await makeRequest(worklogUrl, {
-				method: 'DELETE',
-			});
+			await writeDelete(
+				writeSource,
+				config,
+				() => makeRequest(worklogUrl, { method: 'DELETE' }),
+				issueKey,
+				worklogId,
+			);
 
 			// Remove from the store
 			const currentData = useTimesheetStore.getState().data;

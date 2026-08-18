@@ -24,43 +24,38 @@ describe('looksLikeTempoManaged', () => {
 	});
 });
 
-describe('getWorklogSource — team scope guard (ADA-545)', () => {
-	// Regression: every Tempo fetcher is pinned to GET /4/worklogs/user/{accountId},
-	// so letting a team-scoped read reach Tempo silently drops every teammate —
-	// the Reports table renders plausible-but-partial numbers with no error.
-	const tempoIsOtherwiseActive = {
+describe('getWorklogSource — scope no longer gates the source (ADA-545)', () => {
+	// The temporary guard that pinned team reads to Jira is gone: team reads got
+	// their own non-user-scoped fetcher. `scope` is still required, because
+	// worklogReadRouter uses it to choose the endpoint — and choosing the
+	// per-user endpoint for a team read fails silently rather than loudly.
+	const tempoActive = {
 		tempoApiToken: 'a-real-token',
 		tempoSuspected: true,
+		tempoMode: 'tempo',
 	} as const;
 
-	it('forces jira for team scope even when auto-detection would pick tempo', () => {
-		expect(
-			getWorklogSource({
-				...tempoIsOtherwiseActive,
-				tempoMode: 'auto',
-				scope: 'team',
-			}),
-		).toBe('jira');
+	it('routes team scope to tempo', () => {
+		expect(getWorklogSource({ ...tempoActive, scope: 'team' })).toBe('tempo');
 	});
 
-	it('forces jira for team scope even when tempo is selected explicitly', () => {
-		expect(
-			getWorklogSource({
-				...tempoIsOtherwiseActive,
-				tempoMode: 'tempo',
-				scope: 'team',
-			}),
-		).toBe('jira');
+	it('routes personal scope to tempo', () => {
+		expect(getWorklogSource({ ...tempoActive, scope: 'personal' })).toBe(
+			'tempo',
+		);
 	});
 
-	it('still routes the same config to tempo for personal scope', () => {
+	it('still honours an explicit jira override for both scopes', () => {
+		expect(
+			getWorklogSource({ ...tempoActive, tempoMode: 'jira', scope: 'team' }),
+		).toBe('jira');
 		expect(
 			getWorklogSource({
-				...tempoIsOtherwiseActive,
-				tempoMode: 'tempo',
+				...tempoActive,
+				tempoMode: 'jira',
 				scope: 'personal',
 			}),
-		).toBe('tempo');
+		).toBe('jira');
 	});
 });
 

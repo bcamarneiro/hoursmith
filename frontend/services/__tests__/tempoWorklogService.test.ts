@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { __resetIdentityCache } from '../jiraIdentity';
 import * as bridge from '../proxyUrlBridge';
-import { fetchMonthWorklogsTempo } from '../tempoWorklogService';
+import {
+	fetchMonthWorklogsTempo,
+	fetchTeamMonthWorklogsTempo,
+} from '../tempoWorklogService';
 
 const config = {
 	jiraHost: 'x.atlassian.net',
@@ -155,5 +158,108 @@ describe('fetchMonthWorklogsTempo', () => {
 		await expect(
 			fetchMonthWorklogsTempo(config, 2026, 5, undefined),
 		).rejects.toMatchObject({ kind: 'server-error' });
+	});
+});
+
+describe('fetchTeamMonthWorklogsTempo (ADA-545)', () => {
+	/**
+	 * Records every URL fetched so the tests can assert which Tempo endpoint was
+	 * used — the per-user endpoint silently collapses a team read to one person.
+	 */
+	function routeTeamFetch(tempoPage: object, extra: { bulk?: object } = {}) {
+		const urls: string[] = [];
+		vi.spyOn(bridge, 'getProxyOverrideState').mockReturnValue({
+			hostedProxyUrl: null,
+			userOverride: false,
+			supabaseAccessToken: null,
+		});
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				urls.push(url);
+				if (url.includes('/user/bulk'))
+					return new Response(JSON.stringify(extra.bulk ?? { values: [] }), {
+						status: 200,
+					});
+				if (url.includes('/myself'))
+					return new Response(JSON.stringify({ accountId: 'acc-me' }), {
+						status: 200,
+					});
+				if (url.includes('api.tempo.io'))
+					return new Response(JSON.stringify(tempoPage), { status: 200 });
+				if (url.includes('/search/jql'))
+					return new Response(JSON.stringify({ issues: [] }), { status: 200 });
+				throw new Error(`unexpected url ${url}`);
+			}),
+		);
+		return urls;
+	}
+
+	const twoAuthors = {
+		results: [
+			{
+				tempoWorklogId: 1,
+				issue: { id: 1001 },
+				timeSpentSeconds: 3600,
+				startDate: '2026-07-06',
+				startTime: '09:00:00',
+				createdAt: '2026-07-06T09:00:00Z',
+				author: { accountId: 'acc-alice' },
+			},
+			{
+				tempoWorklogId: 2,
+				issue: { id: 1001 },
+				timeSpentSeconds: 7200,
+				startDate: '2026-07-07',
+				startTime: '09:00:00',
+				createdAt: '2026-07-07T09:00:00Z',
+				author: { accountId: 'acc-bob' },
+			},
+		],
+	};
+
+	it('uses the non-user-scoped endpoint so teammates are not filtered out', async () => {
+		const urls = routeTeamFetch(twoAuthors);
+		await fetchTeamMonthWorklogsTempo(config, 2026, 6);
+		const tempoUrls = urls.filter((u) => u.includes('api.tempo.io'));
+		expect(tempoUrls.length).toBeGreaterThan(0);
+		for (const url of tempoUrls) {
+			expect(url).not.toContain('/worklogs/user/');
+		}
+		expect(tempoUrls[0]).toContain('/worklogs?');
+	});
+
+	it('returns every author, not just the signed-in user', async () => {
+		routeTeamFetch(twoAuthors);
+		const out = await fetchTeamMonthWorklogsTempo(config, 2026, 6);
+		expect(out).toHaveLength(2);
+	});
+
+	it('attributes each worklog to its own author, never the signed-in user', async () => {
+		routeTeamFetch(twoAuthors, {
+			bulk: {
+				values: [
+					{ accountId: 'acc-alice', emailAddress: 'alice@x.com' },
+					{ accountId: 'acc-bob', emailAddress: 'bob@x.com' },
+				],
+			},
+		});
+		const out = await fetchTeamMonthWorklogsTempo(config, 2026, 6);
+		const emails = out.map((w) => w.author?.emailAddress).sort();
+		// The per-user mapper stamps config.email on every row; for a team read
+		// that would collapse the whole team into one person in the completeness
+		// table, which groups by email.
+		expect(emails).toEqual(['alice@x.com', 'bob@x.com']);
+	});
+
+	it('falls back to the accountId when Jira exposes no email for a user', async () => {
+		routeTeamFetch(twoAuthors, {
+			bulk: {
+				values: [{ accountId: 'acc-alice', emailAddress: 'alice@x.com' }],
+			},
+		});
+		const out = await fetchTeamMonthWorklogsTempo(config, 2026, 6);
+		const bob = out.find((w) => w.author?.accountId === 'acc-bob');
+		expect(bob?.author?.emailAddress).toBe('acc-bob');
 	});
 });

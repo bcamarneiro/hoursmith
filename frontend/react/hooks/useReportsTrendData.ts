@@ -84,7 +84,7 @@ export function useReportsTrendData(
 							source,
 						),
 						queryFn: ({ signal }) =>
-							readMonth(source, config, year, month, {}, signal),
+							readMonth(source, config, year, month, { scope: 'team' }, signal),
 						staleTime: 15 * 60 * 1000,
 					}),
 				),

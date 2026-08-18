@@ -107,6 +107,7 @@ export function useCopyPreviousWeek() {
 			const jqlFilter = config.jqlFilter?.trim() || '';
 			const fetchOpts = {
 				jqlFilter: jqlFilter || undefined,
+				scope: 'personal' as const,
 			};
 			const buildKey = (y: number, m: number) =>
 				monthWorklogsQueryKey(

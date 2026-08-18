@@ -32,14 +32,11 @@ export interface WorklogSourceInput {
 
 export function getWorklogSource(input: WorklogSourceInput): 'jira' | 'tempo' {
 	const hasToken = input.tempoApiToken.trim().length > 0;
-	// ADA-545: every Tempo fetcher is hard-wired to the per-user endpoint
-	// `GET /4/worklogs/user/{accountId}` (tempoWorklogService), so a team-scoped
-	// read through Tempo returns ONLY the signed-in user — teammates vanish with
-	// no error and no empty state, which reads as "nobody logged time". Until the
-	// non-user-scoped `GET /4/worklogs` lands, team reads stay on native Jira.
-	// Resolving this here (rather than inside worklogReadRouter) keeps the value
-	// consistent with `monthWorklogsQueryKey`, which also keys on the source.
-	if (input.scope === 'team') return 'jira';
+	// `scope` no longer changes the answer — team reads gained their own
+	// non-user-scoped fetcher in ADA-545, so both scopes may use Tempo. It is
+	// still required on the input because `worklogReadRouter` needs it to pick
+	// between the per-user and team endpoints: routing a team read at the
+	// per-user endpoint silently returns only the signed-in user.
 	if (input.tempoMode === 'jira') return 'jira';
 	if (input.tempoMode === 'tempo') return hasToken ? 'tempo' : 'jira';
 	// auto

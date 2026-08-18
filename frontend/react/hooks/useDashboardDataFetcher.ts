@@ -247,6 +247,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			const jqlFilter = jqlFilterValue?.trim() || '';
 			const fetchOpts = {
 				jqlFilter: jqlFilter || undefined,
+				scope: 'personal' as const,
 			};
 			const buildKey = (y: number, m: number) =>
 				monthWorklogsQueryKey(
