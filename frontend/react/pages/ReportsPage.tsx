@@ -176,6 +176,8 @@ export const ReportsPage: React.FC = () => {
 		tempoMode: config.tempoMode,
 		tempoApiToken: config.tempoApiToken,
 		tempoSuspected,
+		// Reports aggregates every teammate — see ADA-545.
+		scope: 'team',
 	});
 	const jiraDomain = config.jiraHost;
 	const allowedUsers = config.allowedUsers;

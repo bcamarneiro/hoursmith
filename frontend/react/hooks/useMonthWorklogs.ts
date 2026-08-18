@@ -2,7 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import type { WorklogFetchProgress } from '../../../types/worklogLoading';
 import type { WorklogItem } from '../../services/monthWorklogService';
-import { getWorklogSource } from '../../services/worklogSource';
+import {
+	getWorklogSource,
+	type WorklogReadScope,
+} from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import {
 	buildJiraConnectionFingerprint,
@@ -11,6 +14,13 @@ import {
 import { readMonth } from './worklogReadRouter';
 
 interface UseMonthWorklogsOptions {
+	/**
+	 * Whether this month's worklogs need to cover the whole team or just the
+	 * signed-in user. Required because this hook serves both kinds of surface
+	 * (Reports + team completeness vs the personal heatmap), and the answer
+	 * decides whether Tempo may serve the read at all — see ADA-545.
+	 */
+	scope: WorklogReadScope;
 	currentUserOnly?: boolean;
 	jqlFilter?: string;
 	enabled?: boolean;
@@ -44,7 +54,7 @@ export function monthWorklogsQueryKey(
 export function useMonthWorklogs(
 	year: number,
 	month: number,
-	options?: UseMonthWorklogsOptions,
+	options: UseMonthWorklogsOptions,
 ) {
 	const config = useConfigStore((s) => s.config);
 	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
@@ -52,14 +62,15 @@ export function useMonthWorklogs(
 		tempoMode: config.tempoMode,
 		tempoApiToken: config.tempoApiToken,
 		tempoSuspected,
+		scope: options.scope,
 	});
 	const queryClient = useQueryClient();
 	const jiraHost = config.jiraHost;
 	const apiToken = config.apiToken;
 	const corsProxy = config.corsProxy;
-	const currentUserOnly = options?.currentUserOnly ?? false;
-	const jqlFilter = options?.jqlFilter ?? '';
-	const onProgress = options?.onProgress;
+	const currentUserOnly = options.currentUserOnly ?? false;
+	const jqlFilter = options.jqlFilter ?? '';
+	const onProgress = options.onProgress;
 
 	const result = useQuery<WorklogItem[]>({
 		queryKey: monthWorklogsQueryKey(
@@ -79,17 +90,17 @@ export function useMonthWorklogs(
 				month,
 				{
 					currentUserOnly,
-					jqlFilter: options?.jqlFilter,
+					jqlFilter: options.jqlFilter,
 					onProgress: onProgress ?? undefined,
 				},
 				signal,
 			),
-		enabled: (options?.enabled ?? true) && !!jiraHost && !!apiToken,
+		enabled: (options.enabled ?? true) && !!jiraHost && !!apiToken,
 		staleTime: 15 * 60 * 1000,
 	});
 
 	// Prefetch adjacent months in background (opt-in, useful for month navigation)
-	const prefetchAdjacent = options?.prefetchAdjacent ?? false;
+	const prefetchAdjacent = options.prefetchAdjacent ?? false;
 	const queryConfig = useMemo(
 		() => ({
 			...config,
@@ -146,7 +157,7 @@ export function useMonthWorklogs(
 						m,
 						{
 							currentUserOnly,
-							jqlFilter: options?.jqlFilter,
+							jqlFilter: options.jqlFilter,
 						},
 						signal,
 					),
@@ -164,7 +175,7 @@ export function useMonthWorklogs(
 		currentUserOnly,
 		jqlFilter,
 		queryClient,
-		options?.jqlFilter,
+		options.jqlFilter,
 		// Routing source (ADA-543): the prefetch key and `readMonth` both branch on
 		// it, so a jira→tempo flip must re-run this effect or adjacent months stay
 		// prefetched under the previous source's key.

@@ -40,6 +40,8 @@ export function useReportsTrendData(
 		tempoMode: rawConfig.tempoMode,
 		tempoApiToken: rawConfig.tempoApiToken,
 		tempoSuspected,
+		// Trend chart spans the whole team — see ADA-545.
+		scope: 'team',
 	});
 	// Auto-resolve to the hosted Premium proxy when entitled (ADA-273).
 	const effectiveProxy = useEffectiveProxyUrl();

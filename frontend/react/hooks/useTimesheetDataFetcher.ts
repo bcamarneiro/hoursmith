@@ -37,7 +37,14 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 	const tempoMode = useConfigStore((state) => state.config.tempoMode);
 	const tempoApiToken = useConfigStore((state) => state.config.tempoApiToken);
 	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
-	const source = getWorklogSource({ tempoMode, tempoApiToken, tempoSuspected });
+	const source = getWorklogSource({
+		tempoMode,
+		tempoApiToken,
+		tempoSuspected,
+		// Must match the scope useMonthWorklogs resolves below, or the
+		// monthWorklogsQueryKey cache lookups in this hook miss. See ADA-545.
+		scope: 'team',
+	});
 	const queryClient = useQueryClient();
 	const [worklogProgress, setWorklogProgress] =
 		useState<WorklogFetchProgress | null>(null);
@@ -48,6 +55,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 	);
 
 	const mainQuery = useMonthWorklogs(currentYear, currentMonth, {
+		scope: 'team',
 		jqlFilter: jqlFilter || undefined,
 		prefetchAdjacent: enabled,
 		enabled,

@@ -27,6 +27,7 @@ describe('month read routing', () => {
 			tempoMode: 'tempo',
 			tempoApiToken: 't',
 			tempoSuspected: false,
+			scope: 'personal' as const,
 		});
 		const { readMonth } = await import('../worklogReadRouter');
 		await readMonth(source, makeConfig({ tempoApiToken: 't' }), 2026, 5);
@@ -43,6 +44,7 @@ describe('month read routing', () => {
 			tempoMode: 'jira',
 			tempoApiToken: '',
 			tempoSuspected: false,
+			scope: 'personal' as const,
 		});
 		const { readMonth } = await import('../worklogReadRouter');
 		await readMonth(source, makeConfig(), 2026, 5);

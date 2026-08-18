@@ -24,8 +24,52 @@ describe('looksLikeTempoManaged', () => {
 	});
 });
 
+describe('getWorklogSource — team scope guard (ADA-545)', () => {
+	// Regression: every Tempo fetcher is pinned to GET /4/worklogs/user/{accountId},
+	// so letting a team-scoped read reach Tempo silently drops every teammate —
+	// the Reports table renders plausible-but-partial numbers with no error.
+	const tempoIsOtherwiseActive = {
+		tempoApiToken: 'a-real-token',
+		tempoSuspected: true,
+	} as const;
+
+	it('forces jira for team scope even when auto-detection would pick tempo', () => {
+		expect(
+			getWorklogSource({
+				...tempoIsOtherwiseActive,
+				tempoMode: 'auto',
+				scope: 'team',
+			}),
+		).toBe('jira');
+	});
+
+	it('forces jira for team scope even when tempo is selected explicitly', () => {
+		expect(
+			getWorklogSource({
+				...tempoIsOtherwiseActive,
+				tempoMode: 'tempo',
+				scope: 'team',
+			}),
+		).toBe('jira');
+	});
+
+	it('still routes the same config to tempo for personal scope', () => {
+		expect(
+			getWorklogSource({
+				...tempoIsOtherwiseActive,
+				tempoMode: 'tempo',
+				scope: 'personal',
+			}),
+		).toBe('tempo');
+	});
+});
+
 describe('getWorklogSource', () => {
-	const base = { tempoApiToken: '', tempoSuspected: false };
+	const base = {
+		tempoApiToken: '',
+		tempoSuspected: false,
+		scope: 'personal' as const,
+	};
 	it('auto + no token → jira', () => {
 		expect(getWorklogSource({ ...base, tempoMode: 'auto' })).toBe('jira');
 	});
@@ -35,6 +79,7 @@ describe('getWorklogSource', () => {
 				tempoMode: 'auto',
 				tempoApiToken: 't',
 				tempoSuspected: true,
+				scope: 'personal' as const,
 			}),
 		).toBe('tempo');
 	});
@@ -44,6 +89,7 @@ describe('getWorklogSource', () => {
 				tempoMode: 'auto',
 				tempoApiToken: 't',
 				tempoSuspected: false,
+				scope: 'personal' as const,
 			}),
 		).toBe('jira');
 	});
@@ -53,6 +99,7 @@ describe('getWorklogSource', () => {
 				tempoMode: 'tempo',
 				tempoApiToken: 't',
 				tempoSuspected: false,
+				scope: 'personal' as const,
 			}),
 		).toBe('tempo');
 	});
@@ -62,6 +109,7 @@ describe('getWorklogSource', () => {
 				tempoMode: 'tempo',
 				tempoApiToken: '',
 				tempoSuspected: true,
+				scope: 'personal' as const,
 			}),
 		).toBe('jira');
 	});
@@ -71,6 +119,7 @@ describe('getWorklogSource', () => {
 				tempoMode: 'jira',
 				tempoApiToken: 't',
 				tempoSuspected: true,
+				scope: 'personal' as const,
 			}),
 		).toBe('jira');
 	});

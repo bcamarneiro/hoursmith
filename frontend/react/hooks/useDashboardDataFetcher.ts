@@ -131,7 +131,13 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const tempoMode = useConfigStore((s) => s.config.tempoMode);
 	const tempoApiToken = useConfigStore((s) => s.config.tempoApiToken);
 	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
-	const source = getWorklogSource({ tempoMode, tempoApiToken, tempoSuspected });
+	const source = getWorklogSource({
+		tempoMode,
+		tempoApiToken,
+		tempoSuspected,
+		// My Week only ever shows the signed-in user.
+		scope: 'personal',
+	});
 	// For Jira requests, use the effective proxy URL — auto-resolves to the
 	// hosted Premium endpoint when entitled (ADA-273). The `monthWorklogService`
 	// + friends additionally re-route URL/headers via `rewriteForHostedProxy`.

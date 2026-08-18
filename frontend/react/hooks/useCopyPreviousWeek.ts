@@ -81,6 +81,8 @@ export function useCopyPreviousWeek() {
 		tempoMode: config.tempoMode,
 		tempoApiToken: config.tempoApiToken,
 		tempoSuspected,
+		// Copies the signed-in user's own previous week.
+		scope: 'personal',
 	});
 	const weekStart = useDashboardStore((s) => s.weekStart);
 	const mergePreviousWeekSuggestions = useDashboardStore(
