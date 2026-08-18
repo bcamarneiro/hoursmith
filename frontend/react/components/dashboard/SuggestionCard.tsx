@@ -1,4 +1,5 @@
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { WorklogSuggestion } from '../../../../types/Suggestion';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { useDashboardStore } from '../../../stores/useDashboardStore';
@@ -60,6 +61,31 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 	const [isReasonCollapsed, setIsReasonCollapsed] = useState(false);
 	const isLongReason = suggestion.reason.length > 80;
 	const canOpenIssue = !!jiraDomain && !!suggestion.issueKey;
+	const cardRef = useRef<HTMLLIElement>(null);
+	const preEditFocusRef = useRef<Element | null>(null);
+
+	// The dashboard's keyboard nav (useKeyboardShortcuts) moves a virtual focus
+	// between day cards and suggestion cards. Mirror that state into the DOM so
+	// keyboard and screen-reader users land on the same element the visual ring
+	// marks.
+	useEffect(() => {
+		if (isFocused) cardRef.current?.focus({ preventScroll: true });
+	}, [isFocused]);
+
+	// Save / restore actual DOM focus around the edit-worklog dialog so
+	// keyboard-only users return to the suggestion card they were on, not
+	// <body>. This works alongside the native <dialog> close() focus
+	// restoration in <Modal> — whichever fires last wins, and they target the
+	// same element.
+	useEffect(() => {
+		if (isEditOpen) {
+			preEditFocusRef.current = document.activeElement;
+		} else {
+			const el = preEditFocusRef.current;
+			preEditFocusRef.current = null;
+			if (el instanceof HTMLElement) el.focus();
+		}
+	}, [isEditOpen]);
 
 	const isUnmapped =
 		suggestion.source === 'calendar' &&
@@ -127,19 +153,28 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 
 	if (suggestion.logged) {
 		return (
-			<div className={`${styles.card} ${styles.logged}`}>
-				<span className={styles.checkmark}>&#10003;</span>
+			<li
+				className={`${styles.card} ${styles.logged}`}
+				aria-label={`${suggestion.suggestedTimeSpent} logged to ${suggestion.issueKey}`}
+			>
+				<span className={styles.checkmark} aria-hidden="true">
+					&#10003;
+				</span>
 				<span className={styles.loggedText}>
 					{suggestion.suggestedTimeSpent} logged to {suggestion.issueKey}
 				</span>
-			</div>
+			</li>
 		);
 	}
 
 	// Unmapped calendar event card
 	if (isUnmapped) {
 		return (
-			<div
+			<li
+				ref={cardRef}
+				tabIndex={isFocused ? -1 : undefined}
+				aria-current={isFocused ? 'true' : undefined}
+				aria-label={`${suggestion.calendarEventTitle}, unmapped calendar event, ${suggestion.suggestedTimeSpent}`}
 				className={`${styles.card} ${styles.unmapped} ${isFocused ? styles.focused : ''}`}
 			>
 				<div className={styles.header}>
@@ -175,6 +210,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 							value={mappingIssueKey}
 							onChange={(e) => setMappingIssueKey(e.target.value)}
 							placeholder="PROJ-123"
+							aria-label="Jira issue key"
 							autoCapitalize="characters"
 							autoCorrect="off"
 							spellCheck={false}
@@ -220,13 +256,19 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 						</button>
 					</div>
 				)}
-			</div>
+			</li>
 		);
 	}
 
 	return (
 		<>
-			<div className={`${styles.card} ${isFocused ? styles.focused : ''}`}>
+			<li
+				ref={cardRef}
+				tabIndex={isFocused ? -1 : undefined}
+				aria-current={isFocused ? 'true' : undefined}
+				aria-label={`${suggestion.issueKey}${suggestion.issueSummary ? ` ${suggestion.issueSummary}` : ''}, suggested ${suggestion.suggestedTimeSpent}, ${SOURCE_LABELS[suggestion.source] ?? suggestion.source}, confidence ${suggestion.confidence}`}
+				className={`${styles.card} ${isFocused ? styles.focused : ''}`}
+			>
 				<div className={styles.header}>
 					<div className={styles.issueInfo}>
 						{canOpenIssue ? (
@@ -258,6 +300,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 							className={`${styles.confidence} ${CONFIDENCE_STYLES[suggestion.confidence] ?? ''}`}
 							title={`Confidence: ${suggestion.confidence}`}
 						>
+							<span className={styles.srOnly}>Confidence </span>
 							{suggestion.confidence}
 						</span>
 					</div>
@@ -321,25 +364,29 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 						Dismiss
 					</button>
 				</div>
-			</div>
+			</li>
 
-			<Modal
-				isOpen={isEditOpen}
-				onClose={() => setIsEditOpen(false)}
-				title="Log Worklog"
-			>
-				<WorklogForm
-					initialData={{
-						issueKey: suggestion.issueKey,
-						timeSpent: suggestion.suggestedTimeSpent,
-						comment: '',
-						started: `${suggestion.date}T09:00`,
-					}}
-					onSubmit={handleEditSubmit}
-					onCancel={() => setIsEditOpen(false)}
-					isLoading={isLoading}
-				/>
-			</Modal>
+			{isEditOpen &&
+				createPortal(
+					<Modal
+						isOpen
+						onClose={() => setIsEditOpen(false)}
+						title="Log Worklog"
+					>
+						<WorklogForm
+							initialData={{
+								issueKey: suggestion.issueKey,
+								timeSpent: suggestion.suggestedTimeSpent,
+								comment: '',
+								started: `${suggestion.date}T09:00`,
+							}}
+							onSubmit={handleEditSubmit}
+							onCancel={() => setIsEditOpen(false)}
+							isLoading={isLoading}
+						/>
+					</Modal>,
+					document.body,
+				)}
 		</>
 	);
 });

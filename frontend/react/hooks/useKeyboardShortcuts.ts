@@ -10,14 +10,27 @@ interface KeyboardShortcutsResult {
 }
 
 function isInputFocused(): boolean {
-	const tag = document.activeElement?.tagName;
-	if (!tag) return false;
-	return (
+	const el = document.activeElement;
+	if (!el) return false;
+	const tag = el.tagName;
+	// Yield to any interactive element so the user can interact with buttons,
+	// links, and editable content inside a suggestion card without the global
+	// keyboard shortcuts swallowing their keystrokes.
+	if (
 		tag === 'INPUT' ||
 		tag === 'TEXTAREA' ||
 		tag === 'SELECT' ||
-		tag === 'DIALOG'
-	);
+		tag === 'DIALOG' ||
+		tag === 'BUTTON' ||
+		tag === 'A'
+	) {
+		return true;
+	}
+	// contentEditable divs (some rich-text fields) also need unhindered key input.
+	if (el instanceof HTMLElement && el.isContentEditable) {
+		return true;
+	}
+	return false;
 }
 
 export function useKeyboardShortcuts(
@@ -67,10 +80,16 @@ export function useKeyboardShortcuts(
 						break;
 					const dayUp = daysWithGaps[focusedDayIndex];
 					const activeUp = dayUp.suggestions.filter((s) => !s.logged);
-					if (activeUp.length === 0) break;
-					setFocusedSuggestionIndex((prev) =>
-						prev <= 0 ? activeUp.length - 1 : prev - 1,
-					);
+					if (activeUp.length === 0) {
+						// No suggestions left — return focus to the day card.
+						setFocusedSuggestionIndex(-1);
+						break;
+					}
+					setFocusedSuggestionIndex((prev) => {
+						if (prev === -1) return activeUp.length - 1;
+						if (prev === 0) return -1;
+						return prev - 1;
+					});
 					break;
 				}
 				case 'ArrowDown': {
@@ -79,13 +98,27 @@ export function useKeyboardShortcuts(
 						break;
 					const dayDown = daysWithGaps[focusedDayIndex];
 					const activeDown = dayDown.suggestions.filter((s) => !s.logged);
-					if (activeDown.length === 0) break;
-					setFocusedSuggestionIndex((prev) =>
-						prev >= activeDown.length - 1 ? 0 : prev + 1,
-					);
+					if (activeDown.length === 0) {
+						// No suggestions left — return focus to the day card.
+						setFocusedSuggestionIndex(-1);
+						break;
+					}
+					setFocusedSuggestionIndex((prev) => {
+						if (prev === -1) return 0;
+						if (prev >= activeDown.length - 1) return -1;
+						return prev + 1;
+					});
 					break;
 				}
 				case 'Enter': {
+					// Belt-and-suspenders: if real DOM focus is on a native
+					// interactive control inside a card, let the browser handle
+					// the keystroke rather than swallowing it.
+					const activeEl = document.activeElement;
+					if (activeEl instanceof HTMLElement) {
+						const t = activeEl.tagName;
+						if (t === 'BUTTON' || t === 'A' || t === 'INPUT') return;
+					}
 					e.preventDefault();
 					if (focusedDayIndex < 0 || focusedDayIndex >= daysWithGaps.length)
 						break;

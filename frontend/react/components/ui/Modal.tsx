@@ -35,6 +35,13 @@ export const Modal: React.FC<Props> = ({
 		}
 
 		return () => {
+			// When the dialog is removed from the DOM while still open
+			// (conditional rendering in the parent), close it first so the
+			// native <dialog> API restores focus to the previously-focused
+			// element rather than letting it land on <body>.
+			if (dialog.open) {
+				dialog.close();
+			}
 			document.body.style.overflow = 'unset';
 		};
 	}, [isOpen]);

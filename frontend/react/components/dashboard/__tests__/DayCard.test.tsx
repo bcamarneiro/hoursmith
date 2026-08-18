@@ -1,7 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { DaySummary } from '../../../../../types/Suggestion';
+import type {
+	DaySummary,
+	WorklogSuggestion,
+} from '../../../../../types/Suggestion';
 import { DayCard } from '../DayCard';
 
 // 2025-10-15 is a Wednesday and not "today" — so a complete day collapses by
@@ -52,5 +55,49 @@ describe('DayCard — closed-day collapse', () => {
 				name: /Expand Wednesday|Collapse Wednesday/,
 			}),
 		).toBeNull();
+	});
+});
+
+describe('DayCard — suggestion list semantics (RecentActivity surface)', () => {
+	const suggestion = (
+		id: string,
+		overrides: Partial<WorklogSuggestion> = {},
+	): WorklogSuggestion => ({
+		id,
+		source: 'jira-activity',
+		issueKey: 'PROJ-123',
+		issueSummary: 'Fix the login flow',
+		date: '2025-10-15',
+		suggestedTimeSpent: '1h',
+		suggestedSeconds: 3600,
+		confidence: 'high',
+		reason: 'Commented on PROJ-123',
+		logged: false,
+		...overrides,
+	});
+
+	it('labels the suggestions container as a list for screen readers', () => {
+		renderCard(
+			makeDay({
+				gapSeconds: 7200,
+				loggedSeconds: 21600,
+				suggestions: [suggestion('a'), suggestion('b')],
+			}),
+		);
+		const list = screen.getByRole('list', { name: 'Suggestions' });
+		expect(list.querySelectorAll('li')).toHaveLength(2);
+	});
+
+	it('renders logged suggestions in their own labelled list', () => {
+		renderCard(
+			makeDay({
+				gapSeconds: 7200,
+				loggedSeconds: 21600,
+				suggestions: [suggestion('a', { logged: true })],
+			}),
+		);
+		expect(
+			screen.getByRole('list', { name: 'Logged suggestions' }),
+		).toBeTruthy();
 	});
 });
