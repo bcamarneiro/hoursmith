@@ -87,12 +87,12 @@ describe('useDayCalculation', () => {
 	});
 
 	describe('weekend calculations', () => {
-		it('should have zero baseline for weekends', () => {
+		it('skips worklogs on weekends (flagged) and sets zero baseline', () => {
 			const worklogs = [createMockWorklog(14400, '2025-10-18T09:00:00.000Z')];
 
 			const { result } = renderHook(() => useDayCalculation(worklogs, true));
 
-			expect(result.current.dayTotalSeconds).toBe(14400);
+			expect(result.current.dayTotalSeconds).toBe(0);
 			expect(result.current.baselineSeconds).toBe(0);
 			expect(result.current.missingSeconds).toBe(0);
 		});

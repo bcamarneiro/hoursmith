@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { JiraWorklog } from '../../../types/JiraWorklog';
 import { isDateInMonth } from '../utils/date';
-import { classifyWorklog } from '../utils/worklogClassifier';
+import { shouldSkipWorklog } from '../utils/worklogFilter';
 
 export function useMonthTotalCalculation(
 	days: Record<string, JiraWorklog[]>,
@@ -16,7 +16,7 @@ export function useMonthTotalCalculation(
 				continue;
 			}
 			for (const wl of dayWorklogs) {
-				if (classifyWorklog(wl).isBackdated) continue;
+				if (shouldSkipWorklog(wl).skip) continue;
 				userTotalSeconds += wl.timeSpentSeconds ?? 0;
 			}
 		}

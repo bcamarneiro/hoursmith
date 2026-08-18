@@ -9,6 +9,7 @@ import {
 } from './date';
 import { sumWeekdayTargetSeconds } from './dayTarget';
 import { classifyWorklog } from './worklogClassifier';
+import { shouldSkipWorklog } from './worklogFilter';
 
 function isWeekday(dateStr: string): boolean {
 	return !isWeekend(dateStr);
@@ -75,13 +76,15 @@ export function buildTeamSummaries(
 			if (!email || !allowedSet.has(email)) continue;
 		}
 
+		const { skip } = shouldSkipWorklog(worklog);
+		// Backdated worklogs don't count toward weekly totals — see
+		// AGENTS.md ghost-reconciliation invariant.
+		if (skip) continue;
+
 		const c = classifyWorklog(worklog);
 		const day = c.loggedOn;
 		if (!day) continue;
 		if (day < weekStart || day > weekEnd) continue;
-		// Backdated worklogs don't count toward weekly totals — see
-		// AGENTS.md ghost-reconciliation invariant.
-		if (c.isBackdated) continue;
 
 		let groupKey: string;
 		if (accountId) {
