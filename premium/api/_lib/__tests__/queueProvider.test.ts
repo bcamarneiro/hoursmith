@@ -56,6 +56,18 @@ describe('queueOptions', () => {
 		});
 	});
 
+	it('routes the connection through the secure config surface', () => {
+		// The connection comes from the secret-managed env via
+		// loadQueueConnectionConfig: missing config fails loudly, and a
+		// password embedded in a bad URL never reaches the error message.
+		expect(() => queueOptions({})).toThrow();
+		try {
+			queueOptions({ REDIS_URL: 'redis://user:secret@not a url' });
+		} catch (error) {
+			expect(String(error)).not.toContain('secret');
+		}
+	});
+
 	it('defaults job options to bounded retention and retries', () => {
 		const opts = queueOptions({ REDIS_URL: 'redis://cache' });
 		expect(opts.defaultJobOptions?.attempts).toBe(3);
