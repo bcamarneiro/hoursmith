@@ -26,6 +26,7 @@ export interface SettingsIntegrationTests {
 	gitlab: IntegrationTestResult;
 	calendar: IntegrationTestResult;
 	rescuetime: IntegrationTestResult;
+	wakatime: IntegrationTestResult;
 }
 
 interface SettingsFormState {
@@ -45,6 +46,7 @@ interface SettingsFormState {
 	testGitlab: () => Promise<void>;
 	testCalendar: () => Promise<void>;
 	testRescueTime: () => Promise<void>;
+	testWakaTime: () => Promise<void>;
 }
 
 /**
@@ -208,6 +210,7 @@ const resetIntegrationTests = () => ({
 	gitlab: { ...emptyTest },
 	calendar: { ...emptyTest },
 	rescuetime: { ...emptyTest },
+	wakatime: { ...emptyTest },
 });
 
 export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
@@ -708,6 +711,75 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 				integrationTests: {
 					...s.integrationTests,
 					rescuetime: {
+						loading: false,
+						result: {
+							success: false,
+							message:
+								error instanceof Error ? error.message : 'Connection failed',
+						},
+					},
+				},
+			}));
+		}
+	},
+
+	testWakaTime: async () => {
+		set((s) => ({
+			integrationTests: {
+				...s.integrationTests,
+				wakatime: { loading: true, result: null },
+			},
+		}));
+
+		try {
+			const { formData } = get();
+			const normalizedConfig = normalizeConfig(formData);
+			if (!normalizedConfig.wakatimeApiKey) {
+				throw new Error('WakaTime API key is required');
+			}
+
+			const today = toLocalDateString(new Date());
+			const host = (normalizedConfig.wakatimeBaseUrl || 'https://api.wakatime.com').replace(/\/+$/, '');
+			const apiPath = `${host}/api/v1/users/current/summaries?start=${today}&end=${today}`;
+			const url = normalizedConfig.corsProxy
+				? `${normalizedConfig.corsProxy.replace(/\/$/, '')}/${apiPath}`
+				: apiPath;
+
+			const encodedKey = btoa(`${normalizedConfig.wakatimeApiKey}:`);
+			const res = await fetch(url, {
+				headers: {
+					Authorization: `Basic ${encodedKey}`,
+				},
+			});
+
+			if (!res.ok) {
+				if (res.status === 401) throw new Error('Invalid WakaTime API key');
+				throw new Error(`WakaTime API error: ${res.status}`);
+			}
+
+			const data = (await res.json()) as { data?: Array<{ projects?: unknown[] }> };
+			const projectCount = Array.isArray(data.data)
+				? data.data.reduce((sum, day) => sum + (Array.isArray(day.projects) ? day.projects.length : 0), 0)
+				: 0;
+
+			set((s) => ({
+				integrationTests: {
+					...s.integrationTests,
+					wakatime: {
+						loading: false,
+						result: {
+							success: true,
+							message: `Connected — ${projectCount} project${projectCount !== 1 ? 's' : ''} today`,
+						},
+					},
+				},
+			}));
+		} catch (error) {
+			logger.error('[Test] WakaTime failed:', error);
+			set((s) => ({
+				integrationTests: {
+					...s.integrationTests,
+					wakatime: {
 						loading: false,
 						result: {
 							success: false,

@@ -138,6 +138,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const testGitlab = useSettingsFormStore((state) => state.testGitlab);
 	const testCalendar = useSettingsFormStore((state) => state.testCalendar);
 	const testRescueTime = useSettingsFormStore((state) => state.testRescueTime);
+	const testWakaTime = useSettingsFormStore((state) => state.testWakaTime);
 	const loadFromConfig = useSettingsFormStore((state) => state.loadFromConfig);
 	const resetForm = useSettingsFormStore((state) => state.resetForm);
 	const replaceFormData = useSettingsFormStore(
@@ -171,6 +172,8 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const gitlabTokenId = useId();
 	const gitlabHostId = useId();
 	const rescueTimeKeyId = useId();
+	const wakatimeKeyId = useId();
+	const wakatimeBaseUrlId = useId();
 	const timeRoundingId = useId();
 	const themeId = useId();
 	const includeAbsenceInCsvId = useId();
@@ -184,6 +187,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const canTestGitlab =
 		!!formData.gitlabHost.trim() && !!formData.gitlabToken.trim();
 	const canTestRescueTime = !!formData.rescueTimeApiKey.trim();
+	const canTestWakaTime = !!formData.wakatimeApiKey.trim();
 	const hasCalendarFeeds = (formData.calendarFeeds ?? []).some((f) =>
 		f.url.trim(),
 	);
@@ -215,6 +219,11 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		!!formData.rescueTimeApiKey.trim(),
 		integrationTests.rescuetime.loading,
 		integrationTests.rescuetime.result,
+	);
+	const wakatimeStatus = getServiceStatus(
+		!!formData.wakatimeApiKey.trim(),
+		integrationTests.wakatime.loading,
+		integrationTests.wakatime.result,
 	);
 	const calendarStatus = getServiceStatus(
 		hasCalendarFeeds,
@@ -518,22 +527,29 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 						<IntegrationsSection
 							gitlabHost={formData.gitlabHost}
 							gitlabToken={formData.gitlabToken}
-							rescueTimeApiKey={formData.rescueTimeApiKey}
-							absenceAssignments={formData.absenceAssignments ?? []}
-							gitlabHostId={gitlabHostId}
-							gitlabTokenId={gitlabTokenId}
-							rescueTimeKeyId={rescueTimeKeyId}
-							gitlabStatus={gitlabStatus}
-							rescueTimeStatus={rescueTimeStatus}
-							calendarStatus={calendarStatus}
+						rescueTimeApiKey={formData.rescueTimeApiKey}
+						wakatimeApiKey={formData.wakatimeApiKey}
+						wakatimeBaseUrl={formData.wakatimeBaseUrl}
+						absenceAssignments={formData.absenceAssignments ?? []}
+						gitlabHostId={gitlabHostId}
+						gitlabTokenId={gitlabTokenId}
+						rescueTimeKeyId={rescueTimeKeyId}
+						wakatimeKeyId={wakatimeKeyId}
+						wakatimeBaseUrlId={wakatimeBaseUrlId}
+						gitlabStatus={gitlabStatus}
+						rescueTimeStatus={rescueTimeStatus}
+						wakatimeStatus={wakatimeStatus}
+						calendarStatus={calendarStatus}
 							gitlabTroubleshooting={gitlabTroubleshooting}
 							integrationTests={integrationTests}
-							testGitlab={testGitlab}
-							testRescueTime={testRescueTime}
-							testCalendar={testCalendar}
-							canTestGitlab={canTestGitlab}
-							canTestRescueTime={canTestRescueTime}
-							hasCalendarFeeds={hasCalendarFeeds}
+						testGitlab={testGitlab}
+						testRescueTime={testRescueTime}
+						testWakaTime={testWakaTime}
+						testCalendar={testCalendar}
+						canTestGitlab={canTestGitlab}
+						canTestRescueTime={canTestRescueTime}
+						canTestWakaTime={canTestWakaTime}
+						hasCalendarFeeds={hasCalendarFeeds}
 							suggestionFeedEntries={suggestionFeedEntries}
 							absenceFeedEntries={absenceFeedEntries}
 							holidayFeedEntries={holidayFeedEntries}

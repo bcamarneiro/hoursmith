@@ -30,30 +30,38 @@ type Props = {
 	gitlabHost: string;
 	gitlabToken: string;
 	rescueTimeApiKey: string;
+	wakatimeApiKey: string;
+	wakatimeBaseUrl: string;
 	absenceAssignments: AbsenceAssignment[];
 
 	// Static IDs
 	gitlabHostId: string;
 	gitlabTokenId: string;
 	rescueTimeKeyId: string;
+	wakatimeKeyId: string;
+	wakatimeBaseUrlId: string;
 
 	// Status / test state per service
 	gitlabStatus: ServiceStatus;
 	rescueTimeStatus: ServiceStatus;
+	wakatimeStatus: ServiceStatus;
 	calendarStatus: ServiceStatus;
 	gitlabTroubleshooting: string | null;
 	integrationTests: {
 		gitlab: IntegrationTestResult;
 		rescuetime: IntegrationTestResult;
+		wakatime: IntegrationTestResult;
 		calendar: IntegrationTestResult;
 	};
 
 	// Test action callbacks
 	testGitlab: () => void;
 	testRescueTime: () => void;
+	testWakaTime: () => void;
 	testCalendar: () => void;
 	canTestGitlab: boolean;
 	canTestRescueTime: boolean;
+	canTestWakaTime: boolean;
 	hasCalendarFeeds: boolean;
 
 	// Calendar feeds
@@ -94,20 +102,27 @@ export const IntegrationsSection: React.FC<Props> = ({
 	gitlabHost,
 	gitlabToken,
 	rescueTimeApiKey,
+	wakatimeApiKey,
+	wakatimeBaseUrl,
 	absenceAssignments,
 	gitlabHostId,
 	gitlabTokenId,
 	rescueTimeKeyId,
+	wakatimeKeyId,
+	wakatimeBaseUrlId,
 	gitlabStatus,
 	rescueTimeStatus,
+	wakatimeStatus,
 	calendarStatus,
 	gitlabTroubleshooting,
 	integrationTests,
 	testGitlab,
 	testRescueTime,
+	testWakaTime,
 	testCalendar,
 	canTestGitlab,
 	canTestRescueTime,
+	canTestWakaTime,
 	hasCalendarFeeds,
 	suggestionFeedEntries,
 	absenceFeedEntries,
@@ -267,9 +282,83 @@ export const IntegrationsSection: React.FC<Props> = ({
 							Leave this blank if you only want Jira- and calendar-based
 							suggestions.
 						</p>
-					)}
-				</section>
-			</div>
+				)}
+			</section>
+
+			<section className={styles.serviceCard}>
+				<div className={styles.serviceHeader}>
+					<div className={styles.serviceHeading}>
+						<p className={styles.serviceKicker}>WakaTime</p>
+						<h3>Real coding time</h3>
+						<p>
+							Use WakaTime (or self-hosted Wakapi) to add real coding duration
+							per project when Jira and calendar data alone are not enough to
+							explain a day.
+						</p>
+					</div>
+					<span
+						className={`${styles.serviceStatusBadge} ${wakatimeStatus.tone === 'ready' ? styles.serviceStatusReady : wakatimeStatus.tone === 'warning' ? styles.serviceStatusWarning : styles.serviceStatusPending}`}
+					>
+						{wakatimeStatus.label}
+					</span>
+				</div>
+				<div className={styles.formGroup}>
+					<label htmlFor={wakatimeKeyId}>WakaTime API Key</label>
+					<input
+						type="password"
+						id={wakatimeKeyId}
+						name="wakatimeApiKey"
+						value={wakatimeApiKey}
+						onChange={handleChange}
+					/>
+					<small>Requires the CORS proxy to be running</small>
+				</div>
+				<div className={styles.formGroup}>
+					<label htmlFor={wakatimeBaseUrlId}>Base URL (optional)</label>
+					<input
+						type="text"
+						id={wakatimeBaseUrlId}
+						name="wakatimeBaseUrl"
+						value={wakatimeBaseUrl}
+						onChange={handleChange}
+						placeholder="https://api.wakatime.com"
+						autoCapitalize="off"
+						autoCorrect="off"
+						spellCheck={false}
+					/>
+					<small>
+						Override for self-hosted Wakapi instances (e.g.{' '}
+						<code>https://wakapi.example.com</code>)
+					</small>
+				</div>
+				<div className={styles.serviceActions}>
+					<Button
+						type="button"
+						variant="secondary"
+						onClick={testWakaTime}
+						disabled={
+							integrationTests.wakatime.loading || !canTestWakaTime
+						}
+					>
+						{integrationTests.wakatime.loading
+							? 'Testing...'
+							: 'Test WakaTime'}
+					</Button>
+				</div>
+				{integrationTests.wakatime.result ? (
+					<p
+						className={`${styles.testResult} ${integrationTests.wakatime.result.success ? styles.testSuccess : styles.testError}`}
+					>
+						{integrationTests.wakatime.result.message}
+					</p>
+				) : (
+					<p className={styles.serviceHint}>
+						Leave this blank if you only want Jira- and calendar-based
+						suggestions.
+					</p>
+				)}
+			</section>
+		</div>
 
 			<section className={`${styles.serviceCard} ${styles.serviceCardWide}`}>
 				<div className={styles.serviceHeader}>

@@ -44,6 +44,7 @@ describe('useUserDataStore', () => {
 				dayNotes: {},
 				calendarMappings: [],
 				reportPresets: [],
+				wakatimeMappings: [],
 			});
 		});
 	});
@@ -163,6 +164,149 @@ describe('useUserDataStore', () => {
 				enabled: true,
 			},
 		]);
+	});
+
+	it('adds WakaTime mappings with normalized values and prevents duplicates', () => {
+		act(() => {
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: ' hoursmith ',
+				issueKey: ' proj-1 ',
+				issueSummary: ' Hoursmith Dev ',
+			});
+			// Duplicate (case-insensitive project name) is a no-op
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'Hoursmith',
+				issueKey: 'PROJ-2',
+				issueSummary: 'Different issue',
+			});
+			// Different project is added
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'other-project',
+				issueKey: 'PROJ-3',
+			});
+		});
+
+		const mappings = useUserDataStore.getState().wakatimeMappings;
+		expect(mappings).toHaveLength(2);
+		expect(mappings[0]).toEqual({
+			projectName: 'hoursmith',
+			issueKey: 'PROJ-1',
+			issueSummary: 'Hoursmith Dev',
+		});
+		expect(mappings[1]).toEqual({
+			projectName: 'other-project',
+			issueKey: 'PROJ-3',
+			issueSummary: undefined,
+		});
+	});
+
+	it('ignores WakaTime mappings with empty projectName or issueKey', () => {
+		act(() => {
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: '',
+				issueKey: 'PROJ-1',
+			});
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'valid',
+				issueKey: '',
+			});
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: '  ',
+				issueKey: '  ',
+			});
+		});
+
+		expect(useUserDataStore.getState().wakatimeMappings).toEqual([]);
+	});
+
+	it('removes WakaTime mappings case-insensitively', () => {
+		act(() => {
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'hoursmith',
+				issueKey: 'PROJ-1',
+			});
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'other-project',
+				issueKey: 'PROJ-2',
+			});
+			useUserDataStore.getState().removeWakaTimeMapping(' Hoursmith ');
+		});
+
+		const mappings = useUserDataStore.getState().wakatimeMappings;
+		expect(mappings).toHaveLength(1);
+		expect(mappings[0]?.projectName).toBe('other-project');
+	});
+
+	it('updates WakaTime mappings and prevents duplicate project names', () => {
+		act(() => {
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'hoursmith',
+				issueKey: 'PROJ-1',
+				issueSummary: 'Original',
+			});
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'other-project',
+				issueKey: 'PROJ-2',
+			});
+			// Update hoursmith to point to a different issue
+			useUserDataStore.getState().updateWakaTimeMapping('hoursmith', {
+				projectName: 'hoursmith',
+				issueKey: 'PROJ-99',
+				issueSummary: 'Updated',
+			});
+		});
+
+		const mappings = useUserDataStore.getState().wakatimeMappings;
+		expect(mappings).toHaveLength(2);
+		const updated = mappings.find(
+			(m) => m.projectName === 'hoursmith',
+		);
+		expect(updated).toEqual({
+			projectName: 'hoursmith',
+			issueKey: 'PROJ-99',
+			issueSummary: 'Updated',
+		});
+	});
+
+	it('updateWakaTimeMapping rejects rename to an existing project name', () => {
+		act(() => {
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'project-a',
+				issueKey: 'PROJ-1',
+			});
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'project-b',
+				issueKey: 'PROJ-2',
+			});
+			// Try to rename project-a to project-b (duplicate) — should be rejected
+			useUserDataStore.getState().updateWakaTimeMapping('project-a', {
+				projectName: 'project-b',
+				issueKey: 'PROJ-1',
+			});
+		});
+
+		const mappings = useUserDataStore.getState().wakatimeMappings;
+		expect(mappings).toHaveLength(2);
+		// project-a should be unchanged
+		expect(mappings.find((m) => m.projectName === 'project-a')?.issueKey).toBe('PROJ-1');
+		expect(mappings.find((m) => m.projectName === 'project-b')?.issueKey).toBe('PROJ-2');
+	});
+
+	it('updateWakaTimeMapping ignores updates with empty projectName or issueKey', () => {
+		act(() => {
+			useUserDataStore.getState().addWakaTimeMapping({
+				projectName: 'hoursmith',
+				issueKey: 'PROJ-1',
+			});
+			useUserDataStore.getState().updateWakaTimeMapping('hoursmith', {
+				projectName: '',
+				issueKey: 'PROJ-2',
+			});
+		});
+
+		const mappings = useUserDataStore.getState().wakatimeMappings;
+		expect(mappings).toHaveLength(1);
+		expect(mappings[0]?.issueKey).toBe('PROJ-1');
 	});
 
 	it('replaces calendar mappings and merges duplicates by issue key', () => {

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
-import type { RescueTimeDaySummary } from '../../../types/Suggestion';
+import type { RescueTimeDaySummary, WakaTimeDaySummary } from '../../../types/Suggestion';
 import { fetchCalendarSuggestions } from '../../services/calendarService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../../services/monthWorklogService';
 import { fetchRescueTimeData } from '../../services/rescueTimeService';
 import { mergeSuggestions } from '../../services/suggestionMerger';
+import { fetchWakaTimeData } from '../../services/wakatimeService';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import {
@@ -139,6 +140,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const gitlabToken = useConfigStore((s) => s.config.gitlabToken);
 	const gitlabHost = useConfigStore((s) => s.config.gitlabHost);
 	const rescueTimeApiKey = useConfigStore((s) => s.config.rescueTimeApiKey);
+	const wakatimeApiKey = useConfigStore((s) => s.config.wakatimeApiKey);
+	const wakatimeBaseUrl = useConfigStore((s) => s.config.wakatimeBaseUrl);
 	const calendarFeeds = useConfigStore((s) => s.config.calendarFeeds);
 	const timeRounding = useConfigStore((s) => s.config.timeRounding);
 	const weekStart = useDashboardStore((s) => s.weekStart);
@@ -151,6 +154,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const favorites = useUserDataStore((s) => s.favorites);
 	const templates = useUserDataStore((s) => s.templates);
 	const calendarMappings = useUserDataStore((s) => s.calendarMappings);
+	const wakatimeMappings = useUserDataStore((s) => s.wakatimeMappings);
 	const queryClient = useQueryClient();
 	// Bumping this nonce re-runs the fetch effect — the "Try again" affordance.
 	const [refetchNonce, setRefetchNonce] = useState(0);
@@ -190,6 +194,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			gitlabToken,
 			gitlabHost,
 			rescueTimeApiKey,
+			wakatimeApiKey,
+			wakatimeBaseUrl,
 			calendarFeeds,
 			timeRounding,
 		};
@@ -201,6 +207,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			setError('gitlab', null);
 			setError('calendar', null);
 			setError('rescuetime', null);
+			setError('wakatime', null);
 
 			// Set loading states
 			setLoading('worklogs', true);
@@ -218,6 +225,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			const hasCalendar = suggestionFeeds.length > 0;
 			if (hasCalendar) setLoading('calendar', true);
 			if (rescueTimeApiKey) setLoading('rescuetime', true);
+			if (wakatimeApiKey) setLoading('wakatime', true);
 
 			// Determine which month(s) the week spans
 			const [startYear, startMonthStr] = weekStart.split('-').map(Number);
@@ -247,6 +255,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 				gitlabSuggestions,
 				calendarSuggestions,
 				rescueTimeData,
+				wakatimeData,
 			] = await Promise.all([
 				// Worklogs: fetch from shared month query (cached/deduplicated)
 				(async () => {
@@ -399,6 +408,22 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 							})
 							.finally(() => setLoading('rescuetime', false))
 					: Promise.resolve(new Map<string, RescueTimeDaySummary>()),
+
+				wakatimeApiKey
+					? fetchWakaTimeData(
+							wakatimeApiKey,
+							userConfiguredProxy,
+							weekStart,
+							weekEnd,
+							signal,
+							wakatimeBaseUrl,
+						)
+							.catch((e) => {
+								if (!signal.aborted) setError('wakatime', e.message);
+								return new Map<string, WakaTimeDaySummary>();
+							})
+							.finally(() => setLoading('wakatime', false))
+					: Promise.resolve(new Map<string, WakaTimeDaySummary>()),
 			]);
 
 			if (signal.aborted) return;
@@ -417,6 +442,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 				gitlabSuggestions,
 				calendarSuggestions,
 				rescueTimeData,
+				wakatimeData,
+				wakatimeMappings,
 				existingWorklogs: worklogs,
 				favorites,
 				templates,
@@ -448,6 +475,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		gitlabToken,
 		gitlabHost,
 		rescueTimeApiKey,
+		wakatimeApiKey,
+		wakatimeBaseUrl,
 		calendarFeeds,
 		timeRounding,
 		weekStart,
@@ -459,6 +488,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		favorites,
 		templates,
 		calendarMappings,
+		wakatimeMappings,
 		queryClient,
 		refetchNonce,
 	]);

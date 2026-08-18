@@ -80,12 +80,14 @@ interface DashboardState {
 	isLoadingGitlabSuggestions: boolean;
 	isLoadingCalendarSuggestions: boolean;
 	isLoadingRescueTime: boolean;
+	isLoadingWakaTime: boolean;
 
 	worklogsError: string | null;
 	jiraSuggestionsError: string | null;
 	gitlabSuggestionsError: string | null;
 	calendarSuggestionsError: string | null;
 	rescueTimeError: string | null;
+	wakatimeError: string | null;
 
 	lastFetchedAt: string | null;
 	worklogsLoadingProgress: WorklogFetchProgress | null;
@@ -109,11 +111,11 @@ interface DashboardState {
 	fillDayGap: (date: string) => void;
 
 	setLoading: (
-		source: 'worklogs' | 'jira' | 'gitlab' | 'calendar' | 'rescuetime',
+		source: 'worklogs' | 'jira' | 'gitlab' | 'calendar' | 'rescuetime' | 'wakatime',
 		value: boolean,
 	) => void;
 	setError: (
-		source: 'worklogs' | 'jira' | 'gitlab' | 'calendar' | 'rescuetime',
+		source: 'worklogs' | 'jira' | 'gitlab' | 'calendar' | 'rescuetime' | 'wakatime',
 		value: string | null,
 	) => void;
 }
@@ -124,6 +126,7 @@ const loadingKeys = {
 	gitlab: 'isLoadingGitlabSuggestions',
 	calendar: 'isLoadingCalendarSuggestions',
 	rescuetime: 'isLoadingRescueTime',
+	wakatime: 'isLoadingWakaTime',
 } as const;
 
 const errorKeys = {
@@ -132,6 +135,7 @@ const errorKeys = {
 	gitlab: 'gitlabSuggestionsError',
 	calendar: 'calendarSuggestionsError',
 	rescuetime: 'rescueTimeError',
+	wakatime: 'wakatimeError',
 } as const;
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
@@ -147,12 +151,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 	isLoadingGitlabSuggestions: false,
 	isLoadingCalendarSuggestions: false,
 	isLoadingRescueTime: false,
+	isLoadingWakaTime: false,
 
 	worklogsError: null,
 	jiraSuggestionsError: null,
 	gitlabSuggestionsError: null,
 	calendarSuggestionsError: null,
 	rescueTimeError: null,
+	wakatimeError: null,
 
 	lastFetchedAt: null,
 	worklogsLoadingProgress: null,

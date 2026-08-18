@@ -412,6 +412,228 @@ describe('mergeSuggestions: loggedWorklogs per day', () => {
 	});
 });
 
+describe('mergeSuggestions: WakaTime integration', () => {
+	it('generates suggestions from WakaTime data and project mappings', () => {
+		const wakatimeData = new Map([
+			[
+				'2026-03-09',
+				{
+					totalCodingSeconds: 7200,
+					projects: [
+						{ name: 'hoursmith', totalSeconds: 5400 },
+						{ name: 'other', totalSeconds: 1800 },
+					],
+				},
+			],
+		]);
+
+		const result = mergeSuggestions({
+			weekStart: '2026-03-09',
+			jiraSuggestions: [],
+			gitlabSuggestions: [],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			wakatimeData,
+			wakatimeMappings: [
+				{ projectName: 'hoursmith', issueKey: 'PROJ-1', issueSummary: 'Hoursmith' },
+			],
+			existingWorklogs: [],
+		});
+
+		const mon = result.find((d) => d.date === '2026-03-09');
+		expect(mon).toBeDefined();
+		const wtSuggestion = mon?.suggestions.find((s) => s.source === 'wakatime');
+		expect(wtSuggestion).toBeDefined();
+		expect(wtSuggestion?.issueKey).toBe('PROJ-1');
+		expect(wtSuggestion?.suggestedSeconds).toBe(5400);
+		expect(wtSuggestion?.confidence).toBe('high');
+	});
+
+	it('matches WakaTime projects case-insensitively', () => {
+		const wakatimeData = new Map([
+			[
+				'2026-03-09',
+				{
+					totalCodingSeconds: 3600,
+					projects: [{ name: 'Hoursmith', totalSeconds: 3600 }],
+				},
+			],
+		]);
+
+		const result = mergeSuggestions({
+			weekStart: '2026-03-09',
+			jiraSuggestions: [],
+			gitlabSuggestions: [],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			wakatimeData,
+			wakatimeMappings: [
+				{ projectName: 'hoursmith', issueKey: 'PROJ-1' },
+			],
+			existingWorklogs: [],
+		});
+
+		const mon = result.find((d) => d.date === '2026-03-09');
+		const wtSuggestion = mon?.suggestions.find((s) => s.source === 'wakatime');
+		expect(wtSuggestion).toBeDefined();
+		expect(wtSuggestion?.issueKey).toBe('PROJ-1');
+	});
+
+	it('does not generate WakaTime suggestions when issue is already logged', () => {
+		const wakatimeData = new Map([
+			[
+				'2026-03-09',
+				{
+					totalCodingSeconds: 3600,
+					projects: [{ name: 'hoursmith', totalSeconds: 3600 }],
+				},
+			],
+		]);
+
+		const result = mergeSuggestions({
+			weekStart: '2026-03-09',
+			jiraSuggestions: [],
+			gitlabSuggestions: [],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			wakatimeData,
+			wakatimeMappings: [
+				{ projectName: 'hoursmith', issueKey: 'PROJ-1' },
+			],
+			existingWorklogs: [
+				{
+					date: '2026-03-09',
+					issueKey: 'PROJ-1',
+					timeSpentSeconds: 3600,
+				},
+			],
+		});
+
+		const mon = result.find((d) => d.date === '2026-03-09');
+		const wtSuggestion = mon?.suggestions.find((s) => s.source === 'wakatime');
+		expect(wtSuggestion).toBeUndefined();
+	});
+
+	it('skips WakaTime suggestions on weekends', () => {
+		// 2026-03-09 is Monday, 2026-03-14 is Saturday, 2026-03-15 is Sunday
+		const wakatimeData = new Map([
+			[
+				'2026-03-14',
+				{
+					totalCodingSeconds: 3600,
+					projects: [{ name: 'hoursmith', totalSeconds: 3600 }],
+				},
+			],
+		]);
+
+		const result = mergeSuggestions({
+			weekStart: '2026-03-09',
+			jiraSuggestions: [],
+			gitlabSuggestions: [],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			wakatimeData,
+			wakatimeMappings: [
+				{ projectName: 'hoursmith', issueKey: 'PROJ-1' },
+			],
+			existingWorklogs: [],
+		});
+
+		const sat = result.find((d) => d.date === '2026-03-14');
+		expect(sat?.isWeekend).toBe(true);
+		const wtSuggestion = sat?.suggestions.find((s) => s.source === 'wakatime');
+		expect(wtSuggestion).toBeUndefined();
+	});
+
+	it('does not generate suggestions when no mappings exist', () => {
+		const wakatimeData = new Map([
+			[
+				'2026-03-09',
+				{
+					totalCodingSeconds: 3600,
+					projects: [{ name: 'unmapped-project', totalSeconds: 3600 }],
+				},
+			],
+		]);
+
+		const result = mergeSuggestions({
+			weekStart: '2026-03-09',
+			jiraSuggestions: [],
+			gitlabSuggestions: [],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			wakatimeData,
+			wakatimeMappings: [],
+			existingWorklogs: [],
+		});
+
+		const mon = result.find((d) => d.date === '2026-03-09');
+		const wtSuggestions = mon?.suggestions.filter((s) => s.source === 'wakatime');
+		expect(wtSuggestions?.length ?? 0).toBe(0);
+	});
+
+	it('includes wakatime day summary in the DaySummary output', () => {
+		const wakatimeData = new Map([
+			[
+				'2026-03-09',
+				{
+					totalCodingSeconds: 7200,
+					projects: [{ name: 'hoursmith', totalSeconds: 7200 }],
+				},
+			],
+		]);
+
+		const result = mergeSuggestions({
+			weekStart: '2026-03-09',
+			jiraSuggestions: [],
+			gitlabSuggestions: [],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			wakatimeData,
+			existingWorklogs: [],
+		});
+
+		const mon = result.find((d) => d.date === '2026-03-09');
+		expect(mon?.wakatime).toBeDefined();
+		expect(mon?.wakatime?.totalCodingSeconds).toBe(7200);
+	});
+
+	it('handles multiple mappings for the same day', () => {
+		const wakatimeData = new Map([
+			[
+				'2026-03-09',
+				{
+					totalCodingSeconds: 10800,
+					projects: [
+						{ name: 'hoursmith', totalSeconds: 7200 },
+						{ name: 'other-project', totalSeconds: 3600 },
+					],
+				},
+			],
+		]);
+
+		const result = mergeSuggestions({
+			weekStart: '2026-03-09',
+			jiraSuggestions: [],
+			gitlabSuggestions: [],
+			calendarSuggestions: [],
+			rescueTimeData: new Map(),
+			wakatimeData,
+			wakatimeMappings: [
+				{ projectName: 'hoursmith', issueKey: 'PROJ-1' },
+				{ projectName: 'other-project', issueKey: 'PROJ-2' },
+			],
+			existingWorklogs: [],
+		});
+
+		const mon = result.find((d) => d.date === '2026-03-09');
+		const wtSuggestions = mon?.suggestions.filter((s) => s.source === 'wakatime');
+		expect(wtSuggestions).toHaveLength(2);
+		expect(wtSuggestions?.find((s) => s.issueKey === 'PROJ-1')?.suggestedSeconds).toBe(7200);
+		expect(wtSuggestions?.find((s) => s.issueKey === 'PROJ-2')?.suggestedSeconds).toBe(3600);
+	});
+});
+
 describe('roundingStepSeconds', () => {
 	it('returns 60 (one-minute) when rounding is off', () => {
 		expect(roundingStepSeconds('off')).toBe(60);
