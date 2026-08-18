@@ -229,7 +229,7 @@ describe('tokenStorage', () => {
 		).resolves.toBeUndefined();
 
 		expect(receivedBody).not.toBeNull();
-		const parsed = JSON.parse(receivedBody!);
+		const parsed = JSON.parse(receivedBody as unknown as string);
 		expect(parsed).toHaveProperty('last_used_at');
 		expect(parsed.status).toBeUndefined(); // should not change status
 	});
