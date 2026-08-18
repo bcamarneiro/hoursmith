@@ -15,6 +15,7 @@
  */
 
 import { corsHeaders } from './cors.js';
+import { logger } from './logger.js';
 
 /** Headers we drop before forwarding to Jira (browser-injected, leaky, or ours). */
 const REQUEST_HEADER_BLOCKLIST = new Set([
@@ -283,15 +284,10 @@ function isAbortOrTimeout(err: unknown): boolean {
 
 /** Log an upstream forward failure server-side only (no client disclosure). */
 function logForwardError(err: unknown, targetHost: string): void {
-	console.log(
-		JSON.stringify({
-			ts: new Date().toISOString(),
-			svc: 'hoursmith-jira-proxy',
-			event: 'upstream_error',
-			target_host: targetHost,
-			error: (err as Error)?.message ?? String(err),
-		}),
-	);
+	logger.error('hoursmith-jira-proxy', 'upstream_error', {
+		target_host: targetHost,
+		error: (err as Error)?.message ?? String(err),
+	});
 }
 
 function jsonError(

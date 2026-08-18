@@ -14,6 +14,7 @@
  * Linear: ADA-273.
  */
 
+import { logger } from '../_lib/logger.js';
 import {
 	defaultSupabaseAdmin,
 	type SubscriptionRow,
@@ -124,13 +125,9 @@ interface LogFields {
 }
 
 function logEvent(fields: LogFields): void {
-	console.log(
-		JSON.stringify({
-			ts: new Date().toISOString(),
-			svc: 'hoursmith-account-subscription',
-			user_id: fields.userId,
-			status: fields.status,
-			...(fields.note ? { note: fields.note } : {}),
-		}),
-	);
+	logger.info('hoursmith-account-subscription', 'subscription', {
+		user_id: fields.userId,
+		status: fields.status,
+		...(fields.note ? { note: fields.note } : {}),
+	});
 }

@@ -31,6 +31,7 @@
  * Linear: ADA-294.
  */
 
+import { logger } from '../_lib/logger.js';
 import { verifyPolarWebhook } from '../_lib/polarClient.js';
 import {
 	isPolarSubscriptionEvent,
@@ -392,19 +393,15 @@ interface WebhookLogFields {
 }
 
 function logWebhook(fields: WebhookLogFields): void {
-	console.log(
-		JSON.stringify({
-			ts: new Date().toISOString(),
-			svc: 'hoursmith-polar-webhook',
-			event_type: fields.eventType,
-			user_id: fields.userId,
-			outcome: fields.outcome,
-			status: fields.status,
-			...(fields.resultingStatus
-				? { resulting_status: fields.resultingStatus }
-				: {}),
-			...(fields.resultingTier ? { resulting_tier: fields.resultingTier } : {}),
-			...(fields.note ? { note: fields.note } : {}),
-		}),
-	);
+	logger.info('hoursmith-polar-webhook', 'polar_webhook', {
+		event_type: fields.eventType,
+		user_id: fields.userId,
+		outcome: fields.outcome,
+		status: fields.status,
+		...(fields.resultingStatus
+			? { resulting_status: fields.resultingStatus }
+			: {}),
+		...(fields.resultingTier ? { resulting_tier: fields.resultingTier } : {}),
+		...(fields.note ? { note: fields.note } : {}),
+	});
 }

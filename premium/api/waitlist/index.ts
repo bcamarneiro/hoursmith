@@ -18,6 +18,7 @@
  *   DO NOT log: the email value, IP address, or any other request body field.
  */
 
+import { logger } from '../_lib/logger.js';
 import { corsHeaders } from '../_lib/cors.js';
 
 // Pin to Frankfurt for GDPR residency. Mirrors vercel.json.
@@ -190,11 +191,8 @@ interface WaitlistLogFields {
  * Structured log line. Never includes the email value — GDPR scoping.
  */
 function logEvent(fields: WaitlistLogFields): void {
-	const line = {
-		ts: new Date().toISOString(),
-		svc: 'hoursmith-waitlist',
+	logger.info('hoursmith-waitlist', 'waitlist', {
 		source: fields.source,
 		outcome: fields.outcome,
-	};
-	console.log(JSON.stringify(line));
+	});
 }

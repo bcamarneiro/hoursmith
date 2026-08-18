@@ -25,6 +25,7 @@
  * Linear: ADA-294 (migrated from Stripe ADA-260).
  */
 
+import { logger } from '../_lib/logger.js';
 import { emailFromToken } from '../_lib/authEmail.js';
 import { canCheckout, checkoutEnabled, paywallPublic } from '../_lib/flags.js';
 import {
@@ -266,16 +267,12 @@ interface CheckoutLogFields {
 
 /** Structured log line. Scrubbed: no headers, no body, no checkout URL. */
 function logCheckout(fields: CheckoutLogFields): void {
-	console.log(
-		JSON.stringify({
-			ts: new Date().toISOString(),
-			svc: 'hoursmith-checkout',
-			user_id: fields.userId,
-			tier: fields.tier,
-			code: fields.code,
-			status: fields.status,
-			duration_ms: fields.durationMs,
-			...(fields.detail ? { detail: fields.detail } : {}),
-		}),
-	);
+	logger.info('hoursmith-checkout', 'checkout', {
+		user_id: fields.userId,
+		tier: fields.tier,
+		code: fields.code,
+		status: fields.status,
+		duration_ms: fields.durationMs,
+		...(fields.detail ? { detail: fields.detail } : {}),
+	});
 }

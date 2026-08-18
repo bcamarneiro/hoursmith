@@ -19,6 +19,7 @@
  *               Authorization header.
  */
 
+import { logger } from '../_lib/logger.js';
 import { corsHeaders } from '../_lib/cors.js';
 import { getEntitlement } from '../_lib/entitlement.js';
 import { forwardToJira } from '../_lib/jiraForward.js';
@@ -162,13 +163,10 @@ interface ProxyLogFields {
  * TODO: replace with Sentry/Logflare once observability is wired (ADA tbd).
  */
 function logProxy(fields: ProxyLogFields): void {
-	const line = {
-		ts: new Date().toISOString(),
-		svc: 'hoursmith-proxy',
+	logger.info('hoursmith-proxy', 'proxy', {
 		user_id: fields.userId,
 		upstream_status: fields.upstreamStatus,
 		duration_ms: fields.durationMs,
 		...(fields.note ? { note: fields.note } : {}),
-	};
-	console.log(JSON.stringify(line));
+	});
 }

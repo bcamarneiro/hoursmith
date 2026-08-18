@@ -23,6 +23,7 @@
 import { Pool, type PoolClient, type PoolConfig } from 'pg';
 
 import { type PoolEnv, parsePoolSettings, toPoolConfig } from './poolConfig.js';
+import { logger } from './logger.js';
 
 export type { PoolEnv };
 
@@ -79,7 +80,9 @@ export class PoolManager {
 		const pool = new Pool(this.buildPoolConfig());
 		pool.on('error', (err: Error) => {
 			// Log and let the pool recover by replacing the dead client.
-			console.error(`[connectionPool] idle client error: ${err.message}`);
+			logger.error('connectionPool', 'idle client error', {
+				error: err.message,
+			});
 		});
 		this.pool = pool;
 		return pool;
