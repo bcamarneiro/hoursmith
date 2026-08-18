@@ -181,7 +181,7 @@ describe('tokenStorage', () => {
 
 		const result = await store.revokeToken('usr_1', 'jira_api');
 		expect(result).not.toBeNull();
-		expect(result!.status).toBe('revoked');
+		expect(result?.status).toBe('revoked');
 	});
 
 	it('revokeToken returns null if no active/expired token matched', async () => {
@@ -229,7 +229,7 @@ describe('tokenStorage', () => {
 		).resolves.toBeUndefined();
 
 		expect(receivedBody).not.toBeNull();
-		const parsed = JSON.parse(receivedBody!);
+		const parsed = JSON.parse(receivedBody);
 		expect(parsed).toHaveProperty('last_used_at');
 		expect(parsed.status).toBeUndefined(); // should not change status
 	});
@@ -354,7 +354,7 @@ describe('tokenStorage', () => {
 		// 2. Read back
 		const got = await store.getToken('usr_1', 'gitlab');
 		expect(got).not.toBeNull();
-		expect(got!.encrypted_value).toBe('v1');
+		expect(got?.encrypted_value).toBe('v1');
 
 		// 3. Refresh (re-encrypt)
 		const refreshed = await store.upsertToken('usr_1', {
@@ -365,7 +365,7 @@ describe('tokenStorage', () => {
 
 		// 4. Revoke
 		const revoked = await store.revokeToken('usr_1', 'gitlab');
-		expect(revoked!.status).toBe('revoked');
+		expect(revoked?.status).toBe('revoked');
 
 		// 5. Delete
 		const deleted = await store.deleteToken('usr_1', 'gitlab');
