@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { JiraIssue } from '../../../types/jira';
-import { chunkIds, mapTempoWorklog, placeholderIssue } from '../tempoMapper';
+import { classifyWorklog } from '../../react/utils/worklogClassifier';
+import {
+	chunkIds,
+	deriveOffsetSuffix,
+	mapTempoWorklog,
+	placeholderIssue,
+} from '../tempoMapper';
 
 const issue: JiraIssue = {
 	id: '1001',
@@ -95,5 +101,95 @@ describe('placeholderIssue', () => {
 			id: '42',
 			key: 'UNKNOWN-42',
 		});
+	});
+});
+
+describe('late-logging detection on real Tempo payloads (ADA-543)', () => {
+	/**
+	 * Field-for-field copy of a worklog read from a live Tempo-managed instance
+	 * on 2026-08-18. Note `issue` carries no `key`, and `startTime` no offset —
+	 * both were assumed otherwise before this payload was inspected.
+	 */
+	const realWorklog = {
+		tempoWorklogId: 491168,
+		issue: { id: 426364 },
+		timeSpentSeconds: 14400,
+		startDate: '2026-07-27',
+		startTime: '09:00:00',
+		startDateTimeUtc: '2026-07-27T08:00:00Z',
+		createdAt: '2026-08-05T09:12:42Z',
+		updatedAt: '2026-08-05T09:12:50Z',
+		description: 'work',
+		author: { accountId: 'acc-1' },
+	};
+
+	it('reports the true lateness instead of collapsing it to zero', () => {
+		const mapped = mapTempoWorklog(realWorklog, new Map(), 'me@x.com');
+		const classified = classifyWorklog(mapped);
+		// Worked Jul 27, logged Aug 5. Before the fix `created` was copied from
+		// `started`, so this read 0 and every Tempo user looked perfectly punctual.
+		expect(classified.daysLate).toBe(9);
+		expect(classified.isBackdated).toBe(true);
+		expect(classified.intendedFor).toBe('2026-07-27');
+		expect(classified.loggedOn).toBe('2026-08-05');
+	});
+
+	it('carries createdAt through rather than duplicating started', () => {
+		const mapped = mapTempoWorklog(realWorklog, new Map(), 'me@x.com');
+		expect(mapped.created).toBe('2026-08-05T09:12:42Z');
+		expect(mapped.created).not.toBe(mapped.started);
+	});
+
+	it('stamps started with the offset recovered from startDateTimeUtc', () => {
+		const mapped = mapTempoWorklog(realWorklog, new Map(), 'me@x.com');
+		expect(mapped.started).toBe('2026-07-27T09:00:00+01:00');
+	});
+
+	it('falls back to an offset-less timestamp when startDateTimeUtc is absent', () => {
+		const withoutUtc = { ...realWorklog, startDateTimeUtc: undefined };
+		const mapped = mapTempoWorklog(withoutUtc, new Map(), 'me@x.com');
+		expect(mapped.started).toBe('2026-07-27T09:00:00');
+	});
+
+	it('renders a placeholder key, since Tempo never sends issue.key', () => {
+		const mapped = mapTempoWorklog(realWorklog, new Map(), 'me@x.com');
+		expect(mapped.issue.key).toBe('UNKNOWN-426364');
+	});
+});
+
+describe('deriveOffsetSuffix', () => {
+	it('derives a positive offset', () => {
+		expect(
+			deriveOffsetSuffix('2026-07-27', '09:00:00', '2026-07-27T08:00:00Z'),
+		).toBe('+01:00');
+	});
+
+	it('derives a negative offset across a date boundary', () => {
+		expect(
+			deriveOffsetSuffix('2026-10-31', '23:30:00', '2026-11-01T02:30:00Z'),
+		).toBe('-03:00');
+	});
+
+	it('derives a half-hour offset', () => {
+		expect(
+			deriveOffsetSuffix('2026-07-27', '14:45:00', '2026-07-27T09:15:00Z'),
+		).toBe('+05:30');
+	});
+
+	it('returns Z when local time already is UTC', () => {
+		expect(
+			deriveOffsetSuffix('2026-07-27', '09:00:00', '2026-07-27T09:00:00Z'),
+		).toBe('Z');
+	});
+
+	it('returns empty for missing or unparseable input', () => {
+		expect(deriveOffsetSuffix('2026-07-27', '09:00:00', undefined)).toBe('');
+		expect(deriveOffsetSuffix('2026-07-27', '09:00:00', 'not-a-date')).toBe('');
+	});
+
+	it('rejects an absurd offset rather than emitting an unparseable stamp', () => {
+		expect(
+			deriveOffsetSuffix('2026-07-27', '09:00:00', '2026-07-25T09:00:00Z'),
+		).toBe('');
 	});
 });
