@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import path from 'node:path';
 
 const buildTier = (process.env.BUILD_TIER || 'free').toLowerCase();
 
@@ -11,7 +12,7 @@ export default defineConfig({
 	test: {
 		globals: true,
 		environment: 'happy-dom',
-		setupFiles: ['./vitest.setup.ts'],
+		setupFiles: [path.resolve(__dirname, 'vitest.setup.ts')],
 		include: ['**/*.test.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
 		exclude: [
 			'node_modules',
@@ -42,7 +43,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			'@': '/frontend',
+			'@': path.resolve(__dirname, 'frontend'),
 		},
 	},
 });
