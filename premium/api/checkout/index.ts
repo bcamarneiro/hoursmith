@@ -31,6 +31,7 @@ import {
 	type CreateCheckoutInput,
 	createPolarCheckout,
 } from '../_lib/polarClient.js';
+import { transformRequest } from '../_lib/requestTransformer.js';
 import {
 	defaultSupabaseAdmin,
 	type SupabaseAdminClient,
@@ -166,14 +167,27 @@ export async function handleCheckout(
 		}
 	}
 
-	// 2. Parse body and validate the tier.
-	let body: unknown;
-	try {
-		body = await request.json();
-	} catch {
-		body = null;
+	// 2. Parse + validate body via the shared request transformer.
+	const validation = await transformRequest(request, {
+		body: { tier: { type: 'string', required: true } },
+	});
+	if (!validation.ok) {
+		const { status, error: code } = validation;
+		logCheckout({
+			userId,
+			tier: null,
+			code,
+			status,
+			durationMs: Date.now() - start,
+		});
+		return new Response(JSON.stringify({ error: code }), {
+			status,
+			headers: { 'content-type': 'application/json' },
+		});
 	}
-	const tier = parseTier(body);
+
+	const rawTier = validation.body?.tier;
+	const tier = parseTier(rawTier);
 	if (!tier) {
 		logCheckout({
 			userId,
@@ -232,9 +246,8 @@ export async function handleCheckout(
 	return jsonResponse(200, { url });
 }
 
-function parseTier(body: unknown): CheckoutTier | null {
-	if (!body || typeof body !== 'object') return null;
-	const raw = (body as { tier?: unknown }).tier;
+function parseTier(raw: string | undefined): CheckoutTier | null {
+	if (typeof raw !== 'string') return null;
 	if (raw === 'hosted') return 'hosted';
 	if (raw === 'lead' && LEAD_TIER_ENABLED) return 'lead';
 	return null;
