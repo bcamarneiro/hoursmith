@@ -10,6 +10,7 @@ import { FavoritesManager } from '../components/dashboard/FavoritesManager';
 import { KeyboardShortcutsHelp } from '../components/dashboard/KeyboardShortcutsHelp';
 import { MonthHeatmap } from '../components/dashboard/MonthHeatmap';
 import { OfflineIndicator } from '../components/dashboard/OfflineIndicator';
+import { RecentActivityPanel } from '../components/dashboard/RecentActivityPanel';
 import { SourceStatusBar } from '../components/dashboard/SourceStatusBar';
 import { TemplatesManager } from '../components/dashboard/TemplatesManager';
 import { WeeklyCloseAssistant } from '../components/dashboard/WeeklyCloseAssistant';
@@ -414,6 +415,8 @@ export const MyWeekPage: React.FC = () => {
 					)}
 				</>
 			)}
+
+			<RecentActivityPanel weekStart={weekStart} weekEnd={weekEnd} />
 
 			<FavoritesManager
 				isOpen={isFavoritesOpen}
