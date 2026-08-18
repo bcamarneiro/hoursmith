@@ -95,7 +95,7 @@ function sumMonthlyHours(
 		for (const [dateKey, worklogs] of Object.entries(days)) {
 			if (!dateKey.startsWith(monthPrefix)) continue;
 			for (const worklog of worklogs) {
-				if (classifyWorklog(worklog).isBackdated) continue;
+				if (worklog.classified?.isBackdated ?? classifyWorklog(worklog).isBackdated) continue;
 				totalSeconds += worklog.timeSpentSeconds ?? 0;
 			}
 		}
@@ -313,29 +313,29 @@ export const ReportsPage: React.FC = () => {
 		void queryClient.invalidateQueries({ queryKey: ['monthWorklogs'] });
 	}, [queryClient]);
 
-	const handleSort = (field: SortField) => {
+	const handleSort = useCallback((field: SortField) => {
 		if (sortField === field) {
 			setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
 		} else {
 			setSortField(field);
 			setSortDirection('asc');
 		}
-	};
+	}, [sortField]);
 
-	const handleUserChange = (value: string) => {
+	const handleUserChange = useCallback((value: string) => {
 		setSelectedUser(value);
-	};
+	}, []);
 
-	const handleMemberClick = (name: string) => {
+	const handleMemberClick = useCallback((name: string) => {
 		setSelectedUser(name);
 		setViewMode('monthly');
-	};
+	}, [])
 
-	const handleDownloadUser = (user: string) => {
+	const handleDownloadUser = useCallback((user: string) => {
 		downloadUser(user, grouped, issueSummaries, currentYear, currentMonth);
-	};
+	}, [downloadUser, grouped, issueSummaries, currentYear, currentMonth]);
 
-	const handleDownloadAll = () => {
+	const handleDownloadAll = useCallback(() => {
 		downloadAll(
 			filteredVisibleEntries.map(([user]) => user),
 			grouped,
@@ -343,7 +343,7 @@ export const ReportsPage: React.FC = () => {
 			currentYear,
 			currentMonth,
 		);
-	};
+	}, [downloadAll, filteredVisibleEntries, grouped, issueSummaries, currentYear, currentMonth]);
 
 	const weekdays = useMemo(
 		() =>
@@ -353,7 +353,7 @@ export const ReportsPage: React.FC = () => {
 		[weekStart],
 	);
 
-	const handleExportTeamCsv = () => {
+	const handleExportTeamCsv = useCallback(() => {
 		const csv = buildTeamCsv(sortedMembers, weekdays, {
 			provenance: { jiraHost: config.jiraHost },
 			includeProvenance: config.includeCsvProvenance,
@@ -362,7 +362,7 @@ export const ReportsPage: React.FC = () => {
 		const filename = `team-report-${weekStart}.csv`;
 		downloadAsFile(csv, filename, 'text/csv;charset=utf-8');
 		toast.success('Weekly report exported');
-	};
+	}, [sortedMembers, weekdays, config, weekStart]);
 
 	// Keyboard shortcuts for month/week navigation
 	const handleKeyDown = useCallback(
@@ -400,7 +400,7 @@ export const ReportsPage: React.FC = () => {
 		setValidationState(buildIdleValidationState(viewMode, weekStart, weekEnd));
 	}, [viewMode, weekStart, weekEnd]);
 
-	const handleClearFilters = () => {
+	const handleClearFilters = useCallback(() => {
 		setSearchQuery('');
 		setOnlyAttentionNeeded(false);
 		setManagerMode(false);
@@ -409,9 +409,9 @@ export const ReportsPage: React.FC = () => {
 		setSortDirection('asc');
 		setSelectedUser('');
 		toast.info('Reports filters cleared');
-	};
+	}, []);
 
-	const handleSavePreset = (label: string) => {
+	const handleSavePreset = useCallback((label: string) => {
 		const trimmedLabel = label.trim();
 		if (!trimmedLabel) return;
 
@@ -430,9 +430,9 @@ export const ReportsPage: React.FC = () => {
 			selectedUser,
 		});
 		toast.success(`Saved preset "${trimmedLabel}"`);
-	};
+	}, [saveReportPreset, viewMode, searchQuery, onlyAttentionNeeded, managerMode, trendWeeks, sortField, sortDirection, selectedUser]);
 
-	const handleApplyPreset = (preset: ReportPreset) => {
+	const handleApplyPreset = useCallback((preset: ReportPreset) => {
 		setViewMode(preset.viewMode);
 		setSearchQuery(preset.searchQuery);
 		setOnlyAttentionNeeded(preset.onlyAttentionNeeded);
@@ -442,26 +442,26 @@ export const ReportsPage: React.FC = () => {
 		setSortDirection(preset.sortDirection);
 		setSelectedUser(preset.selectedUser);
 		toast.success(`Applied preset "${preset.label}"`);
-	};
+	}, []);
 
-	const handleRemovePreset = (id: string) => {
+	const handleRemovePreset = useCallback((id: string) => {
 		const preset = reportPresets.find((item) => item.id === id);
 		removeReportPreset(id);
 		toast.success(
 			preset ? `Removed preset "${preset.label}"` : 'Removed report preset',
 		);
-	};
+	}, [reportPresets, removeReportPreset]);
 
-	const handleCopyShareLink = async () => {
+	const handleCopyShareLink = useCallback(async () => {
 		try {
 			await navigator.clipboard.writeText(window.location.href);
 			toast.success('Share link copied to clipboard');
 		} catch {
 			toast.error('Failed to copy share link');
 		}
-	};
+	}, []);
 
-	const buildSnapshotInput = () =>
+	const buildSnapshotInput = useCallback(() =>
 		viewMode === 'weekly'
 			? {
 					viewMode: 'weekly' as const,
@@ -487,9 +487,9 @@ export const ReportsPage: React.FC = () => {
 					searchQuery,
 					selectedUser,
 					entries: filteredVisibleEntries,
-				};
+				}, [viewMode, jiraDomain, weekStart, weekEnd, searchQuery, onlyAttentionNeeded, managerMode, trendWeeks, sortField, sortDirection, sortedMembers, validationState, trendModel, currentYear, currentMonth, selectedUser, filteredVisibleEntries]);
 
-	const handleExportSnapshotHtml = () => {
+	const handleExportSnapshotHtml = useCallback(() => {
 		const html = buildReportsSnapshotHtml(buildSnapshotInput());
 		const filename =
 			viewMode === 'weekly'
@@ -497,9 +497,9 @@ export const ReportsPage: React.FC = () => {
 				: `reports-snapshot-month-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.html`;
 		downloadAsFile(html, filename, 'text/html;charset=utf-8');
 		toast.success('Read-only HTML snapshot exported');
-	};
+	}, [buildSnapshotInput, viewMode, weekStart, currentYear, currentMonth]);
 
-	const handleExportSnapshotMarkdown = () => {
+	const handleExportSnapshotMarkdown = useCallback(() => {
 		const markdown = buildReportsSnapshotMarkdown(buildSnapshotInput());
 		const filename =
 			viewMode === 'weekly'
@@ -507,9 +507,9 @@ export const ReportsPage: React.FC = () => {
 				: `reports-snapshot-month-${currentYear}-${String(currentMonth + 1).padStart(2, '0')}.md`;
 		downloadAsFile(markdown, filename, 'text/markdown;charset=utf-8');
 		toast.success('Read-only Markdown snapshot exported');
-	};
+	}, [buildSnapshotInput, viewMode, weekStart, currentYear, currentMonth]);
 
-	const handleValidateConsistency = async () => {
+	const handleValidateConsistency = useCallback(async () => {
 		if (viewMode !== 'weekly') {
 			toast.info('Switch to Weekly to validate weekly and monthly totals');
 			return;
@@ -589,7 +589,7 @@ export const ReportsPage: React.FC = () => {
 			});
 			toast.error(message);
 		}
-	};
+	}, [viewMode, weekStart, weekEnd, config, queryClient, teamMembers, allowedUsers, fetchMonthWorklogs, validateReportsConsistency, monthWorklogsQueryKey]);
 
 	const hasNoData = !isLoading && !!data && allMonthlyEntries.length === 0;
 	const hasNoFilteredMonthlyResults =

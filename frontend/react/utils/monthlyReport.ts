@@ -95,7 +95,7 @@ export function deriveMonthlyReportState(
 		const email = wl.author?.emailAddress?.toLowerCase();
 		if (displayName && isUserAllowed(wl)) {
 			const user = buildUserKey(displayName, email, emailsByDisplayName);
-			const date = classifyWorklog(wl).loggedOn;
+			const date = wl.classified?.loggedOn ?? classifyWorklog(wl).loggedOn;
 			if (!date) continue;
 			if (!grouped[user]) grouped[user] = {};
 			if (!grouped[user][date]) grouped[user][date] = [];

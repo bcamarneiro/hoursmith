@@ -1,4 +1,4 @@
-import type React from 'react';
+import React from 'react';
 import type { AbsenceDay } from '../../../services/absenceService';
 import { getAbsenceKindLabel } from '../../utils/absence';
 import { isWeekendDay, monthLabel } from '../../utils/date';
@@ -47,7 +47,7 @@ function getLevel(seconds: number): string {
 	return 'level4';
 }
 
-export const MonthHeatmap: React.FC<Props> = ({
+const MonthHeatmapBase: React.FC<Props> = ({
 	monthData,
 	backdatedSeconds,
 	month,
@@ -204,3 +204,5 @@ export const MonthHeatmap: React.FC<Props> = ({
 		</div>
 	);
 };
+
+export const MonthHeatmap = React.memo(MonthHeatmapBase);

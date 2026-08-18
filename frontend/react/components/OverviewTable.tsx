@@ -65,7 +65,7 @@ export const OverviewTable: React.FC<Props> = ({
 				if (!dateKey) continue;
 				if (!isDateInMonth(dateKey, year, monthZeroIndexed)) continue;
 				for (const wl of worklogs) {
-					if (classifyWorklog(wl).isBackdated) continue;
+						if (wl.classified?.isBackdated ?? classifyWorklog(wl).isBackdated) continue;
 					const seconds = wl.timeSpentSeconds ?? 0;
 					totalSeconds += seconds;
 					worklogCount++;

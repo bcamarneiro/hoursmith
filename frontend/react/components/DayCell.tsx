@@ -1,5 +1,4 @@
-import type React from 'react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 import type { EnrichedJiraWorklog } from '../../../types/jira';
 import type { AbsenceDay } from '../../services/absenceService';
@@ -27,7 +26,7 @@ type Props = {
 	isToday: boolean;
 };
 
-export const DayCell: React.FC<Props> = ({
+const DayCellBase: React.FC<Props> = ({
 	iso,
 	dayNumber,
 	worklogs,
@@ -243,3 +242,5 @@ export const DayCell: React.FC<Props> = ({
 		</>
 	);
 };
+
+export const DayCell = React.memo(DayCellBase);

@@ -31,7 +31,7 @@ export function projectDays(
 
 	for (const list of Object.values(days)) {
 		for (const wl of list) {
-			const c = classifyWorklog(wl);
+			const c = wl.classified ?? classifyWorklog(wl);
 			const key = wl.id ?? '';
 			if (key) classifications.set(key, c);
 

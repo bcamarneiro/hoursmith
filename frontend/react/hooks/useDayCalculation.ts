@@ -13,7 +13,7 @@ export function useDayCalculation(
 		let backdatedSeconds = 0;
 		for (const wl of worklogs) {
 			const seconds = wl.timeSpentSeconds ?? 0;
-			if (classifyWorklog(wl).isBackdated) {
+			if (wl.classified?.isBackdated ?? classifyWorklog(wl).isBackdated) {
 				backdatedSeconds += seconds;
 			} else {
 				countedSeconds += seconds;

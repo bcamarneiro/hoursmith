@@ -100,7 +100,7 @@ export function buildTimesheetCsv(opts: BuildTimesheetCsvOptions): string {
 
 	const classified = worklogs.map((entry) => ({
 		entry,
-		classified: classifyWorklog(entry, classifierOptions),
+		classified: entry.classified ?? classifyWorklog(entry, classifierOptions),
 	}));
 
 	const filtered = period

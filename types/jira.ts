@@ -1,3 +1,5 @@
+import type { ClassifiedWorklog } from '../frontend/react/utils/worklogClassifier';
+
 export interface JiraUser {
 	self?: string;
 	accountId?: string;
@@ -31,12 +33,14 @@ export interface JiraWorklog {
 	timeSpentSeconds?: number;
 	issueId?: string;
 	issueKey?: string;
+	/** Pre-computed classification result. Attached at ingest to avoid re-classifying the same worklog across multiple consumers. */
+	classified?: ClassifiedWorklog;
 	[key: string]: unknown;
 }
 
-export type EnrichedJiraWorklog = JiraWorklog & {
+export interface EnrichedJiraWorklog extends JiraWorklog {
 	issue: JiraIssue;
-};
+}
 
 export type GroupedWorklogs = Record<
 	string,

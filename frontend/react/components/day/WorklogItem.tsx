@@ -27,7 +27,7 @@ export const WorklogItem: React.FC<Props> = ({
 		worklog.issue?.fields.summary ||
 		'';
 	const comment = typeof worklog.comment === 'string' ? worklog.comment : '';
-	const classified = classifyWorklog(worklog);
+	const classified = worklog.classified ?? classifyWorklog(worklog);
 	const isRetroactive = classified.isBackdated;
 	const retroactiveLabel = isRetroactive
 		? `Logged ${classified.daysLate}d after the work date (intended ${classified.intendedFor}, logged ${classified.loggedOn})`
