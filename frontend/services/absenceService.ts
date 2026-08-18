@@ -1,4 +1,5 @@
-import type { AbsenceKind } from '../../types/absence';
+import type { AbsenceDay, AbsenceKind, UserAbsenceDays } from '../../types/absence';
+export type { AbsenceDay, UserAbsenceDays };
 import { toLocalDateString } from '../react/utils/date';
 import { logger } from '../react/utils/logger';
 import type { AbsenceAssignment, CalendarFeed } from '../stores/useConfigStore';
@@ -347,14 +348,6 @@ function expandAbsenceDates(
 
 	return results;
 }
-
-export interface AbsenceDay {
-	date: string;
-	reasons: string[];
-	kind: AbsenceKind;
-}
-
-export type UserAbsenceDays = Map<string, Map<string, AbsenceDay>>;
 
 function addAbsenceReason(
 	userAbsenceDays: UserAbsenceDays,
