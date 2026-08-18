@@ -1,6 +1,7 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { rewriteForHostedProxy } from '../../services/jiraGateway';
+import { fromHttpResponseAsync } from '../../services/serviceErrors';
 import { useConfigStore } from '../../stores/useConfigStore';
 import type { EnrichedJiraWorklog } from '../../stores/useTimesheetStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
@@ -106,8 +107,10 @@ export function useWorklogOperations() {
 		});
 
 		if (!response.ok) {
-			const text = await response.text();
-			throw new Error(`Jira API error: ${response.status} - ${text}`);
+			// Standardized ServiceError (ADA-475/694): carries kind/status/source
+			// so the global error interceptor maps it to user-facing copy instead
+			// of leaking the raw response body.
+			throw await fromHttpResponseAsync('Jira API', response);
 		}
 
 		// 204 No Content (e.g. DELETE) returns no body
@@ -174,7 +177,7 @@ export function useWorklogOperations() {
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to create worklog';
 			setError(errorMessage);
-			throw new Error(errorMessage);
+			throw err instanceof Error ? err : new Error(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
@@ -267,7 +270,7 @@ export function useWorklogOperations() {
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to update worklog';
 			setError(errorMessage);
-			throw new Error(errorMessage);
+			throw err instanceof Error ? err : new Error(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}
@@ -388,7 +391,7 @@ export function useWorklogOperations() {
 			const errorMessage =
 				err instanceof Error ? err.message : 'Failed to delete worklog';
 			setError(errorMessage);
-			throw new Error(errorMessage);
+			throw err instanceof Error ? err : new Error(errorMessage);
 		} finally {
 			setIsLoading(false);
 		}

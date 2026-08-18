@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import type { WorklogSuggestion } from '../../../../types/Suggestion';
+import { reportError } from '../../../services/errorInterceptor';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { useDashboardStore } from '../../../stores/useDashboardStore';
 import { useUserDataStore } from '../../../stores/useUserDataStore';
@@ -109,7 +110,10 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 				undoAction,
 			);
 		} catch (e) {
-			toast.error(e instanceof Error ? e.message : 'Failed to log');
+			reportError(e, {
+				source: 'Jira worklog',
+				fallbackMessage: 'Failed to log',
+			});
 		}
 	};
 
