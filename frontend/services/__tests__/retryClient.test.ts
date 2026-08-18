@@ -7,13 +7,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	_resetRetryClient,
+	_resetRetryLogger,
 	calculateBackoffDelayMs,
 	configureRetryClient,
 	fetchWithRetry,
+	generateIdempotencyKey,
+	IDEMPOTENCY_HEADER,
+	isIdempotentMethod,
 	isRetryableStatus,
 	parseRetryAfter,
+	type RetryLogEntry,
+	type RetryLogger,
 	RETRYABLE_STATUS_CODES,
 	RequestQueue,
+	setRetryLogger,
 } from '../retryClient';
 
 function jsonResponse(
@@ -572,5 +579,363 @@ describe('configureRetryClient', () => {
 		expect(() => configureRetryClient({ maxConcurrent: 0 })).toThrow(
 			RangeError,
 		);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Structured logging
+// ---------------------------------------------------------------------------
+
+describe('structured logging', () => {
+	let logEntries: RetryLogEntry[];
+
+	const captureLogger: RetryLogger = {
+		info(entry) {
+			logEntries.push(entry);
+		},
+		warn(entry) {
+			logEntries.push(entry);
+		},
+	};
+
+	beforeEach(() => {
+		logEntries = [];
+		setRetryLogger(captureLogger);
+	});
+
+	afterEach(() => {
+		_resetRetryLogger();
+	});
+
+	it('emits queued → attempt → success phases for a clean call', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue(jsonResponse(200, { ok: true })),
+		);
+
+		await fetchWithRetry('https://jira.example/rest/api/2/myself', undefined, {
+			maxRetries: 0,
+		});
+
+		const phases = logEntries.map((e) => e.phase);
+		expect(phases).toEqual(['queued', 'attempt', 'success']);
+		expect(logEntries[2].status).toBe(200);
+		expect(logEntries[2].totalAttempts).toBe(1);
+	});
+
+	it('emits retryable and succeeds after transient failures', async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValueOnce(jsonResponse(503))
+			.mockResolvedValueOnce(jsonResponse(429))
+			.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+		vi.stubGlobal('fetch', fetchMock);
+
+		const config = {
+			maxRetries: 3,
+			baseDelayMs: 100,
+			jitter: 'none' as const,
+		};
+		const promise = fetchWithRetry(
+			'https://jira.example/rest/api/2/myself',
+			undefined,
+			config,
+		);
+		await vi.advanceTimersByTimeAsync(100);
+		await vi.advanceTimersByTimeAsync(200);
+		const res = await promise;
+
+		expect(res.status).toBe(200);
+		const phases = logEntries.map((e) => e.phase);
+		expect(phases).toContain('retryable');
+		expect(phases).toContain('success');
+		const retryableEntries = logEntries.filter((e) => e.phase === 'retryable');
+		expect(retryableEntries[0].status).toBe(503);
+		expect(retryableEntries[1].status).toBe(429);
+	});
+
+	it('emits exhausted warning when retries run out for a retryable status', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse(503));
+		vi.stubGlobal('fetch', fetchMock);
+
+		const config = {
+			maxRetries: 2,
+			baseDelayMs: 100,
+			jitter: 'none' as const,
+		};
+		const promise = fetchWithRetry(
+			'https://jira.example/rest/api/2/myself',
+			undefined,
+			config,
+		);
+		await vi.advanceTimersByTimeAsync(100);
+		await vi.advanceTimersByTimeAsync(200);
+		const res = await promise;
+
+		expect(res.status).toBe(503);
+		const exhausted = logEntries.find((e) => e.phase === 'exhausted');
+		expect(exhausted).toBeDefined();
+		expect(exhausted!.status).toBe(503);
+	});
+
+	it('emits non-retryable and returns immediately for client errors', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(404)));
+
+		const res = await fetchWithRetry(
+			'https://jira.example/rest/api/2/myself',
+			undefined,
+			{ maxRetries: 3 },
+		);
+
+		expect(res.status).toBe(404);
+		expect(logEntries.map((e) => e.phase)).toEqual([
+			'queued',
+			'attempt',
+			'non-retryable',
+		]);
+	});
+
+	it('emits network-retry then exhausted on persistent network failure', async () => {
+		const networkError = new TypeError('Failed to fetch');
+		const fetchMock = vi.fn().mockRejectedValue(networkError);
+		vi.stubGlobal('fetch', fetchMock);
+
+		const config = {
+			maxRetries: 2,
+			baseDelayMs: 100,
+			jitter: 'none' as const,
+		};
+		const promise = fetchWithRetry(
+			'https://jira.example/rest/api/2/myself',
+			undefined,
+			config,
+		);
+
+		// Advance timers for both backoff delays.
+		await vi.advanceTimersByTimeAsync(100);
+		await vi.advanceTimersByTimeAsync(200);
+
+		// Use a try/catch to avoid vitest unhandled-rejection false positives
+		// with fake timers.
+		await promise.then(
+			() => {
+				throw new Error('expected fetchWithRetry to reject');
+			},
+			(err: unknown) => {
+				expect(err).toBe(networkError);
+			},
+		);
+
+		const phases = logEntries.map((e) => e.phase);
+		expect(phases).toContain('network-retry');
+		expect(phases).toContain('exhausted');
+		const netRetry = logEntries.find((e) => e.phase === 'network-retry');
+		expect(netRetry!.error).toContain('Failed to fetch');
+		expect(netRetry!.delayMs).toBeGreaterThan(0);
+	});
+
+	it('emits aborted on mid-backoff abort', async () => {
+		const fetchMock = vi.fn().mockResolvedValue(jsonResponse(503));
+		vi.stubGlobal('fetch', fetchMock);
+
+		const controller = new AbortController();
+		const promise = fetchWithRetry(
+			'https://jira.example/rest/api/2/myself',
+			{ signal: controller.signal },
+			{ maxRetries: 3, baseDelayMs: 1000, jitter: 'none' as const },
+		);
+
+		await vi.advanceTimersByTimeAsync(500);
+		controller.abort();
+		await expect(promise).rejects.toMatchObject({ name: 'AbortError' });
+
+		expect(logEntries.map((e) => e.phase)).toContain('aborted');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Idempotency
+// ---------------------------------------------------------------------------
+
+describe('idempotency', () => {
+	describe('isIdempotentMethod', () => {
+		it.each([
+			'POST',
+			'PUT',
+			'PATCH',
+			'DELETE',
+		] as const)('returns true for %s', (method) => {
+			expect(isIdempotentMethod(method)).toBe(true);
+			expect(isIdempotentMethod(method.toLowerCase())).toBe(true);
+		});
+
+		it.each([
+			'GET',
+			'HEAD',
+			'OPTIONS',
+		] as const)('returns false for safe method %s', (method) => {
+			expect(isIdempotentMethod(method)).toBe(false);
+		});
+	});
+
+	describe('generateIdempotencyKey', () => {
+		it('returns a non-empty string', () => {
+			const key = generateIdempotencyKey();
+			expect(typeof key).toBe('string');
+			expect(key.length).toBeGreaterThan(0);
+		});
+
+		it('produces unique keys across successive calls', () => {
+			const keys = new Set(
+				Array.from({ length: 100 }, () => generateIdempotencyKey()),
+			);
+			expect(keys.size).toBe(100);
+		});
+	});
+
+	describe('fetchWithRetry idempotency-key injection', () => {
+		it('injects an Idempotency-Key header for POST requests', async () => {
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValue(jsonResponse(200, { ok: true }));
+			vi.stubGlobal('fetch', fetchMock);
+
+			await fetchWithRetry(
+				'https://jira.example/rest/api/2/issue',
+				{ method: 'POST', body: '{}' },
+				{ maxRetries: 0 },
+			);
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			const headers = fetchMock.mock.calls[0][1]?.headers as Headers;
+			expect(headers.has(IDEMPOTENCY_HEADER)).toBe(true);
+			const key = headers.get(IDEMPOTENCY_HEADER);
+			expect(key).toBeTruthy();
+			expect(key!.length).toBeGreaterThan(0);
+		});
+
+		it('reuses the same key across retries for mutating requests', async () => {
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValueOnce(jsonResponse(503))
+				.mockResolvedValueOnce(jsonResponse(503))
+				.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+			vi.stubGlobal('fetch', fetchMock);
+
+			const config = {
+				maxRetries: 3,
+				baseDelayMs: 100,
+				jitter: 'none' as const,
+			};
+			const promise = fetchWithRetry(
+				'https://jira.example/rest/api/2/issue',
+				{ method: 'POST', body: '{}' },
+				config,
+			);
+			await vi.advanceTimersByTimeAsync(100);
+			await vi.advanceTimersByTimeAsync(200);
+			await promise;
+
+			expect(fetchMock).toHaveBeenCalledTimes(3);
+			const keys = fetchMock.mock.calls.map((call: unknown[]) => {
+				const h = (call[1] as { headers: Headers }).headers;
+				return h.get(IDEMPOTENCY_HEADER);
+			});
+			expect(new Set(keys).size).toBe(1);
+			expect(keys[0]).toBeTruthy();
+		});
+
+		it('does not inject an Idempotency-Key for GET requests', async () => {
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValue(jsonResponse(200, { ok: true }));
+			vi.stubGlobal('fetch', fetchMock);
+
+			await fetchWithRetry(
+				'https://jira.example/rest/api/2/myself',
+				undefined,
+				{
+					maxRetries: 0,
+				},
+			);
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			const headers = fetchMock.mock.calls[0][1]?.headers as
+				| Headers
+				| undefined;
+			expect(headers?.has(IDEMPOTENCY_HEADER) ?? false).toBe(false);
+		});
+
+		it('preserves a caller-supplied Idempotency-Key across retries', async () => {
+			const callerKey = 'my-custom-key-123';
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValueOnce(jsonResponse(503))
+				.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+			vi.stubGlobal('fetch', fetchMock);
+
+			const headers = new Headers();
+			headers.set(IDEMPOTENCY_HEADER, callerKey);
+
+			const config = {
+				maxRetries: 3,
+				baseDelayMs: 100,
+				jitter: 'none' as const,
+			};
+			const promise = fetchWithRetry(
+				'https://jira.example/rest/api/2/issue',
+				{ method: 'POST', body: '{}', headers },
+				config,
+			);
+			await vi.advanceTimersByTimeAsync(100);
+			await promise;
+
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+			const keys = fetchMock.mock.calls.map((call: unknown[]) => {
+				const h = (call[1] as { headers: Headers }).headers;
+				return h.get(IDEMPOTENCY_HEADER);
+			});
+			expect(new Set(keys).size).toBe(1);
+			expect(keys[0]).toBe(callerKey);
+		});
+
+		it('includes idempotencyKey in structured log entries for mutating requests', async () => {
+			const logEntries: RetryLogEntry[] = [];
+			setRetryLogger({
+				info(e) {
+					logEntries.push(e);
+				},
+				warn(e) {
+					logEntries.push(e);
+				},
+			});
+
+			const fetchMock = vi
+				.fn()
+				.mockResolvedValueOnce(jsonResponse(503))
+				.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+			vi.stubGlobal('fetch', fetchMock);
+
+			const config = {
+				maxRetries: 2,
+				baseDelayMs: 100,
+				jitter: 'none' as const,
+			};
+			const promise = fetchWithRetry(
+				'https://jira.example/rest/api/2/issue',
+				{ method: 'PUT', body: '{}' },
+				config,
+			);
+			await vi.advanceTimersByTimeAsync(100);
+			await promise;
+
+			_resetRetryLogger();
+
+			const keys = logEntries
+				.map((e) => e.idempotencyKey)
+				.filter((k): k is string => k !== undefined);
+			expect(new Set(keys).size).toBe(1);
+			expect(keys[0]).toBeTruthy();
+		});
 	});
 });
