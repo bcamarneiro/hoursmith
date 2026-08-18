@@ -16,6 +16,21 @@
 	"files": {
 		"ignoreUnknown": true
 	},
+	"css": {
+		"linter": {
+			"enabled": true
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["design_handoff_hoursmith/**"],
+			"css": {
+				"linter": {
+					"enabled": false
+				}
+			}
+		}
+	],
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "single"
