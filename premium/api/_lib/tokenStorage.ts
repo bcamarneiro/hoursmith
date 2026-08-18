@@ -22,6 +22,22 @@ export type TokenProvider =
 	| 'clockify'
 	| 'custom';
 
+const VALID_PROVIDERS = new Set<TokenProvider>([
+	'jira_api',
+	'gitlab',
+	'rescuetime',
+	'github',
+	'toggl',
+	'harvest',
+	'clockify',
+	'custom',
+]);
+
+/** Type guard: returns true when `value` is a recognised {@link TokenProvider}. */
+export function isTokenProvider(value: string): value is TokenProvider {
+	return VALID_PROVIDERS.has(value as TokenProvider);
+}
+
 export type TokenStatus = 'active' | 'revoked' | 'expired';
 
 export interface UserToken {
