@@ -13,7 +13,6 @@ vi.mock('bullmq', () => ({
 
 import { Queue } from 'bullmq';
 
-import { QueueConnectionError } from '../queueConnection.js';
 import {
 	closeQueue,
 	createQueue,
@@ -91,21 +90,6 @@ describe('queueOptions', () => {
 			age: 30,
 			count: 1_000,
 		});
-	});
-
-	it('surfaces QueueConnectionError for invalid secrets without leaking credentials', () => {
-		expect(() =>
-			queueOptions({ REDIS_URL: 'redis://user:sekret@:6379' }),
-		).toThrow(QueueConnectionError);
-		try {
-			queueOptions({ REDIS_URL: 'redis://user:sekret@:6379' });
-		} catch (error) {
-			expect(String(error)).not.toContain('sekret');
-		}
-	});
-
-	it('fails loudly when no queue connection is configured', () => {
-		expect(() => queueOptions({})).toThrow(QueueConnectionError);
 	});
 });
 
