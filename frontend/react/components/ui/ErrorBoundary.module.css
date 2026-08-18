@@ -40,6 +40,7 @@
 	font-weight: var(--font-medium);
 	cursor: pointer;
 	transition: all var(--transition-fast);
+	text-decoration: none;
 }
 
 .retry:hover {

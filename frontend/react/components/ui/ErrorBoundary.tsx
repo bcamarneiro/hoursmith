@@ -1,5 +1,6 @@
 import type React from 'react';
 import { Component } from 'react';
+import { Link } from 'react-router-dom';
 import { captureException } from '../../../analytics';
 import * as styles from './ErrorBoundary.module.css';
 
@@ -44,6 +45,9 @@ export class ErrorBoundary extends Component<Props, State> {
 					>
 						Try again
 					</button>
+					<Link to="/" className={styles.retry}>
+						Go Home
+					</Link>
 				</div>
 			);
 		}
