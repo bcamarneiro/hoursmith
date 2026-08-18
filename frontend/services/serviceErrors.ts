@@ -268,6 +268,17 @@ export function describeServiceError(error: unknown): ServiceErrorCopy {
 					message:
 						'Network error reaching Jira. Check your connection and retry.',
 				};
+			case 'unknown':
+				if (looksLikeCorsFailure(error.message)) {
+					return {
+						message:
+							'Your browser blocked direct access to Jira (CORS). Try configuring the CORS proxy in Settings.',
+						action: settings,
+					};
+				}
+				return {
+					message: error.message || 'Something went wrong. Please try again.',
+				};
 		}
 
 		return { message: error.message };
