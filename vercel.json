@@ -3,6 +3,12 @@
 	"buildCommand": "npm run build:vercel",
 	"outputDirectory": "dist",
 	"regions": ["fra1"],
+	"crons": [
+		{
+			"path": "/api/cron/absence-poll",
+			"schedule": "*/15 * * * *"
+		}
+	],
 	"rewrites": [
 		{
 			"source": "/api/proxy/:path*",

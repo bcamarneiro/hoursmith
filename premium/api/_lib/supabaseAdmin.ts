@@ -41,6 +41,38 @@ export interface SubscriptionUpsert {
 	current_period_end: string | null;
 }
 
+export interface CalendarFeedRow {
+	id: string;
+	user_id: string;
+	url: string;
+	type: 'absence' | 'holiday';
+	label: string;
+	absence_attribution: 'self' | 'shared' | null;
+	title_filter: string | null;
+	enabled: boolean;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface AbsenceAssignmentRow {
+	id: string;
+	user_id: string;
+	pattern: string;
+	user_emails: string[];
+	created_at: string;
+	updated_at: string;
+}
+
+export interface AbsenceRecordUpsert {
+	user_id: string;
+	feed_id: string | null;
+	date: string;
+	kind: 'vacation' | 'sick' | 'off' | 'holiday';
+	summary: string;
+	reasons: string[];
+	source: string;
+}
+
 export interface SupabaseAdminClient {
 	getProfile(userId: string): Promise<ProfileRow | null>;
 	getSubscription(userId: string): Promise<SubscriptionRow | null>;
@@ -74,6 +106,25 @@ export interface SupabaseAdminClient {
 	 * already seen (a duplicate delivery that must not be reprocessed).
 	 */
 	recordBillingEvent(eventId: string): Promise<boolean>;
+	/** Fetch all enabled calendar feeds. */
+	getAllEnabledFeeds(): Promise<CalendarFeedRow[]>;
+	/** Fetch all user profiles (for fan-out of nationwide holidays). */
+	getAllProfiles(): Promise<ProfileRow[]>;
+	/** Fetch absence assignments for a user. */
+	getAbsenceAssignments(
+		userId: string,
+	): Promise<AbsenceAssignmentRow[]>;
+	/**
+	 * Upsert absence records for a user on a batch of dates.
+	 * Replaces the user's records within the date range with the new data
+	 * (atomic swap: clear range then insert).
+	 */
+	replaceAbsenceRecords(
+		userId: string,
+		rangeStart: string,
+		rangeEnd: string,
+		rows: AbsenceRecordUpsert[],
+	): Promise<void>;
 }
 
 export function defaultSupabaseAdmin(): SupabaseAdminClient {
@@ -294,5 +345,111 @@ class FetchSupabaseAdminClient implements SupabaseAdminClient {
 		}
 		const rows = (await res.json()) as unknown[];
 		return Array.isArray(rows) && rows.length > 0;
+	}
+
+	async getAllEnabledFeeds(): Promise<CalendarFeedRow[]> {
+		const params = new URLSearchParams({
+			enabled: 'eq.true',
+			select:
+				'id,user_id,url,type,label,absence_attribution,title_filter,enabled,created_at,updated_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/user_calendar_feeds?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(
+				`supabaseAdmin.getAllEnabledFeeds failed: ${res.status}`,
+			);
+		}
+		return (await res.json()) as CalendarFeedRow[];
+	}
+
+	async getAllProfiles(): Promise<ProfileRow[]> {
+		const params = new URLSearchParams({
+			select: 'id,email,created_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/profiles?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(`supabaseAdmin.getAllProfiles failed: ${res.status}`);
+		}
+		return (await res.json()) as ProfileRow[];
+	}
+
+	async getAbsenceAssignments(
+		userId: string,
+	): Promise<AbsenceAssignmentRow[]> {
+		const params = new URLSearchParams({
+			user_id: `eq.${userId}`,
+			select:
+				'id,user_id,pattern,user_emails,created_at,updated_at',
+		});
+		const res = await fetch(
+			`${this.url}/rest/v1/absence_assignments?${params.toString()}`,
+			{ headers: this.headers() },
+		);
+		if (!res.ok) {
+			throw new Error(
+				`supabaseAdmin.getAbsenceAssignments failed: ${res.status}`,
+			);
+		}
+		return (await res.json()) as AbsenceAssignmentRow[];
+	}
+
+	async replaceAbsenceRecords(
+		userId: string,
+		rangeStart: string,
+		rangeEnd: string,
+		rows: AbsenceRecordUpsert[],
+	): Promise<void> {
+		// Atomic swap: delete rows in the range for this user, then insert new
+		const deleteParams = new URLSearchParams({
+			user_id: `eq.${userId}`,
+			date: `gte.${rangeStart}`,
+			and: `(date.lte.${rangeEnd})`,
+		});
+		const delRes = await fetch(
+			`${this.url}/rest/v1/absence_records?${deleteParams.toString()}`,
+			{ method: 'DELETE', headers: this.headers() },
+		);
+		if (!delRes.ok) {
+			throw new Error(
+				`supabaseAdmin.replaceAbsenceRecords (clear) failed: ${delRes.status}`,
+			);
+		}
+
+		if (rows.length === 0) return;
+
+		// For large batches, chunk to avoid request body limits
+		const CHUNK_SIZE = 100;
+		for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+			const chunk = rows.slice(i, i + CHUNK_SIZE);
+			const res = await fetch(`${this.url}/rest/v1/absence_records`, {
+				method: 'POST',
+				headers: this.headers({
+					'content-type': 'application/json',
+					prefer: 'return=minimal',
+				}),
+				body: JSON.stringify(
+					chunk.map((r) => ({
+						user_id: r.user_id,
+						feed_id: r.feed_id,
+						date: r.date,
+						kind: r.kind,
+						summary: r.summary,
+						reasons: r.reasons,
+						source: r.source,
+					})),
+				),
+			});
+			if (!res.ok) {
+				throw new Error(
+					`supabaseAdmin.replaceAbsenceRecords (insert) failed: ${res.status}`,
+				);
+			}
+		}
 	}
 }
