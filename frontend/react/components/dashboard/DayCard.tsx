@@ -88,6 +88,7 @@ export const DayCard = memo<Props>(function DayCard({
 	const isClosed = !day.isWeekend && day.gapSeconds === 0;
 	const [expanded, setExpanded] = useState<boolean>(() => !isClosed || isToday);
 	const [cloneSource, setCloneSource] = useState<LoggedWorklog | null>(null);
+	const [cloneError, setCloneError] = useState<string | null>(null);
 	const [editingWorklog, setEditingWorklog] = useState<{
 		worklog: LoggedWorklog;
 		initial: {
@@ -234,7 +235,9 @@ export const DayCard = memo<Props>(function DayCard({
 				);
 			}
 		} catch (e) {
+			setCloneError(e instanceof Error ? e.message : 'Clone failed');
 			toast.error(e instanceof Error ? e.message : 'Clone failed');
+			setCloneSource(null);
 		}
 	};
 
@@ -536,7 +539,10 @@ export const DayCard = memo<Props>(function DayCard({
 			{cloneSource && (
 				<Modal
 					isOpen
-					onClose={() => setCloneSource(null)}
+					onClose={() => {
+						setCloneSource(null);
+						setCloneError(null);
+					}}
 					title="Clone worklog"
 				>
 					<CloneWorklogPopover
@@ -544,7 +550,12 @@ export const DayCard = memo<Props>(function DayCard({
 						timeSpent={formatJiraTimeSpent(cloneSource.timeSpentSeconds)}
 						sourceDate={day.date}
 						onClone={(dates) => handleClone(cloneSource, dates)}
-						onCancel={() => setCloneSource(null)}
+						onCancel={() => {
+							setCloneSource(null);
+							setCloneError(null);
+						}}
+						isLoading={isWorklogOpLoading}
+						error={cloneError}
 					/>
 				</Modal>
 			)}

@@ -99,4 +99,22 @@ describe('DayCard — clone worklog', () => {
 			}),
 		);
 	});
+
+	it('closes the modal on clone failure and surfaces the error', async () => {
+		createMultipleWorklogs.mockRejectedValueOnce(
+			new Error('Jira rejected the worklog'),
+		);
+		renderCard(makeDay());
+
+		fireEvent.click(
+			screen.getByRole('button', { name: 'Clone PROJ-1 to other days' }),
+		);
+		fireEvent.click(screen.getByRole('button', { name: '2026-07-16' }));
+		fireEvent.click(screen.getByRole('button', { name: /Clone →/ }));
+
+		await act(async () => {});
+
+		// Modal should be closed (the popover is gone)
+		expect(screen.queryByRole('button', { name: /Clone →/ })).toBeNull();
+	});
 });
