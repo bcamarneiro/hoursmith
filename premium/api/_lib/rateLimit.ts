@@ -18,6 +18,7 @@
  * Edge-runtime compatible: dependency-free `fetch`, mirroring entitlement.ts.
  */
 
+import { secureLogger } from './secureLog.js';
 export const RATE_LIMIT_WINDOW_SECONDS = 300;
 export const RATE_LIMIT_MAX_REQUESTS = 200;
 
@@ -125,14 +126,12 @@ export async function checkRateLimit(
 			count,
 		};
 	} catch (err) {
-		console.warn(
-			JSON.stringify({
-				ts: new Date().toISOString(),
-				svc: 'hoursmith-proxy',
-				code: 'rate_limit_store_unavailable',
-				note: (err as Error).message,
-			}),
-		);
+		secureLogger.warn({
+			ts: new Date().toISOString(),
+			svc: 'hoursmith-proxy',
+			code: 'rate_limit_store_unavailable',
+			note: (err as Error).message,
+		});
 		return { allowed: true, retryAfterSeconds, count: null };
 	}
 }
