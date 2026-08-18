@@ -23,6 +23,10 @@ describe('SiteFooter', () => {
 			'href',
 			'/terms',
 		);
+		expect(screen.getByRole('link', { name: 'Security' })).toHaveAttribute(
+			'href',
+			'/security',
+		);
 		expect(
 			screen.getByRole('link', { name: 'Sub-processors' }),
 		).toHaveAttribute('href', '/sub-processors');

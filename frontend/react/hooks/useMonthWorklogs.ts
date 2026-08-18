@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import type { WorklogFetchProgress } from '../../../types/worklogLoading';
-import { type WorklogItem } from '../../services/monthWorklogService';
+import type { WorklogItem } from '../../services/monthWorklogService';
 import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import {
@@ -165,6 +165,10 @@ export function useMonthWorklogs(
 		jqlFilter,
 		queryClient,
 		options?.jqlFilter,
+		// Routing source (ADA-543): the prefetch key and `readMonth` both branch on
+		// it, so a jira→tempo flip must re-run this effect or adjacent months stay
+		// prefetched under the previous source's key.
+		source,
 	]);
 
 	return result;

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as jira from '../../../services/monthWorklogService';
+import * as tempo from '../../../services/tempoWorklogService';
+import { getWorklogSource } from '../../../services/worklogSource';
 import type { Config } from '../../../stores/useConfigStore';
 import { createDefaultConfig } from '../../../stores/useConfigStore';
-import { getWorklogSource } from '../../../services/worklogSource';
-import * as tempo from '../../../services/tempoWorklogService';
-import * as jira from '../../../services/monthWorklogService';
 
 const makeConfig = (overrides: Partial<Config> = {}): Config => ({
 	...createDefaultConfig(),

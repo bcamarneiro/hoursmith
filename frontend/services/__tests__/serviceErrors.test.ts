@@ -192,10 +192,15 @@ describe('describeServiceError', () => {
 		);
 	});
 
-	it('maps a CORS / Failed to fetch TypeError to the CORS-proxy hint', () => {
+	it('maps a CORS / Failed to fetch TypeError to plain network-blocked copy (ADA-484 #4)', () => {
 		const copy = describeServiceError(new TypeError('Failed to fetch'));
-		expect(copy.message).toMatch(/cors/i);
+		// Plain language, no "CORS" jargon, names the network as the cause and
+		// gives an IT-facing next step.
+		expect(copy.message).toMatch(/network is blocking direct browser access/i);
+		expect(copy.message).toMatch(/IT team/i);
+		expect(copy.message).not.toMatch(/cors/i);
 		expect(copy.action?.kind).toBe('settings');
+		expect(copy.action?.label).toBe('Set up a proxy');
 	});
 
 	it('falls back on a legacy "401" string error', () => {

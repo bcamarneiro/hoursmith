@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import type { WorklogFetchProgress } from '../../../../types/worklogLoading';
+import { isPremiumBuild } from '../../../buildTier';
 import { describeServiceError } from '../../../services/serviceErrors';
 import type { TeamMemberSummary } from '../../../services/teamService';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useReminderStateSync } from '../../hooks/useReminderStateSync';
 import type {
 	ReportsSortDirection,
 	ReportsSortField,
@@ -9,6 +12,8 @@ import type {
 import * as styles from '../../pages/ReportsPage.module.css';
 import { addDaysToIsoDate, parseIsoDateLocal } from '../../utils/date';
 import { formatHours } from '../../utils/format';
+import { describeOnTimeStatus } from '../../utils/onTimeStatus';
+import type { TeamCoverage } from '../../utils/teamCoverage';
 import type { ManagerTrendModel } from '../../utils/teamReports';
 import { TeamStatsCards } from '../team/TeamStatsCards';
 import { Button } from '../ui/Button';
@@ -18,16 +23,28 @@ import { ManagerInsightsPanel } from './ManagerInsightsPanel';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
+// On-time status badge tone → CSS class (ADA-387). The ember brand accent is
+// never used here — this rides the green/amber/red worklog ramp plus a neutral.
+const ON_TIME_TONE_CLASS: Record<string, string> = {
+	success: styles.onTimeSuccess,
+	warning: styles.onTimeWarning,
+	error: styles.onTimeError,
+	neutral: styles.onTimeNeutral,
+};
+
 // Per-day cells stay neutral mono — the Gap column is the single red signal on
 // this table (screens.html: "only the gap cell goes red"). Per-day fullness is
 // read from the figure itself, not a colour wash.
-const gapCellStyleMap = {
-	positive: styles.gapPositive,
-	zero: styles.gapZero,
-} as const;
-
-function getGapCellStyle(gapSeconds: number): string {
-	return gapSeconds > 0 ? gapCellStyleMap.positive : gapCellStyleMap.zero;
+//
+// The cell always shows the full-week remaining figure, but it only turns RED
+// when the member is behind *relative to elapsed days* (prorated gap > 0). A
+// member on track mid-week still shows a remaining figure, in a neutral tone —
+// no manufactured "you're behind" on Monday for Thursday's hours (ADA-477).
+function getGapCellStyle(member: TeamMemberSummary): string {
+	const behindSchedule = (member.proratedGapSeconds ?? member.gapSeconds) > 0;
+	if (behindSchedule) return styles.gapPositive; // genuinely behind → red
+	if (member.gapSeconds > 0) return styles.gapPending; // on track, week open → neutral
+	return styles.gapZero; // fully complete → OK
 }
 
 function getWeekdays(weekStart: string): string[] {
@@ -92,6 +109,17 @@ function TeamMemberRow({
 				>
 					{member.displayName}
 				</button>
+				{member.onTimeStatus &&
+					(() => {
+						const { label, tone } = describeOnTimeStatus(member.onTimeStatus);
+						return (
+							<span
+								className={`${styles.onTimeBadge} ${ON_TIME_TONE_CLASS[tone]}`}
+							>
+								{label}
+							</span>
+						);
+					})()}
 				{workedOnPto.length > 0 && (
 					<span
 						className={styles.workedOnPtoBadge}
@@ -117,7 +145,7 @@ function TeamMemberRow({
 				);
 			})}
 			<td className={styles.totalCell}>{formatHours(member.totalSeconds)}</td>
-			<td className={getGapCellStyle(member.gapSeconds)}>
+			<td className={getGapCellStyle(member)}>
 				{member.gapSeconds > 0 ? formatHours(member.gapSeconds) : 'OK'}
 			</td>
 		</tr>
@@ -170,6 +198,53 @@ function SummaryRow({
 	);
 }
 
+// Coverage / visibility banner (ADA-488). Surfaces expected-vs-observed so a
+// permission hole or a genuinely-absent 0h member never reads as "all clear".
+// Rides the amber warning tone (never the ember brand accent).
+function TeamCoverageBanner({ coverage }: { coverage: TeamCoverage }) {
+	if (!coverage.rosterConfigured) {
+		return (
+			<div
+				className={`${styles.coverageBanner} ${styles.coverageBannerWarning}`}
+			>
+				<strong>No team roster set</strong>
+				<span>
+					This board is built only from people who logged time, so anyone who
+					logged nothing this week won't appear here. Add your team in{' '}
+					<Link to="/settings">Settings</Link> to track 0h members too.
+				</span>
+			</div>
+		);
+	}
+	if (coverage.noWorklogCount > 0) {
+		const { rosterSize, loggedCount, noWorklogCount } = coverage;
+		return (
+			<div
+				className={`${styles.coverageBanner} ${styles.coverageBannerWarning}`}
+			>
+				<strong>
+					Roster {rosterSize} · logged {loggedCount} · no worklogs{' '}
+					{noWorklogCount}
+				</strong>
+				<span>
+					{noWorklogCount} roster{' '}
+					{noWorklogCount === 1 ? 'member has' : 'members have'} nothing logged
+					this week — shown in red below. A 0h row can mean they're behind or
+					that your token can't see their work, so nothing is silently dropped.
+				</span>
+			</div>
+		);
+	}
+	return (
+		<div className={`${styles.coverageBanner} ${styles.coverageBannerOk}`}>
+			<strong>Full roster coverage</strong>
+			<span>
+				All {coverage.rosterSize} roster members logged time this week.
+			</span>
+		</div>
+	);
+}
+
 function SortIndicator({
 	field,
 	activeField,
@@ -206,6 +281,8 @@ type Props = {
 	trendsError: unknown;
 	hasNoFilteredWeeklyResults: boolean;
 	weeklySummary: { totalSeconds: number; totalGapSeconds: number } | null;
+	/** Roster-vs-observed coverage for the visibility banner (ADA-488). */
+	coverage?: TeamCoverage;
 	/** Re-runs the weekly team fetch from the data-error surface (ADA-476). */
 	onRetry?: () => void;
 	onMemberClick: (name: string) => void;
@@ -236,11 +313,22 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 	trendsError,
 	hasNoFilteredWeeklyResults,
 	weeklySummary,
+	coverage,
 	onRetry,
 	onMemberClick,
 	notConfigured,
 }) => {
 	const weekdays = getWeekdays(weekStart);
+
+	// Keep the server's reminder state fresh from what the lead sees here, so the
+	// cron can chase behind members (ADA-552). Dark until the `reminders-ui` flag
+	// is on and the lead has opted in; a no-op in the Free build.
+	const remindersUiFlag = useFeatureFlag('reminders-ui');
+	useReminderStateSync(
+		teamMembers,
+		weekStart,
+		isPremiumBuild() && remindersUiFlag && !weekLoading,
+	);
 
 	if (notConfigured) {
 		return (
@@ -269,6 +357,9 @@ export const ReportsWeeklyView: React.FC<Props> = ({
 							: 'No team gap remaining'}
 					</span>
 				</div>
+			)}
+			{coverage && !weekLoading && !teamError && teamMembers.length > 0 && (
+				<TeamCoverageBanner coverage={coverage} />
 			)}
 			{teamError &&
 				(() => {

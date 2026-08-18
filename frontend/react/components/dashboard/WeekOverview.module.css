@@ -134,6 +134,14 @@
 	opacity: 0.7;
 }
 
+/* Empty weekday that isn't overdue yet (today or future). Neutral, not red —
+ * nothing is owed until the day is over (ADA-477). */
+.upcoming {
+	border-style: dashed;
+	border-color: var(--color-border);
+	opacity: 0.85;
+}
+
 .today {
 	border-width: 2px;
 	border-color: var(--color-primary);

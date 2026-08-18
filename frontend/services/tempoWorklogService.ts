@@ -3,9 +3,9 @@ import { resolveAccountId } from './jiraIdentity';
 import { fromHttpResponse, fromNetworkError } from './serviceErrors';
 import { buildTempoRequest } from './tempoGateway';
 import {
-	type TempoWorklog,
 	fetchIssueMetadata,
 	mapTempoWorklog,
+	type TempoWorklog,
 } from './tempoMapper';
 import type { WorklogEntry } from './worklogService';
 

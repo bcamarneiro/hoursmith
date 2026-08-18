@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { WorklogSuggestion } from '../../../types/Suggestion';
-import { type WorklogItem } from '../../services/monthWorklogService';
+import type { WorklogItem } from '../../services/monthWorklogService';
 import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';

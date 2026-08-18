@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as bridge from '../proxyUrlBridge';
 import { __resetIdentityCache } from '../jiraIdentity';
+import * as bridge from '../proxyUrlBridge';
 import { fetchMonthWorklogsTempo } from '../tempoWorklogService';
 
 const config = {

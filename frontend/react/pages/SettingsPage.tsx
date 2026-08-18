@@ -10,6 +10,7 @@ import {
 	buildJiraConnectionFingerprint,
 	useUIStore,
 } from '../../stores/useUIStore';
+import { FirstRunOnboarding } from '../components/settings/FirstRunOnboarding';
 import { SettingsForm } from '../components/settings/SettingsForm';
 import { SettingsReadinessHeader } from '../components/settings/SettingsReadinessHeader';
 import { toast } from '../components/ui/Toast';
@@ -50,6 +51,12 @@ export const SettingsPage: React.FC = () => {
 		SETTINGS_SECTION_IDS.connection,
 	);
 	const [readinessCollapsed, setReadinessCollapsed] = useState(false);
+	// First-run signpost (ADA-470): a brand-new visitor (nothing saved) sees an
+	// honest Hosted-vs-self-host fork before the dev-jargon form. Dismissed once
+	// they pick self-host, so the form becomes the focus. Based on saved config,
+	// not the in-progress form, so mid-typing doesn't hide it.
+	const isFirstRun = !savedConfig.jiraHost && !savedConfig.apiToken;
+	const [selfHostChosen, setSelfHostChosen] = useState(false);
 
 	const isDirty = JSON.stringify(formData) !== JSON.stringify(savedConfig);
 	const canTestJira =
@@ -91,8 +98,11 @@ export const SettingsPage: React.FC = () => {
 	// and scrolls it into view (replaces the old scroll-to-anchor behaviour).
 	const selectSection = (sectionId: string) => {
 		setActiveSection(sectionId);
+		const prefersReducedMotion = window.matchMedia(
+			'(prefers-reduced-motion: reduce)',
+		).matches;
 		document.getElementById(SETTINGS_SECTION_IDS.form)?.scrollIntoView({
-			behavior: 'smooth',
+			behavior: prefersReducedMotion ? 'auto' : 'smooth',
 			block: 'start',
 		});
 	};
@@ -143,6 +153,9 @@ export const SettingsPage: React.FC = () => {
 
 	return (
 		<div className={styles.container}>
+			{isFirstRun && !selfHostChosen && (
+				<FirstRunOnboarding onChooseSelfHost={() => setSelfHostChosen(true)} />
+			)}
 			<SettingsReadinessHeader
 				model={model}
 				canRunChecks={canRunChecks}

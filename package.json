@@ -8,6 +8,7 @@
 		"dev": "NODE_ENV=development rspack dev",
 		"dev:offline": "NODE_ENV=development OFFLINE_MODE=true rspack dev",
 		"dev:premium:offline": "NODE_ENV=development OFFLINE_MODE=true BUILD_TIER=premium rspack dev",
+		"dev:premium:offline:e2e": "NODE_ENV=development OFFLINE_MODE=true BUILD_TIER=premium VITE_SUPABASE_URL=https://mock.supabase.co VITE_SUPABASE_ANON_KEY=mock-anon-key-for-e2e rspack serve",
 		"build": "rspack build",
 		"build:vercel": "rspack build",
 		"build:pages": "APP_ROUTER_MODE=hash rspack build",
@@ -18,6 +19,7 @@
 		"test:e2e": "playwright test",
 		"test:e2e:smoke": "playwright test e2e/smoke.spec.ts",
 		"test:e2e:premium": "playwright test e2e/premium-smoke.spec.ts",
+		"test:e2e:lifecycle": "playwright test e2e/paid-lifecycle.spec.ts --project=chromium",
 		"test:e2e:ui": "playwright test --ui",
 		"test:e2e:headed": "playwright test --headed",
 		"lint": "biome lint .",
@@ -77,5 +79,11 @@
 		"workerDirectory": [
 			"frontend/public"
 		]
+	},
+	"volta": {
+		"node": "22.22.0"
+	},
+	"engines": {
+		"node": ">=20.19"
 	}
 }

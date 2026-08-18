@@ -184,6 +184,35 @@
 	justify-content: flex-end;
 }
 
+/* Per-person recurring-gap names are collapsed by default (ADA-479) so the
+   manager view reads as aggregate patterns; the lead opts in to see individuals. */
+.perPersonDisclosure > summary {
+	cursor: pointer;
+	font-size: var(--text-sm);
+	font-weight: var(--font-medium);
+	color: var(--color-text-secondary);
+	padding: var(--space-2) 0;
+}
+
+.perPersonDisclosure[open] > summary {
+	margin-bottom: var(--space-3);
+	color: var(--color-text);
+}
+
+.perPersonDisclosure > .attentionList {
+	margin-top: 0;
+}
+
+/* Completeness ≠ productivity footnote (ADA-479). */
+.disclaimer {
+	margin: 0;
+	padding-top: var(--space-4);
+	border-top: 1px solid var(--color-border);
+	font-size: var(--text-xs);
+	line-height: var(--leading-relaxed);
+	color: var(--color-text-secondary);
+}
+
 .loading {
 	display: inline-flex;
 	align-items: center;

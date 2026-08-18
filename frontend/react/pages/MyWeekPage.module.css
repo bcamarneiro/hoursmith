@@ -145,6 +145,67 @@
 	gap: var(--space-3);
 }
 
+/* Low-fi week preview in the first-run empty state (ADA-314). Muted + dashed so
+   it reads as an illustration of the product, not live data. */
+.previewMock {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-3);
+	padding: var(--space-4);
+	border: 1px dashed var(--color-border);
+	border-radius: var(--radius-lg);
+	background: var(--color-surface-sunken);
+	opacity: 0.9;
+}
+
+.previewGrid {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: var(--space-3);
+	align-items: end;
+	height: 96px;
+}
+
+.previewDay {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--space-2);
+	height: 100%;
+}
+
+.previewBarTrack {
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: flex-end;
+}
+
+.previewBar {
+	width: 100%;
+	min-height: 6px;
+	border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+	background: color-mix(
+		in srgb,
+		var(--color-primary) 55%,
+		var(--color-surface)
+	);
+}
+
+.previewDayLabel {
+	font-size: var(--text-xs);
+	color: var(--color-text-tertiary);
+	text-transform: uppercase;
+}
+
+.previewCaption {
+	font-size: var(--text-xs);
+	color: var(--color-text-tertiary);
+	text-align: center;
+}
+
 .primaryLink,
 .secondaryLink {
 	display: inline-flex;

@@ -88,6 +88,42 @@
 	color: var(--color-text-tertiary);
 }
 
+/* Per-user expected-hours overrides (ADA-392): one compact row per configured
+   team member with a small "h/day" number input. */
+.expectedHoursRows {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.expectedHoursRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-3);
+}
+
+.expectedHoursRow span {
+	font-size: var(--text-sm);
+	color: var(--color-text-secondary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.expectedHoursInput {
+	width: 8rem;
+	flex: 0 0 auto;
+}
+
+/* Weekly-deadline row: weekday select + time input side by side (ADA-387). */
+.deadlineRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-3);
+	align-items: center;
+}
+
 /* ADA-273 — Proxy URL "Hosted by Premium" / "Self-hosted" pills */
 .badgePremium,
 .badgeNeutral {
@@ -182,6 +218,81 @@
 	padding: 1px 4px;
 	border-radius: var(--radius-sm);
 	font-size: var(--text-xs);
+}
+
+/* ADA-484 #2: inline "How do I get an API token?" walkthrough — an in-flow
+   disclosure instead of a link that navigates the user away mid-setup. */
+.tokenHelp {
+	margin-top: var(--space-1);
+	font-size: var(--text-xs);
+	color: var(--color-text-tertiary);
+}
+
+.tokenHelp summary {
+	cursor: pointer;
+	color: var(--color-primary);
+	width: fit-content;
+}
+
+/* Numbered, "illustrated" 3-step list — counter badges stand in for figures
+   without shipping image assets. */
+.tokenSteps {
+	list-style: none;
+	counter-reset: token-step;
+	margin: var(--space-2) 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.tokenSteps li {
+	counter-increment: token-step;
+	position: relative;
+	padding-left: calc(var(--space-6) + var(--space-1));
+	line-height: var(--leading-normal);
+	color: var(--color-text-secondary);
+}
+
+.tokenSteps li::before {
+	content: counter(token-step);
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: var(--space-6);
+	height: var(--space-6);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-full);
+	background: var(--color-surface-sunken);
+	color: var(--color-text);
+	font-variant-numeric: tabular-nums;
+	font-weight: var(--font-medium);
+	font-size: var(--text-xs);
+}
+
+/* ADA-484 #1: "Advanced — proxy & network" disclosure. Collapsed on first run
+   so the CORS-proxy / SOCKS5 jargon doesn't greet a non-technical lead; opens
+   only when a proxy is set, Premium can manage it, or a test hit a network
+   block. */
+.advanced {
+	margin-top: var(--space-2);
+	border-top: 1px solid var(--color-border);
+	padding-top: var(--space-3);
+}
+
+.advancedSummary {
+	cursor: pointer;
+	font-weight: var(--font-medium);
+	color: var(--color-text-secondary);
+	width: fit-content;
+}
+
+.advancedHint {
+	margin: var(--space-2) 0 var(--space-3);
+	font-size: var(--text-xs);
+	color: var(--color-text-tertiary);
 }
 
 .buttonGroup {

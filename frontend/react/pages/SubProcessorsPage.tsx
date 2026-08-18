@@ -101,12 +101,12 @@ export const SubProcessorsPage: React.FC = () => {
 						<tbody>
 							{ACTIVE_SUB_PROCESSORS.map((row) => (
 								<tr key={row.name}>
-									<td>
+									<td data-label="Sub-processor">
 										<strong>{row.name}</strong>
 									</td>
-									<td>{row.purpose}</td>
-									<td>{row.region}</td>
-									<td>
+									<td data-label="Purpose">{row.purpose}</td>
+									<td data-label="Region">{row.region}</td>
+									<td data-label="DPA">
 										<a
 											className={styles.link}
 											href={row.dpa.href}

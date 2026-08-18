@@ -89,6 +89,7 @@ describe('buildReportsSnapshotMarkdown', () => {
 						currentLoggedSeconds: 32 * 3600,
 					},
 				],
+				onTimeHistory: [],
 			},
 		});
 

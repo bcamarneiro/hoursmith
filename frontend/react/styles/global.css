@@ -36,6 +36,18 @@ a:hover {
 	color: var(--color-primary);
 }
 
+/* ============================================================
+   Global keyboard focus ring (WCAG 2.4.7).
+   Uses :focus-visible so mouse clicks don't trigger the ring,
+   but Tab / arrow-key navigation always shows a visible outline
+   even on elements with rounded corners or filled backgrounds
+   that would otherwise suppress the browser default.
+   ============================================================ */
+:focus-visible {
+	outline: var(--focus-ring-width) solid var(--focus-ring-color);
+	outline-offset: var(--focus-ring-offset);
+}
+
 /* Toast container */
 .toast-container {
 	position: fixed;

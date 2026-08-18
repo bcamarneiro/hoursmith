@@ -35,6 +35,17 @@ import * as styles from './MyWeekPage.module.css';
 
 const GAP_DAYS_SECTION_ID = 'dashboard-gap-days';
 
+// Low-fi week preview shown in the first-run empty state (ADA-314) so a new
+// user sees what they're working toward before connecting Jira. Decorative
+// (aria-hidden) — the numbers are illustrative, not real data.
+const PREVIEW_DAYS: { label: string; pct: number }[] = [
+	{ label: 'Mon', pct: 90 },
+	{ label: 'Tue', pct: 70 },
+	{ label: 'Wed', pct: 100 },
+	{ label: 'Thu', pct: 55 },
+	{ label: 'Fri', pct: 40 },
+];
+
 // Session-scoped guard so `first_value_reached` fires at most once per page load
 // (the activation milestone — real worklog data on screen), not on every week
 // navigation or re-render within the same session.
@@ -193,6 +204,25 @@ export const MyWeekPage: React.FC = () => {
 							Back to Home
 						</Link>
 					</div>
+					<figure className={styles.previewMock} aria-hidden="true">
+						<div className={styles.previewGrid}>
+							{PREVIEW_DAYS.map((day) => (
+								<div key={day.label} className={styles.previewDay}>
+									<div className={styles.previewBarTrack}>
+										<div
+											className={styles.previewBar}
+											style={{ height: `${day.pct}%` }}
+										/>
+									</div>
+									<span className={styles.previewDayLabel}>{day.label}</span>
+								</div>
+							))}
+						</div>
+						<figcaption className={styles.previewCaption}>
+							A preview of your week — logged against target — once Jira is
+							connected.
+						</figcaption>
+					</figure>
 				</section>
 			</div>
 		);
@@ -232,8 +262,11 @@ export const MyWeekPage: React.FC = () => {
 
 	const hasGaps = orderedWeekdays.some((d) => d.gapSeconds > 0);
 	const jumpToGapDays = () => {
+		const prefersReducedMotion = window.matchMedia(
+			'(prefers-reduced-motion: reduce)',
+		).matches;
 		document.getElementById(GAP_DAYS_SECTION_ID)?.scrollIntoView({
-			behavior: 'smooth',
+			behavior: prefersReducedMotion ? 'auto' : 'smooth',
 			block: 'start',
 		});
 	};

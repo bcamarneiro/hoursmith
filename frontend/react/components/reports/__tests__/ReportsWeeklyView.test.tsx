@@ -165,6 +165,65 @@ describe('ReportsWeeklyView', () => {
 		).toBeTruthy();
 	});
 
+	// ADA-488 coverage / visibility banner.
+	it('warns that an author-only board can hide 0h members when no roster is set', () => {
+		const member: TeamMemberSummary = {
+			email: 'alice@example.com',
+			displayName: 'Alice',
+			dailyHours: new Map([['2025-05-05', 8]]),
+			totalSeconds: 8 * 3600,
+			targetSeconds: 8 * 3600,
+			gapSeconds: 0,
+		};
+		render(
+			<MemoryRouter>
+				<ReportsWeeklyView
+					{...baseProps}
+					teamMembers={[member]}
+					sortedMembers={[member]}
+					coverage={{
+						rosterConfigured: false,
+						rosterSize: null,
+						loggedCount: 1,
+						noWorklogCount: 0,
+						hasWarning: true,
+					}}
+				/>
+			</MemoryRouter>,
+		);
+		expect(screen.getByText('No team roster set')).toBeTruthy();
+	});
+
+	it('surfaces roster-vs-observed counts when some roster members have no worklogs', () => {
+		const member: TeamMemberSummary = {
+			email: 'alice@example.com',
+			displayName: 'Alice',
+			dailyHours: new Map([['2025-05-05', 8]]),
+			totalSeconds: 8 * 3600,
+			targetSeconds: 8 * 3600,
+			gapSeconds: 0,
+		};
+		render(
+			<MemoryRouter>
+				<ReportsWeeklyView
+					{...baseProps}
+					teamMembers={[member]}
+					sortedMembers={[member]}
+					coverage={{
+						rosterConfigured: true,
+						rosterSize: 3,
+						loggedCount: 1,
+						noWorklogCount: 2,
+						hasWarning: true,
+					}}
+				/>
+			</MemoryRouter>,
+		);
+		expect(
+			screen.getByText(/Roster 3 · logged 1 · no worklogs 2/),
+		).toBeTruthy();
+	});
+
 	it('singularizes the member count and compliance copy for a 1-member team', () => {
 		const member: TeamMemberSummary = {
 			email: 'gail@example.com',

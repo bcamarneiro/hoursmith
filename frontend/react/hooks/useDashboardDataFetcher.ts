@@ -9,10 +9,10 @@ import {
 } from '../../services/githubService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
 import { fetchJiraActivitySuggestions } from '../../services/jiraActivityService';
-import { type WorklogItem } from '../../services/monthWorklogService';
-import { getWorklogSource } from '../../services/worklogSource';
+import type { WorklogItem } from '../../services/monthWorklogService';
 import { fetchRescueTimeData } from '../../services/rescueTimeService';
 import { mergeSuggestions } from '../../services/suggestionMerger';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import {

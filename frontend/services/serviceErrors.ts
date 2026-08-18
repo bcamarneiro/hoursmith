@@ -178,6 +178,15 @@ function looksLikeCorsFailure(message: string): boolean {
 }
 
 /**
+ * Plain-language copy for a browser CORS / direct-access block (ADA-484 #4).
+ * The non-technical ICP reads "CORS" / "configure a proxy" as self-blame, so
+ * this names the cause (the network), reassures it's normal, and gives two
+ * concrete next steps — one self-serve, one to hand to IT — instead of jargon.
+ */
+const NETWORK_BLOCKED_COPY =
+	'Your network is blocking direct browser access to Jira — common on locked-down corporate networks. Set up a proxy in Settings, or ask your IT team to allow browser access to your Jira host.';
+
+/**
  * The single error→user-copy mapper (ADA-475). Consumers should call this
  * instead of flattening to `error.message` or substring-matching `'401'`.
  *
@@ -199,6 +208,12 @@ export function describeServiceError(error: unknown): ServiceErrorCopy {
 	const settings = {
 		kind: 'settings' as const,
 		label: 'Check Settings',
+		to: '/settings',
+	};
+	// A CORS block is fixed by a proxy, so point the action there specifically.
+	const proxySettings = {
+		kind: 'settings' as const,
+		label: 'Set up a proxy',
 		to: '/settings',
 	};
 
@@ -258,11 +273,7 @@ export function describeServiceError(error: unknown): ServiceErrorCopy {
 				};
 			case 'network':
 				if (looksLikeCorsFailure(error.message)) {
-					return {
-						message:
-							'Your browser blocked direct access to Jira (CORS). Try configuring the CORS proxy in Settings.',
-						action: settings,
-					};
+					return { message: NETWORK_BLOCKED_COPY, action: proxySettings };
 				}
 				return {
 					message:
@@ -276,11 +287,7 @@ export function describeServiceError(error: unknown): ServiceErrorCopy {
 	// 4. Legacy / non-ServiceError fallbacks.
 	const message = error instanceof Error ? error.message : String(error);
 	if (looksLikeCorsFailure(message)) {
-		return {
-			message:
-				'Your browser blocked direct access to Jira (CORS). Try configuring the CORS proxy in Settings.',
-			action: settings,
-		};
+		return { message: NETWORK_BLOCKED_COPY, action: proxySettings };
 	}
 	if (message.includes('401')) {
 		return {

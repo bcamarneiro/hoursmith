@@ -66,7 +66,7 @@ jobs:
         if: steps.secrets.outputs.skip == 'false'
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install
@@ -77,11 +77,11 @@ jobs:
         if: steps.secrets.outputs.skip == 'false'
         run: npx playwright install --with-deps chromium
 
-      # TODO: write `e2e/paywall-sandbox.spec.ts` covering signup → checkout →
-      # webhook → /account active → cancel → proxy 403. Until that exists,
-      # this step exits non-zero so the workflow shape is reviewable but the
-      # job is honestly red until the spec is written (tracked as ADA-274).
-      - name: Run paywall sandbox e2e (TODO — spec not written yet)
+      # Runs the full paywall lifecycle: signup(admin-confirmed) → checkout →
+      # webhook → /account active → cancel → proxy 403 (ADA-274). The spec
+      # self-skips if any required secret is blank, so a partial secret set
+      # yields a skipped (green) run rather than a false failure.
+      - name: Run paywall sandbox e2e
         if: steps.secrets.outputs.skip == 'false'
         env:
           E2E_TARGET_URL: ${{ inputs.target_url || secrets.E2E_TARGET_URL }}
@@ -90,9 +90,7 @@ jobs:
           POLAR_SANDBOX_PRODUCT_LEAD: ${{ secrets.POLAR_SANDBOX_PRODUCT_LEAD }}
           AGENTMAIL_API_KEY: ${{ secrets.AGENTMAIL_API_KEY }}
           SUPABASE_STAGING_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_STAGING_SERVICE_ROLE_KEY }}
-        run: |
-          echo "TODO: invoke 'npx playwright test e2e/paywall-sandbox.spec.ts' once the spec lands (ADA-274)."
-          exit 1
+        run: npx playwright test e2e/paywall-sandbox.spec.ts --project=chromium
 
       - name: Upload Playwright report on failure
         if: failure() && steps.secrets.outputs.skip == 'false'

@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { useUIStore } from '../../stores/useUIStore';
 import { useTeamStore } from '../../stores/useTeamStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
+import { useUIStore } from '../../stores/useUIStore';
 import {
 	type ReportPreset,
 	useUserDataStore,
@@ -19,7 +20,6 @@ import { toast } from '../components/ui/Toast';
 import { useAbsenceDaysByUser } from '../hooks/useAbsenceDays';
 import { useDownload } from '../hooks/useDownload';
 import { monthWorklogsQueryKey } from '../hooks/useMonthWorklogs';
-import { readMonth } from '../hooks/worklogReadRouter';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { useReportsTrendData } from '../hooks/useReportsTrendData';
 import {
@@ -29,15 +29,22 @@ import {
 } from '../hooks/useReportsURLState';
 import { useTeamData } from '../hooks/useTeamData';
 import { useTimesheetDataFetcher } from '../hooks/useTimesheetDataFetcher';
+import { readMonth } from '../hooks/worklogReadRouter';
 import { describeFreshness } from '../utils/dataFreshness';
 import { addDaysToIsoDate, monthLabel } from '../utils/date';
-import { downloadAsFile } from '../utils/downloadFile';
+import { downloadAsFile, downloadBinaryFile } from '../utils/downloadFile';
 import { deriveMonthlyReportState } from '../utils/monthlyReport';
+import { computeMonthlyDeadline } from '../utils/onTimeStatus';
 import { validateReportsConsistency } from '../utils/reportConsistency';
 import {
 	buildReportsSnapshotHtml,
 	buildReportsSnapshotMarkdown,
 } from '../utils/reportSnapshots';
+import {
+	buildTeamCompletenessCsv,
+	buildTeamCompletenessWorkbook,
+} from '../utils/teamCompletenessExport';
+import { computeTeamCoverage } from '../utils/teamCoverage';
 import { buildTeamCsv } from '../utils/teamCsvExport';
 import { uid } from '../utils/uid';
 import { classifyWorklog } from '../utils/worklogClassifier';
@@ -46,6 +53,14 @@ import * as styles from './ReportsPage.module.css';
 type SortField = 'name' | 'total' | 'gap';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'monthly' | 'weekly';
+
+// The weekly team view lands on "who's behind first" (ADA-435): the lead's
+// recurring Job-2 task is chasing the gap, so the largest shortfall belongs on
+// top, not alphabetical order. Single source of truth for the initial sort and
+// for the filters-cleared reset. A shared `?sort=`/`?dir=` link still overrides
+// this (useReportsURLState applies URL sort params only when present).
+export const DEFAULT_SORT_FIELD: SortField = 'gap';
+export const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
 type ReportsValidationState = {
 	status: 'idle' | 'checking' | 'consistent' | 'inconsistent' | 'error';
 	message: string;
@@ -126,8 +141,10 @@ export const ReportsPage: React.FC = () => {
 	// deep-link isn't normalized back to weekly by the URL-write effect on the
 	// first render (ADA-448).
 	const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewModeFromURL);
-	const [sortField, setSortField] = useState<SortField>('name');
-	const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+	const [sortField, setSortField] = useState<SortField>(DEFAULT_SORT_FIELD);
+	const [sortDirection, setSortDirection] = useState<SortDirection>(
+		DEFAULT_SORT_DIRECTION,
+	);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [onlyAttentionNeeded, setOnlyAttentionNeeded] = useState(false);
 	const [managerMode, setManagerMode] = useState(false);
@@ -372,6 +389,36 @@ export const ReportsPage: React.FC = () => {
 		toast.success('Weekly report exported');
 	};
 
+	// Completeness summary export (ADA-390): hand the lead's manager / HR / PMO
+	// the expected-vs-logged / completeness-% / on-time picture. Reuses the
+	// current sort + people filter (sortedMembers) and the provenance-footer
+	// preference. CSV carries a UTF-8 BOM + the repo's ';' separator so it opens
+	// cleanly in Excel; the .xlsx path is a real (hand-built) OOXML workbook.
+	const handleExportCompletenessCsv = () => {
+		const csv = buildTeamCompletenessCsv(sortedMembers, {
+			provenance: { jiraHost: config.jiraHost },
+			includeProvenance: config.includeCsvProvenance,
+			period: `${weekStart}..${weekEnd}`,
+		});
+		// Prepend a UTF-8 BOM so Excel detects the encoding and the ';' separator.
+		downloadAsFile(
+			`﻿${csv}`,
+			`team-completeness-${weekStart}.csv`,
+			'text/csv;charset=utf-8',
+		);
+		toast.success('Completeness CSV exported');
+	};
+
+	const handleExportCompletenessXlsx = () => {
+		const bytes = buildTeamCompletenessWorkbook(sortedMembers);
+		downloadBinaryFile(
+			bytes,
+			`team-completeness-${weekStart}.xlsx`,
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		);
+		toast.success('Completeness Excel exported');
+	};
+
 	// Keyboard shortcuts for month/week navigation
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
@@ -413,8 +460,10 @@ export const ReportsPage: React.FC = () => {
 		setOnlyAttentionNeeded(false);
 		setManagerMode(false);
 		setTrendWeeks(6);
-		setSortField('name');
-		setSortDirection('asc');
+		// Clearing filters returns to the "who's behind first" default (ADA-435),
+		// not alphabetical, so a reset still surfaces the gap.
+		setSortField(DEFAULT_SORT_FIELD);
+		setSortDirection(DEFAULT_SORT_DIRECTION);
 		setSelectedUser('');
 		toast.info('Reports filters cleared');
 	};
@@ -622,6 +671,30 @@ export const ReportsPage: React.FC = () => {
 			),
 		};
 	}, [data, viewMode, filteredVisibleEntries, currentYear, currentMonth]);
+	// Monthly timesheet deadline (ADA-549): Nth working day of the following
+	// month. Drives the "due by" line + the overview table's on-time badges.
+	const monthlyDeadline = useMemo(
+		() =>
+			computeMonthlyDeadline(
+				currentYear,
+				currentMonth,
+				config.monthlyDeadlineDay ?? 3,
+				config.monthlyDeadlineTime ?? '18:00',
+			),
+		[
+			currentYear,
+			currentMonth,
+			config.monthlyDeadlineDay,
+			config.monthlyDeadlineTime,
+		],
+	);
+	// Roster-vs-observed coverage for the weekly visibility banner (ADA-488).
+	// Uses the unfiltered team set so a search/attention filter never changes the
+	// coverage headline.
+	const teamCoverage = useMemo(
+		() => computeTeamCoverage(teamMembers, allowedUsers),
+		[teamMembers, allowedUsers],
+	);
 	const weeklySummary = useMemo(() => {
 		if (viewMode !== 'weekly' || sortedMembers.length === 0) return null;
 		return {
@@ -659,6 +732,27 @@ export const ReportsPage: React.FC = () => {
 		monthlyFetching,
 	]);
 
+	// First-run intercept (ADA-314): before Jira is connected, don't render the
+	// full toolbar + control panel (view toggle, filters, share, snapshot,
+	// exports, consistency check) above a "connect Jira" message — a first-run
+	// user shouldn't face a wall of unfamiliar controls before being told the one
+	// thing they need to do. Show only the setup intercept, linked to Settings.
+	if (!config.jiraHost || !config.apiToken) {
+		return (
+			<div className={styles.container}>
+				<div className={styles.error}>
+					<h2>Connect Jira to see reports</h2>
+					<p>
+						Add your Jira host and API token in Settings to load your team's
+						weekly worklogs. Filters, exports, and the manager view appear here
+						once there's data to show.
+					</p>
+					<Link to="/settings">Go to Settings</Link>
+				</div>
+			</div>
+		);
+	}
+
 	if (errorMessage && viewMode === 'monthly') {
 		return (
 			<div className={styles.container}>
@@ -678,6 +772,7 @@ export const ReportsPage: React.FC = () => {
 					hasNoFilteredMonthlyResults={hasNoFilteredMonthlyResults}
 					monthlyWorklogProgress={monthlyWorklogProgress}
 					monthlySummary={monthlySummary}
+					monthlyDeadline={monthlyDeadline}
 					errorMessage={errorMessage}
 					onRetry={handleRetryMonthly}
 					onUserChange={handleUserChange}
@@ -780,6 +875,11 @@ export const ReportsPage: React.FC = () => {
 				onExportPrimary={
 					viewMode === 'weekly' ? handleExportTeamCsv : handleDownloadAll
 				}
+				onExportCompletenessCsv={handleExportCompletenessCsv}
+				onExportCompletenessXlsx={handleExportCompletenessXlsx}
+				canExportCompleteness={
+					viewMode === 'weekly' && sortedMembers.length > 0
+				}
 				onValidateConsistency={handleValidateConsistency}
 				validationState={validationState}
 				primaryExportLabel={
@@ -831,6 +931,7 @@ export const ReportsPage: React.FC = () => {
 					trendsError={trendsError}
 					hasNoFilteredWeeklyResults={hasNoFilteredWeeklyResults}
 					weeklySummary={weeklySummary}
+					coverage={teamCoverage}
 					onRetry={handleRetryWeekly}
 					onMemberClick={handleMemberClick}
 					notConfigured={!config.jiraHost || !config.apiToken}
@@ -852,6 +953,7 @@ export const ReportsPage: React.FC = () => {
 					hasNoFilteredMonthlyResults={hasNoFilteredMonthlyResults}
 					monthlyWorklogProgress={monthlyWorklogProgress}
 					monthlySummary={monthlySummary}
+					monthlyDeadline={monthlyDeadline}
 					errorMessage={errorMessage}
 					onRetry={handleRetryMonthly}
 					onUserChange={handleUserChange}

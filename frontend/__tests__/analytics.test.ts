@@ -24,12 +24,17 @@ const initSpy = vi.fn();
 const captureSpy = vi.fn();
 const identifySpy = vi.fn();
 
+const onFeatureFlagsSpy = vi.fn();
+const isFeatureEnabledSpy = vi.fn();
+
 vi.mock('posthog-js', () => ({
 	default: {
 		init: initSpy,
 		capture: captureSpy,
 		captureException: vi.fn(),
 		identify: identifySpy,
+		onFeatureFlags: onFeatureFlagsSpy,
+		isFeatureEnabled: isFeatureEnabledSpy,
 	},
 }));
 

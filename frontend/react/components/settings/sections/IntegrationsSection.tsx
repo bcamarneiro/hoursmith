@@ -1,12 +1,12 @@
 import type React from 'react';
 import { useRef, useState } from 'react';
+import { describeServiceError } from '../../../../services/serviceErrors';
+import { buildTempoRequest } from '../../../../services/tempoGateway';
 import type {
 	AbsenceAssignment,
 	CalendarFeed,
 } from '../../../../stores/useConfigStore';
 import type { CalendarMapping } from '../../../../stores/useUserDataStore';
-import { buildTempoRequest } from '../../../../services/tempoGateway';
-import { describeServiceError } from '../../../../services/serviceErrors';
 import { SETTINGS_SECTION_IDS } from '../../../constants/settingsSections';
 import { useProxyBadge } from '../../../hooks/useProxyBadge';
 import { Button } from '../../ui/Button';

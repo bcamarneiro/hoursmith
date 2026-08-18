@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hoursmith-shell-v4';
+const CACHE_NAME = 'hoursmith-shell-v5';
 // Stable, fixed-name shell assets only. The JS/CSS bundles are content-hashed
 // (`main.<hash>.js`, etc.) and change every build, so they are NOT precached
 // here — listing them would 404 and, because `addAll` is atomic, abort the
@@ -57,10 +57,31 @@ self.addEventListener('fetch', (event) => {
 	}
 
 	if (event.request.mode === 'navigate') {
+		// Stale-while-revalidate for the app shell: serve the cached
+		// index.html instantly so the app loads without waiting for the
+		// network, then fetch a fresh copy in the background to update the
+		// cache for the *next* navigation. The versioned CACHE_NAME ensures
+		// a new SW build invalidates the old shell and its hashed chunk
+		// references in one activation.
 		event.respondWith(
-			fetch(event.request).catch(async () => {
+			caches.open(CACHE_NAME).then(async (cache) => {
 				const cachedResponse =
-					(await caches.match('./index.html')) || (await caches.match('./'));
+					(await cache.match('./index.html')) || (await cache.match('./'));
+
+				// Background revalidation — don't block the response on it.
+				const networkPromise = fetch(event.request)
+					.then((networkResponse) => {
+						if (networkResponse && networkResponse.status === 200) {
+							cache.put('./index.html', networkResponse.clone());
+						}
+						return networkResponse;
+					})
+					.catch(() => undefined);
+
+				// Wait for the background update so the SW doesn't get
+				// terminated before the cache is written.
+				event.waitUntil(networkPromise);
+
 				return cachedResponse || Response.error();
 			}),
 		);

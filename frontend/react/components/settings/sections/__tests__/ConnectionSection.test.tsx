@@ -88,7 +88,7 @@ describe('ConnectionSection', () => {
 		);
 	});
 
-	it('links to the Atlassian API token docs in a new tab (ADA-468)', () => {
+	it('offers an inline 3-step API-token walkthrough that keeps the Atlassian link in a new tab (ADA-468, ADA-484 #2)', () => {
 		render(
 			<ConnectionSection
 				formData={{
@@ -107,8 +107,16 @@ describe('ConnectionSection', () => {
 				corsProxyId="cp"
 			/>,
 		);
+		// The disclosure is inline (a <summary>), no longer a bare link that
+		// navigates the user away mid-setup.
+		expect(
+			screen.getByText('How do I get an API token?').tagName.toLowerCase(),
+		).toBe('summary');
+		// Three walkthrough steps.
+		expect(screen.getAllByRole('listitem')).toHaveLength(3);
+		// The Atlassian page is still reachable — as the first step, in a new tab.
 		const link = screen.getByRole('link', {
-			name: /How do I get an API token\?/i,
+			name: /Atlassian API tokens page/i,
 		});
 		expect(link).toHaveAttribute(
 			'href',
@@ -165,5 +173,91 @@ describe('ConnectionSection', () => {
 			/>,
 		);
 		expect(screen.getByText('All good')).toBeInTheDocument();
+	});
+
+	it('hides the proxy/network block behind a collapsed Advanced disclosure on first run, but keeps the field mounted (ADA-484 #1)', () => {
+		render(
+			<ConnectionSection
+				formData={{
+					jiraHost: 'h',
+					email: 'e',
+					apiToken: 't',
+					corsProxy: '',
+				}}
+				handleChange={vi.fn()}
+				testJira={vi.fn()}
+				canTestJira={true}
+				integrationTest={{ loading: false, result: null }}
+				jiraHostId="jh"
+				emailId="em"
+				apiTokenId="at"
+				corsProxyId="cp"
+			/>,
+		);
+		const details = screen
+			.getByText(/Advanced — proxy/)
+			.closest('details') as HTMLDetailsElement;
+		expect(details).not.toHaveAttribute('open');
+		// Field parity: the CORS Proxy input is still in the DOM, just disclosed.
+		expect(
+			screen.getByPlaceholderText('http://localhost:8081'),
+		).toBeInTheDocument();
+	});
+
+	it('opens the Advanced disclosure when a connection test reports a network block (ADA-484 #1/#4)', () => {
+		render(
+			<ConnectionSection
+				formData={{
+					jiraHost: 'h',
+					email: 'e',
+					apiToken: 't',
+					corsProxy: '',
+				}}
+				handleChange={vi.fn()}
+				testJira={vi.fn()}
+				canTestJira={true}
+				integrationTest={{
+					loading: false,
+					result: {
+						success: false,
+						message:
+							'Your network is blocking direct browser access to Jira — set up a proxy below.',
+					},
+				}}
+				jiraHostId="jh"
+				emailId="em"
+				apiTokenId="at"
+				corsProxyId="cp"
+			/>,
+		);
+		const details = screen
+			.getByText(/Advanced — proxy/)
+			.closest('details') as HTMLDetailsElement;
+		expect(details).toHaveAttribute('open');
+	});
+
+	it('opens the Advanced disclosure for a returning user who already set a proxy (ADA-484 #1)', () => {
+		render(
+			<ConnectionSection
+				formData={{
+					jiraHost: 'h',
+					email: 'e',
+					apiToken: 't',
+					corsProxy: 'http://localhost:8081',
+				}}
+				handleChange={vi.fn()}
+				testJira={vi.fn()}
+				canTestJira={true}
+				integrationTest={{ loading: false, result: null }}
+				jiraHostId="jh"
+				emailId="em"
+				apiTokenId="at"
+				corsProxyId="cp"
+			/>,
+		);
+		const details = screen
+			.getByText(/Advanced — proxy/)
+			.closest('details') as HTMLDetailsElement;
+		expect(details).toHaveAttribute('open');
 	});
 });

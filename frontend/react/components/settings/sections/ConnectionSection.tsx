@@ -1,9 +1,15 @@
 import type React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SETTINGS_SECTION_IDS } from '../../../constants/settingsSections';
 import { useProxyBadge } from '../../../hooks/useProxyBadge';
 import { PremiumWaitlistForm } from '../../marketing/PremiumWaitlistForm';
 import * as styles from '../SettingsForm.module.css';
+
+// The connection-test failure copy that means "the network blocked direct
+// access" (ADA-484 #4). When we see it, auto-open the Advanced proxy disclosure
+// so the "set up a proxy below" guidance actually reveals the field.
+const NETWORK_BLOCK_PATTERN =
+	/blocking direct browser access|network is blocking/i;
 
 interface IntegrationTestResult {
 	loading: boolean;
@@ -51,6 +57,28 @@ export const ConnectionSection: React.FC<Props> = ({
 	// below makes this visible and keeps an escape hatch.
 	const proxyBadge = useProxyBadge();
 	const hostedActive = proxyBadge.mode === 'hosted';
+
+	// ADA-484 #1: on first run the proxy / network block (the `npm run cors-proxy`
+	// + SOCKS5 jargon) is hidden behind an "Advanced" disclosure, so a
+	// non-technical lead sees only host / email / token. It opens by default only
+	// when it's actually relevant: a proxy is already configured, the user can
+	// manage the hosted proxy (Premium), or the last connection test failed
+	// because the network blocked direct access.
+	const lastTestBlockedAccess =
+		!!integrationTest.result &&
+		!integrationTest.result.success &&
+		NETWORK_BLOCK_PATTERN.test(integrationTest.result.message);
+	const advancedRelevant =
+		formData.corsProxy.trim().length > 0 ||
+		proxyBadge.canOverride ||
+		lastTestBlockedAccess;
+	const [advancedOpen, setAdvancedOpen] = useState(advancedRelevant);
+	// A network-block failure can arrive after mount (the user clicks Test), so
+	// reveal the proxy field when it does — matching the error copy's "below".
+	useEffect(() => {
+		if (lastTestBlockedAccess) setAdvancedOpen(true);
+	}, [lastTestBlockedAccess]);
+
 	return (
 		<fieldset id={SETTINGS_SECTION_IDS.connection} className={styles.section}>
 			<legend className={styles.sectionTitle}>
@@ -138,93 +166,123 @@ export const ConnectionSection: React.FC<Props> = ({
 						{showApiToken ? 'Hide' : 'Show'}
 					</button>
 				</div>
-				<small>
-					<a
-						href="https://id.atlassian.com/manage-profile/security/api-tokens"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						How do I get an API token?
-					</a>
-				</small>
+				<details className={styles.tokenHelp}>
+					<summary>How do I get an API token?</summary>
+					<ol className={styles.tokenSteps}>
+						<li>
+							Open the{' '}
+							<a
+								href="https://id.atlassian.com/manage-profile/security/api-tokens"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								Atlassian API tokens page
+							</a>{' '}
+							(opens in a new tab).
+						</li>
+						<li>
+							Click <strong>Create API token</strong>, give it a label like{' '}
+							<code>Hoursmith</code>, and copy the value it shows you.
+						</li>
+						<li>
+							Paste it into the <strong>API Token</strong> field above. It stays
+							in this browser — Hoursmith never sees or stores it.
+						</li>
+					</ol>
+				</details>
 			</div>
-			<div className={styles.formGroup}>
-				<label htmlFor={corsProxyId}>
-					CORS Proxy <span className={styles.optional}>optional</span>
-					{hostedActive ? (
-						<span
-							className={styles.badgePremium}
-							title="Your Jira token never leaves your browser — the hosted proxy just forwards the request to Atlassian."
-						>
-							Hosted by Premium
-						</span>
-					) : proxyBadge.canOverride && proxyBadge.userOverride ? (
-						<span className={styles.badgeNeutral}>
-							Self-hosted (overridden)
-						</span>
-					) : formData.corsProxy.trim() ? (
-						<span className={styles.badgeNeutral}>Self-hosted</span>
-					) : null}
-				</label>
-				<input
-					type="text"
-					id={corsProxyId}
-					name="corsProxy"
-					value={
-						hostedActive ? (proxyBadge.hostedUrl ?? '') : formData.corsProxy
-					}
-					onChange={handleChange}
-					placeholder="http://localhost:8081"
-					autoCapitalize="off"
-					autoCorrect="off"
-					spellCheck={false}
-					disabled={hostedActive}
-					readOnly={hostedActive}
-				/>
-				{proxyBadge.canOverride ? (
-					<small>
-						{hostedActive
-							? 'You are subscribed to Premium — Jira requests are being routed through the Hoursmith hosted proxy.'
-							: 'You overrode the hosted proxy. Your self-configured value above is being used.'}{' '}
-						<button
-							type="button"
-							className={styles.linkButton}
-							onClick={() =>
-								proxyBadge.setUserOverride(!proxyBadge.userOverride)
-							}
-						>
-							{hostedActive ? 'Override' : 'Use hosted proxy'}
-						</button>
-					</small>
-				) : (
-					<>
-						<small>
-							Leave this blank on the first attempt. Only fill it in if the Jira
-							check fails because your browser or network blocks direct access.
-						</small>
-						<small>
-							Start with <code>npm run cors-proxy</code>. If your environment
-							needs SOCKS5, run <code>npm run cors-proxy:socks</code> and keep
-							the same local proxy URL here.
-						</small>
-						{formData.corsProxy.trim() ? (
-							<small>
-								Jira requests are currently going through{' '}
-								<code>{formData.corsProxy.trim()}</code> instead of using direct
-								browser access.
-							</small>
-						) : null}
-					</>
-				)}
-			</div>
-			{!proxyBadge.canOverride && (
+			<details
+				className={styles.advanced}
+				open={advancedOpen}
+				onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+			>
+				<summary className={styles.advancedSummary}>
+					Advanced — proxy &amp; network{' '}
+					<span className={styles.optional}>optional</span>
+				</summary>
+				<p className={styles.advancedHint}>
+					Most people can leave this alone. Only needed if your browser or
+					network blocks direct access to Jira.
+				</p>
 				<div className={styles.formGroup}>
-					<PremiumWaitlistForm
-						source="in-app-settings"
-						heading="Tired of running the local proxy? Premium hosted-proxy coming soon — leave your email."
+					<label htmlFor={corsProxyId}>
+						CORS Proxy <span className={styles.optional}>optional</span>
+						{hostedActive ? (
+							<span
+								className={styles.badgePremium}
+								title="Your Jira token never leaves your browser — the hosted proxy just forwards the request to Atlassian."
+							>
+								Hosted by Premium
+							</span>
+						) : proxyBadge.canOverride && proxyBadge.userOverride ? (
+							<span className={styles.badgeNeutral}>
+								Self-hosted (overridden)
+							</span>
+						) : formData.corsProxy.trim() ? (
+							<span className={styles.badgeNeutral}>Self-hosted</span>
+						) : null}
+					</label>
+					<input
+						type="text"
+						id={corsProxyId}
+						name="corsProxy"
+						value={
+							hostedActive ? (proxyBadge.hostedUrl ?? '') : formData.corsProxy
+						}
+						onChange={handleChange}
+						placeholder="http://localhost:8081"
+						autoCapitalize="off"
+						autoCorrect="off"
+						spellCheck={false}
+						disabled={hostedActive}
+						readOnly={hostedActive}
 					/>
+					{proxyBadge.canOverride ? (
+						<small>
+							{hostedActive
+								? 'You are subscribed to Premium — Jira requests are being routed through the Hoursmith hosted proxy.'
+								: 'You overrode the hosted proxy. Your self-configured value above is being used.'}{' '}
+							<button
+								type="button"
+								className={styles.linkButton}
+								onClick={() =>
+									proxyBadge.setUserOverride(!proxyBadge.userOverride)
+								}
+							>
+								{hostedActive ? 'Override' : 'Use hosted proxy'}
+							</button>
+						</small>
+					) : (
+						<>
+							<small>
+								Leave this blank on the first attempt. Only fill it in if the
+								Jira check fails because your browser or network blocks direct
+								access.
+							</small>
+							<small>
+								Start with <code>npm run cors-proxy</code>. If your environment
+								needs SOCKS5, run <code>npm run cors-proxy:socks</code> and keep
+								the same local proxy URL here.
+							</small>
+							{formData.corsProxy.trim() ? (
+								<small>
+									Jira requests are currently going through{' '}
+									<code>{formData.corsProxy.trim()}</code> instead of using
+									direct browser access.
+								</small>
+							) : null}
+						</>
+					)}
 				</div>
-			)}
+				{!proxyBadge.canOverride && (
+					<div className={styles.formGroup}>
+						<PremiumWaitlistForm
+							source="in-app-settings"
+							heading="Tired of running the local proxy? Premium hosted-proxy coming soon — leave your email."
+						/>
+					</div>
+				)}
+			</details>
 		</fieldset>
 	);
 };

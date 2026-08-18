@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { isPremiumBuild } from '../../../buildTier';
 import type {
 	AbsenceAssignment,
 	CalendarFeed,
@@ -15,6 +16,7 @@ import {
 	SETTINGS_RAIL_ITEMS,
 	SETTINGS_SECTION_IDS,
 } from '../../constants/settingsSections';
+import { useFeatureFlag } from '../../hooks/useFeatureFlag';
 import { downloadAsFile } from '../../utils/downloadFile';
 import { splitCsvEmailList, uniqueEmailEntries } from '../../utils/emailList';
 import {
@@ -33,6 +35,7 @@ import { ConnectionSection } from './sections/ConnectionSection';
 import { IntegrationsSection } from './sections/IntegrationsSection';
 import { PermissionsSection } from './sections/PermissionsSection';
 import { PreferencesSection } from './sections/PreferencesSection';
+import { RemindersSection } from './sections/RemindersSection';
 import { ScopeSection } from './sections/ScopeSection';
 
 type FeedEntry = {
@@ -165,6 +168,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	);
 	const activeSection = controlledActiveSection ?? internalActiveSection;
 	const selectSection = onSelectSection ?? setInternalActiveSection;
+	const remindersUiFlag = useFeatureFlag('reminders-ui');
 
 	const jiraHostId = useId();
 	const emailId = useId();
@@ -172,6 +176,11 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const corsProxyId = useId();
 	const jqlFilterId = useId();
 	const allowedUsersId = useId();
+	const expectedDailyHoursId = useId();
+	const weeklyDeadlineWeekdayId = useId();
+	const weeklyDeadlineTimeId = useId();
+	const monthlyDeadlineDayId = useId();
+	const monthlyDeadlineTimeId = useId();
 	const gitlabTokenId = useId();
 	const gitlabHostId = useId();
 	const rescueTimeKeyId = useId();
@@ -330,6 +339,38 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		updateFormField(name as keyof typeof formData, value as never);
 	};
 
+	const handleExpectedDailyHoursChange = (hours: number) => {
+		updateFormField('expectedDailyHours', hours as never);
+	};
+
+	const handleExpectedHoursOverrideChange = (
+		email: string,
+		hours: number | null,
+	) => {
+		const next = { ...(formData.expectedHoursByUser ?? {}) };
+		if (hours === null) delete next[email];
+		else next[email] = hours;
+		updateFormField('expectedHoursByUser', next as never);
+	};
+
+	const handleWeeklyDeadlineWeekdayChange = (weekday: number) => {
+		if (!Number.isFinite(weekday)) return;
+		updateFormField('weeklyDeadlineWeekday', weekday as never);
+	};
+
+	const handleWeeklyDeadlineTimeChange = (time: string) => {
+		updateFormField('weeklyDeadlineTime', time as never);
+	};
+
+	const handleMonthlyDeadlineDayChange = (day: number) => {
+		if (!Number.isFinite(day)) return;
+		updateFormField('monthlyDeadlineDay', day as never);
+	};
+
+	const handleMonthlyDeadlineTimeChange = (time: string) => {
+		updateFormField('monthlyDeadlineTime', time as never);
+	};
+
 	const handleSave = () => {
 		if (!isDirty) return;
 		saveSettings();
@@ -425,9 +466,23 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		}
 	};
 
-	const configRailItems = SETTINGS_RAIL_ITEMS.filter(
-		(item) => item.group === 'config',
-	);
+	// Reminders (ADA-552): Hosted-tier capability, revealed behind the
+	// `reminders-ui` flag (default off) so the panel can ship dark and be
+	// switched on once the email provider + DNS are live.
+	const showReminders = isPremiumBuild() && remindersUiFlag;
+
+	const configRailItems = [
+		...SETTINGS_RAIL_ITEMS.filter((item) => item.group === 'config'),
+		...(showReminders
+			? [
+					{
+						id: SETTINGS_SECTION_IDS.reminders,
+						label: 'Reminders',
+						group: 'config' as const,
+					},
+				]
+			: []),
+	];
 	const savedRailItems = SETTINGS_RAIL_ITEMS.filter(
 		(item) => item.group === 'saved',
 	);
@@ -513,6 +568,23 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							}
 							jqlFilterId={jqlFilterId}
 							allowedUsersId={allowedUsersId}
+							expectedDailyHours={formData.expectedDailyHours ?? 8}
+							expectedHoursByUser={formData.expectedHoursByUser ?? {}}
+							onExpectedDailyHoursChange={handleExpectedDailyHoursChange}
+							onExpectedHoursOverrideChange={handleExpectedHoursOverrideChange}
+							expectedDailyHoursId={expectedDailyHoursId}
+							weeklyDeadlineWeekday={formData.weeklyDeadlineWeekday ?? 5}
+							weeklyDeadlineTime={formData.weeklyDeadlineTime ?? '18:00'}
+							onWeeklyDeadlineWeekdayChange={handleWeeklyDeadlineWeekdayChange}
+							onWeeklyDeadlineTimeChange={handleWeeklyDeadlineTimeChange}
+							weeklyDeadlineWeekdayId={weeklyDeadlineWeekdayId}
+							weeklyDeadlineTimeId={weeklyDeadlineTimeId}
+							monthlyDeadlineDay={formData.monthlyDeadlineDay ?? 3}
+							monthlyDeadlineTime={formData.monthlyDeadlineTime ?? '18:00'}
+							onMonthlyDeadlineDayChange={handleMonthlyDeadlineDayChange}
+							onMonthlyDeadlineTimeChange={handleMonthlyDeadlineTimeChange}
+							monthlyDeadlineDayId={monthlyDeadlineDayId}
+							monthlyDeadlineTimeId={monthlyDeadlineTimeId}
 						/>
 					</div>
 
@@ -595,6 +667,12 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							analyticsOptOutId={analyticsOptOutId}
 						/>
 					</div>
+
+					{showReminders && (
+						<div hidden={activeSection !== SETTINGS_SECTION_IDS.reminders}>
+							<RemindersSection />
+						</div>
+					)}
 
 					<div hidden={activeSection !== dataSectionId}>
 						<section className={styles.section}>

@@ -44,6 +44,11 @@ type Props = {
 	onExportSnapshotHtml: () => void;
 	onExportSnapshotMarkdown: () => void;
 	onExportPrimary: () => void;
+	/** Export the completeness summary (expected/logged/%/on-time) — weekly only
+	 *  (ADA-390). Omitted in monthly. */
+	onExportCompletenessCsv?: () => void;
+	onExportCompletenessXlsx?: () => void;
+	canExportCompleteness?: boolean;
 	onValidateConsistency: () => Promise<void> | void;
 	validationState: ValidationState;
 	primaryExportLabel: string | null;
@@ -86,6 +91,9 @@ export const ReportsControlPanel: React.FC<Props> = ({
 	onExportSnapshotHtml,
 	onExportSnapshotMarkdown,
 	onExportPrimary,
+	onExportCompletenessCsv,
+	onExportCompletenessXlsx,
+	canExportCompleteness,
 	onValidateConsistency,
 	validationState,
 	primaryExportLabel,
@@ -138,6 +146,26 @@ export const ReportsControlPanel: React.FC<Props> = ({
 							disabled={!canExportPrimary}
 						>
 							{primaryExportLabel}
+						</Button>
+					) : null}
+					{isWeekly && onExportCompletenessCsv ? (
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={onExportCompletenessCsv}
+							disabled={!canExportCompleteness}
+						>
+							Completeness CSV
+						</Button>
+					) : null}
+					{isWeekly && onExportCompletenessXlsx ? (
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={onExportCompletenessXlsx}
+							disabled={!canExportCompleteness}
+						>
+							Completeness Excel
 						</Button>
 					) : null}
 					<Button

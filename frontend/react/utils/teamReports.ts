@@ -8,6 +8,11 @@ import {
 	toLocalDateString,
 } from './date';
 import { sumWeekdayTargetSeconds } from './dayTarget';
+import {
+	computeWeeklyDeadline,
+	deriveOnTimeStatus,
+	type OnTimeStatus,
+} from './onTimeStatus';
 import { classifyWorklog } from './worklogClassifier';
 
 function isWeekday(dateStr: string): boolean {
@@ -33,6 +38,29 @@ export function getWeekdaysBetween(start: string, end: string): string[] {
 	return days;
 }
 
+/**
+ * Per-user working-hours configuration (ADA-392). `defaultDailyHours` is the
+ * team-wide per-weekday target; `byUser` maps a lowercased email to a
+ * per-person override so contractors / part-timers get an accurate target
+ * rather than being perpetually flagged red.
+ */
+export interface ExpectedHoursConfig {
+	defaultDailyHours: number;
+	byUser: Record<string, number>;
+}
+
+const DEFAULT_DAILY_HOURS = 8;
+
+function resolveDailyTargetSeconds(
+	email: string,
+	expectedHours: ExpectedHoursConfig | undefined,
+): number {
+	const perUser = email ? expectedHours?.byUser?.[email] : undefined;
+	const hours =
+		perUser ?? expectedHours?.defaultDailyHours ?? DEFAULT_DAILY_HOURS;
+	return hours * 3600;
+}
+
 function parseAllowedUsers(allowedUsers: string): Set<string> | null {
 	const entries = allowedUsers
 		.split(',')
@@ -47,8 +75,23 @@ export function buildTeamSummaries(
 	weekEnd: string,
 	allowedUsers: string,
 	absenceDaysByUser?: UserAbsenceDays,
+	// The "as of" date used to prorate the colored gap to elapsed weekdays.
+	// Defaults to today; injected in tests. Pure enough — only used for a
+	// `<=` weekday comparison, never for grouping/bucketing.
+	asOf: string = toLocalDateString(new Date()),
+	// Per-user working-hours config (ADA-392). When omitted, every member gets
+	// the 8h/weekday baseline (behaviour unchanged from before this feature).
+	expectedHours?: ExpectedHoursConfig,
+	// Weekly deadline (ADA-387). When provided, each member gets an on-time
+	// classification from whether their worklogs were *created* by this instant.
+	// `now` decides whether a still-incomplete member reads "pending" (deadline
+	// ahead) or "incomplete" (deadline passed). Both omitted → no on-time fields.
+	deadline?: Date,
+	now: Date = new Date(),
 ): TeamMemberSummary[] {
 	const allowedSet = parseAllowedUsers(allowedUsers);
+	const deadlineMs = deadline ? deadline.getTime() : null;
+	const deadlinePassed = deadline ? now.getTime() > deadline.getTime() : false;
 	// Group on a STABLE key so we never (a) drop authors that have no
 	// emailAddress, nor (b) merge two distinct people who share a displayName
 	// (ADA-458). Preference: accountId → email → a clearly-marked synthetic
@@ -60,6 +103,7 @@ export function buildTeamSummaries(
 			displayName: string;
 			email: string;
 			dailySeconds: Map<string, number>;
+			onTimeSeconds: number;
 		}
 	>();
 
@@ -107,12 +151,27 @@ export function buildTeamSummaries(
 				displayName: worklog.author?.displayName || email || 'Unknown user',
 				email: email ?? '',
 				dailySeconds: new Map(),
+				onTimeSeconds: 0,
 			};
 			memberMap.set(groupKey, member);
 		}
 
+		const seconds = worklog.timeSpentSeconds ?? 0;
 		const existing = member.dailySeconds.get(day) || 0;
-		member.dailySeconds.set(day, existing + (worklog.timeSpentSeconds ?? 0));
+		member.dailySeconds.set(day, existing + seconds);
+
+		// On-time accounting (ADA-387): a worklog counts as "on time" when it was
+		// created on or before the deadline. A missing `created` can't be proven
+		// late, so it's treated as on-time. Backdated worklogs already `continue`d
+		// above, so they never reach here.
+		if (deadlineMs !== null) {
+			const createdMs = worklog.created
+				? new Date(worklog.created).getTime()
+				: null;
+			if (createdMs === null || createdMs <= deadlineMs) {
+				member.onTimeSeconds += seconds;
+			}
+		}
 	}
 
 	if (allowedSet) {
@@ -128,6 +187,7 @@ export function buildTeamSummaries(
 					displayName: email,
 					email,
 					dailySeconds: new Map(),
+					onTimeSeconds: 0,
 				});
 			}
 		}
@@ -141,6 +201,10 @@ export function buildTeamSummaries(
 	// "OK / no gap" here while My Week showed a large gap (ADA-443). The target
 	// now spans the same weekdays the per-day totals are reported over.
 	const weekdays = getWeekdaysBetween(weekStart, weekEnd);
+	// Weekdays that have already elapsed by `asOf`. For a past week this is every
+	// weekday (so prorated == full); for the current week it's Mon..today, which
+	// is what stops the "everyone red on Monday" false alarm (ADA-477).
+	const elapsedWeekdays = weekdays.filter((day) => day <= asOf);
 
 	const summaries: TeamMemberSummary[] = [];
 	for (const member of memberMap.values()) {
@@ -153,10 +217,28 @@ export function buildTeamSummaries(
 		const memberAbsenceMap = email ? absenceDaysByUser?.get(email) : undefined;
 		const isAbsentOnDay = (day: string) => memberAbsenceMap?.has(day) ?? false;
 		const loggedOnDay = (day: string) => member.dailySeconds.get(day) ?? 0;
+		// Per-user daily target (ADA-392): the lead's override for this member, or
+		// the team default, or the 8h baseline. Drives both the full-week target
+		// and the prorated one, so gap / completeness % / RAG are all correct for
+		// part-timers instead of always red.
+		const dailyTargetSeconds = resolveDailyTargetSeconds(email, expectedHours);
 		const targetSeconds = sumWeekdayTargetSeconds(
 			weekdays,
 			isAbsentOnDay,
 			loggedOnDay,
+			dailyTargetSeconds,
+		);
+		// Prorated "expected by today" target + gap — the colored signal. Keeps
+		// the full-week target/gap above as the week-completion context.
+		const expectedByTodaySeconds = sumWeekdayTargetSeconds(
+			elapsedWeekdays,
+			isAbsentOnDay,
+			loggedOnDay,
+			dailyTargetSeconds,
+		);
+		const proratedGapSeconds = Math.max(
+			0,
+			expectedByTodaySeconds - totalSeconds,
 		);
 		const workedOnPtoDates: string[] = [];
 		for (const day of weekdays) {
@@ -170,6 +252,17 @@ export function buildTeamSummaries(
 			dailyHours.set(day, seconds / 3600);
 		}
 
+		// On-time classification (ADA-387) — only when a deadline was supplied.
+		const onTimeSeconds = deadline ? member.onTimeSeconds : undefined;
+		const onTimeStatus = deadline
+			? deriveOnTimeStatus({
+					targetSeconds,
+					totalSeconds,
+					onTimeSeconds: member.onTimeSeconds,
+					deadlinePassed,
+				})
+			: undefined;
+
 		summaries.push({
 			email,
 			displayName: member.displayName,
@@ -177,6 +270,10 @@ export function buildTeamSummaries(
 			totalSeconds,
 			targetSeconds,
 			gapSeconds: Math.max(0, targetSeconds - totalSeconds),
+			expectedByTodaySeconds,
+			proratedGapSeconds,
+			onTimeSeconds,
+			onTimeStatus,
 			workedOnPtoDates:
 				workedOnPtoDates.length > 0 ? workedOnPtoDates : undefined,
 		});
@@ -205,11 +302,35 @@ export interface RecurringGapMember {
 	currentLoggedSeconds: number;
 }
 
+/** One week's on-time cell for a member in the RAG grid (ADA-388). `status` is
+ *  null for a week where the member had no row (not on the roster yet). */
+export interface OnTimeHistoryWeek {
+	weekStart: string;
+	weekEnd: string;
+	status: OnTimeStatus | null;
+}
+
+/** A member's on-time record across the trend window (ADA-388). */
+export interface OnTimeHistoryMember {
+	email: string;
+	displayName: string;
+	weeks: OnTimeHistoryWeek[];
+	/** Weeks classified `on-time`. */
+	onTimeWeeks: number;
+	/** Weeks the member had a rated status (appeared in the roster). */
+	ratedWeeks: number;
+	/** The most recent week's status (drives the row's headline chip). */
+	currentStatus: OnTimeStatus | null;
+}
+
 export interface ManagerTrendModel {
 	weeks: TeamTrendPoint[];
 	averageComplianceRate: number;
 	totalTrendGapSeconds: number;
 	recurringGapMembers: RecurringGapMember[];
+	/** Per-member on-time history for the RAG grid. Empty unless a deadline was
+	 *  supplied (the on-time feature is off otherwise). */
+	onTimeHistory: OnTimeHistoryMember[];
 }
 
 export function buildManagerTrendModel(
@@ -218,18 +339,35 @@ export function buildManagerTrendModel(
 	trendWeeks: number,
 	allowedUsers: string,
 	absenceDaysByUser?: UserAbsenceDays,
+	asOf: string = toLocalDateString(new Date()),
+	expectedHours?: ExpectedHoursConfig,
+	// Weekly-deadline config (ADA-388). When provided, each week gets its own
+	// deadline and members carry an on-time status, which feeds the RAG history.
+	deadlineConfig?: { weekday: number; time: string },
+	now: Date = new Date(),
 ): ManagerTrendModel {
 	const weekStarts = Array.from({ length: trendWeeks }, (_, index) =>
 		addDaysToIsoDate(endWeekStart, -7 * (trendWeeks - 1 - index)),
 	);
 	const weekSummaries = weekStarts.map((weekStart) => {
 		const weekEnd = addDaysToIsoDate(weekStart, 6);
+		const deadline = deadlineConfig
+			? computeWeeklyDeadline(
+					weekStart,
+					deadlineConfig.weekday,
+					deadlineConfig.time,
+				)
+			: undefined;
 		const members = buildTeamSummaries(
 			worklogs,
 			weekStart,
 			weekEnd,
 			allowedUsers,
 			absenceDaysByUser,
+			asOf,
+			expectedHours,
+			deadline,
+			now,
 		);
 		const totalSeconds = members.reduce(
 			(sum, member) => sum + member.totalSeconds,
@@ -337,6 +475,55 @@ export function buildManagerTrendModel(
 				)
 			: 0;
 
+	// Per-member on-time history for the RAG grid (ADA-388). Only built when a
+	// deadline was supplied — otherwise members carry no on-time status.
+	const onTimeHistory: OnTimeHistoryMember[] = [];
+	if (deadlineConfig) {
+		const perWeekStatus = weekSummaries.map(({ members }) => {
+			const map = new Map<string, OnTimeStatus | null>();
+			for (const member of members) {
+				const key = member.email || `name:${member.displayName}`;
+				map.set(key, member.onTimeStatus ?? null);
+			}
+			return map;
+		});
+		const keys: string[] = [];
+		const displayNameByKey = new Map<string, string>();
+		const emailByKey = new Map<string, string>();
+		for (const { members } of weekSummaries) {
+			for (const member of members) {
+				const key = member.email || `name:${member.displayName}`;
+				if (!displayNameByKey.has(key)) {
+					keys.push(key);
+					displayNameByKey.set(key, member.displayName);
+					emailByKey.set(key, member.email);
+				}
+			}
+		}
+		for (const key of keys) {
+			const memberWeeks: OnTimeHistoryWeek[] = weekSummaries.map(
+				({ point }, index) => ({
+					weekStart: point.weekStart,
+					weekEnd: point.weekEnd,
+					status: perWeekStatus[index].get(key) ?? null,
+				}),
+			);
+			onTimeHistory.push({
+				email: emailByKey.get(key) ?? '',
+				displayName: displayNameByKey.get(key) ?? key,
+				weeks: memberWeeks,
+				onTimeWeeks: memberWeeks.filter((w) => w.status === 'on-time').length,
+				ratedWeeks: memberWeeks.filter((w) => w.status !== null).length,
+				currentStatus: memberWeeks[memberWeeks.length - 1]?.status ?? null,
+			});
+		}
+		// Worst record first so a lead spots chronic laggards at the top.
+		onTimeHistory.sort((a, b) => {
+			if (a.onTimeWeeks !== b.onTimeWeeks) return a.onTimeWeeks - b.onTimeWeeks;
+			return a.displayName.localeCompare(b.displayName);
+		});
+	}
+
 	return {
 		weeks,
 		averageComplianceRate,
@@ -345,5 +532,6 @@ export function buildManagerTrendModel(
 			0,
 		),
 		recurringGapMembers,
+		onTimeHistory,
 	};
 }

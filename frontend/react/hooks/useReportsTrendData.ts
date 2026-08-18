@@ -101,12 +101,27 @@ export function useReportsTrendData(
 			trendWeeks,
 			config.allowedUsers,
 			absenceQuery.data,
+			// asOf defaults to today inside buildManagerTrendModel.
+			undefined,
+			{
+				defaultDailyHours: config.expectedDailyHours ?? 8,
+				byUser: config.expectedHoursByUser ?? {},
+			},
+			// Weekly-deadline config for the on-time RAG history (ADA-388).
+			{
+				weekday: config.weeklyDeadlineWeekday ?? 5,
+				time: config.weeklyDeadlineTime ?? '18:00',
+			},
 		);
 	}, [
 		worklogsQuery.data,
 		weekStart,
 		trendWeeks,
 		config.allowedUsers,
+		config.expectedDailyHours,
+		config.expectedHoursByUser,
+		config.weeklyDeadlineWeekday,
+		config.weeklyDeadlineTime,
 		absenceQuery.data,
 	]);
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { UserAbsenceDays } from '../../../services/absenceService';
 import type { WorklogItem } from '../../../services/monthWorklogService';
+import { computeWeeklyDeadline } from '../onTimeStatus';
 import { buildManagerTrendModel, buildTeamSummaries } from '../teamReports';
 
 function createWorklog(
@@ -101,6 +102,217 @@ describe('buildTeamSummaries', () => {
 		// gap reflects the same 40h expectation My Week uses.
 		expect(summaries[0]?.targetSeconds).toBe(40 * 3600);
 		expect(summaries[0]?.gapSeconds).toBe((40 - 21.5) * 3600);
+	});
+
+	it('prorates the colored gap to elapsed weekdays for the current week (ADA-477)', () => {
+		// Week Mon 2026-03-02 .. Sun 2026-03-08. As of Tue 2026-03-03 only Mon+Tue
+		// are owed (16h). Alice logged 8h: the full-week gap is 32h (context), but
+		// the colored/prorated gap is only 8h (16h owed − 8h logged). This is what
+		// stops the mid-week "everyone is behind" false alarm.
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					8 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+			undefined,
+			'2026-03-03',
+		);
+
+		expect(summaries[0]?.targetSeconds).toBe(40 * 3600);
+		expect(summaries[0]?.gapSeconds).toBe(32 * 3600);
+		expect(summaries[0]?.expectedByTodaySeconds).toBe(16 * 3600);
+		expect(summaries[0]?.proratedGapSeconds).toBe(8 * 3600);
+	});
+
+	it('does not flag a member behind before any weekday has elapsed (ADA-477)', () => {
+		// asOf is the Sunday BEFORE the week — nothing is owed yet, so the colored
+		// gap is 0 even though the full-week gap is the whole 40h.
+		const summaries = buildTeamSummaries(
+			[],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+			undefined,
+			'2026-03-01',
+		);
+
+		expect(summaries[0]?.gapSeconds).toBe(40 * 3600);
+		expect(summaries[0]?.expectedByTodaySeconds).toBe(0);
+		expect(summaries[0]?.proratedGapSeconds).toBe(0);
+	});
+
+	it('prorated gap equals the full gap once the week has fully elapsed (ADA-477)', () => {
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-02T09:00:00.000+0000',
+					32 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'bob@example.com',
+			undefined,
+			'2026-03-20',
+		);
+
+		expect(summaries[0]?.expectedByTodaySeconds).toBe(40 * 3600);
+		expect(summaries[0]?.proratedGapSeconds).toBe(8 * 3600);
+		expect(summaries[0]?.proratedGapSeconds).toBe(summaries[0]?.gapSeconds);
+	});
+
+	it('applies a per-user expected-hours override so a part-timer has no gap (ADA-392)', () => {
+		// Bob is a 30h/week contractor → 6h/day. He logged 30h; with the default
+		// 8h/day he'd show a 10h gap, but his override makes the target 30h → no
+		// gap and no false "behind" colour.
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-02T09:00:00.000+0000',
+					30 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com,bob@example.com',
+			undefined,
+			'2026-03-20', // fully-elapsed week
+			{ defaultDailyHours: 8, byUser: { 'bob@example.com': 6 } },
+		);
+
+		const alice = summaries.find((s) => s.email === 'alice@example.com');
+		const bob = summaries.find((s) => s.email === 'bob@example.com');
+		expect(alice?.targetSeconds).toBe(40 * 3600);
+		expect(alice?.gapSeconds).toBe(0);
+		expect(bob?.targetSeconds).toBe(30 * 3600);
+		expect(bob?.gapSeconds).toBe(0);
+		expect(bob?.proratedGapSeconds).toBe(0);
+	});
+
+	it('applies the team default daily hours when no override is set (ADA-392)', () => {
+		// Team default of 6h/day → 30h week target for everyone without an override.
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					30 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+			undefined,
+			'2026-03-20',
+			{ defaultDailyHours: 6, byUser: {} },
+		);
+
+		expect(summaries[0]?.targetSeconds).toBe(30 * 3600);
+		expect(summaries[0]?.gapSeconds).toBe(0);
+	});
+
+	it('classifies members on-time / late / incomplete vs. the weekly deadline (ADA-387)', () => {
+		const deadline = computeWeeklyDeadline('2026-03-02', 5, '18:00');
+		const now = new Date('2026-03-10T09:00:00'); // after the Friday deadline
+		const summaries = buildTeamSummaries(
+			[
+				// Alice: full week, no `created` → can't be proven late → on-time.
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+				// Bob: full week, but created after the deadline → late.
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-03T09:00:00.000+0000',
+					40 * 3600,
+					'2026-03-07T09:00:00.000+0000',
+				),
+				// Carol: only 20h and the deadline has passed → incomplete.
+				createWorklog(
+					'carol@example.com',
+					'Carol',
+					'2026-03-02T09:00:00.000+0000',
+					20 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com,bob@example.com,carol@example.com',
+			undefined,
+			'2026-03-20',
+			undefined,
+			deadline,
+			now,
+		);
+
+		const byEmail = (email: string) => summaries.find((s) => s.email === email);
+		expect(byEmail('alice@example.com')?.onTimeStatus).toBe('on-time');
+		expect(byEmail('bob@example.com')?.onTimeStatus).toBe('late');
+		expect(byEmail('carol@example.com')?.onTimeStatus).toBe('incomplete');
+	});
+
+	it('reads pending when incomplete but the deadline is still ahead (ADA-387)', () => {
+		const deadline = computeWeeklyDeadline('2026-03-02', 5, '18:00');
+		const now = new Date('2026-03-04T09:00:00'); // before the deadline
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'dave@example.com',
+					'Dave',
+					'2026-03-02T09:00:00.000+0000',
+					16 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'dave@example.com',
+			undefined,
+			'2026-03-04',
+			undefined,
+			deadline,
+			now,
+		);
+		expect(summaries[0]?.onTimeStatus).toBe('pending');
+	});
+
+	it('omits on-time fields when no deadline is supplied (ADA-387)', () => {
+		const summaries = buildTeamSummaries(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+			],
+			'2026-03-02',
+			'2026-03-08',
+			'alice@example.com',
+		);
+		expect(summaries[0]?.onTimeStatus).toBeUndefined();
+		expect(summaries[0]?.onTimeSeconds).toBeUndefined();
 	});
 
 	it('excludes backdated worklogs from a member weekly total and gap', () => {
@@ -281,6 +493,78 @@ describe('buildManagerTrendModel', () => {
 				currentLoggedSeconds: 24 * 3600,
 			},
 		]);
+	});
+
+	it('builds per-member on-time history for the RAG grid (ADA-388)', () => {
+		const now = new Date('2026-03-20T09:00:00'); // after both weeks' deadlines
+		const model = buildManagerTrendModel(
+			[
+				// Week of 2026-03-02: Alice full (on-time), Bob short (incomplete).
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-02T09:00:00.000+0000',
+					16 * 3600,
+				),
+				// Week of 2026-03-09: both full + on-time.
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-09T09:00:00.000+0000',
+					40 * 3600,
+				),
+				createWorklog(
+					'bob@example.com',
+					'Bob',
+					'2026-03-09T09:00:00.000+0000',
+					40 * 3600,
+				),
+			],
+			'2026-03-09',
+			2,
+			'alice@example.com,bob@example.com',
+			undefined,
+			'2026-03-20',
+			undefined,
+			{ weekday: 5, time: '18:00' },
+			now,
+		);
+
+		expect(model.onTimeHistory).toHaveLength(2);
+		const alice = model.onTimeHistory.find(
+			(m) => m.email === 'alice@example.com',
+		);
+		const bob = model.onTimeHistory.find((m) => m.email === 'bob@example.com');
+		expect(alice?.weeks.map((w) => w.status)).toEqual(['on-time', 'on-time']);
+		expect(alice?.onTimeWeeks).toBe(2);
+		expect(bob?.weeks.map((w) => w.status)).toEqual(['incomplete', 'on-time']);
+		expect(bob?.onTimeWeeks).toBe(1);
+		expect(bob?.ratedWeeks).toBe(2);
+		// Worst record first → Bob before Alice.
+		expect(model.onTimeHistory[0]?.email).toBe('bob@example.com');
+	});
+
+	it('leaves on-time history empty when no deadline config is supplied (ADA-388)', () => {
+		const model = buildManagerTrendModel(
+			[
+				createWorklog(
+					'alice@example.com',
+					'Alice',
+					'2026-03-02T09:00:00.000+0000',
+					40 * 3600,
+				),
+			],
+			'2026-03-02',
+			1,
+			'alice@example.com',
+		);
+		expect(model.onTimeHistory).toEqual([]);
 	});
 
 	it('floors complianceRate so it never reads 100 while a member has a gap (ADA-458)', () => {

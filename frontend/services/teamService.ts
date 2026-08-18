@@ -20,6 +20,22 @@ export interface TeamMemberSummary {
 	/** Dates (YYYY-MM-DD) where the member logged work on a PTO/holiday day.
 	 *  Drives the "worked on PTO" badge in the team weekly view. */
 	workedOnPtoDates?: string[];
+	/** Target owed for weekdays that have already elapsed by "today" (absence-
+	 *  aware). This — not the full-week `targetSeconds` — is what the RED/OK
+	 *  coloring is derived from, so a member isn't flagged "behind" mid-week for
+	 *  hours not yet owed (ADA-477). Optional: producers that don't prorate
+	 *  (fixtures) omit it and consumers fall back to `gapSeconds`. */
+	expectedByTodaySeconds?: number;
+	/** `max(0, expectedByTodaySeconds - totalSeconds)`. The colored "behind
+	 *  schedule" signal. Equals `gapSeconds` once the week has fully elapsed. */
+	proratedGapSeconds?: number;
+	/** Seconds among `totalSeconds` whose worklog was *created* on or before the
+	 *  weekly deadline (ADA-387). Drives the on-time classification. Undefined
+	 *  when no deadline was supplied to the builder. */
+	onTimeSeconds?: number;
+	/** on-time / late / incomplete / pending vs. the weekly deadline (ADA-387).
+	 *  Undefined when no deadline was supplied. */
+	onTimeStatus?: import('../react/utils/onTimeStatus').OnTimeStatus;
 }
 
 const SECONDS_PER_DAY = 28800; // 8h

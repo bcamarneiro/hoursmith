@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { WorklogFetchProgress } from '../../../types/worklogLoading';
 import { useConfigStore } from '../../stores/useConfigStore';
+import { computeWeeklyDeadline } from '../utils/onTimeStatus';
 import { buildTeamSummaries } from '../utils/teamReports';
 import { useAbsenceDaysByUser } from './useAbsenceDays';
 import { useMonthWorklogs } from './useMonthWorklogs';
@@ -79,6 +80,18 @@ export function useTeamData(
 			weekEnd,
 			config.allowedUsers,
 			absenceDaysByUser,
+			// asOf defaults to today inside buildTeamSummaries.
+			undefined,
+			{
+				defaultDailyHours: config.expectedDailyHours ?? 8,
+				byUser: config.expectedHoursByUser ?? {},
+			},
+			// Weekly deadline for the on-time classification (ADA-387).
+			computeWeeklyDeadline(
+				weekStart,
+				config.weeklyDeadlineWeekday ?? 5,
+				config.weeklyDeadlineTime ?? '18:00',
+			),
 		);
 	}, [
 		month1.data,
@@ -87,6 +100,10 @@ export function useTeamData(
 		weekStart,
 		weekEnd,
 		config.allowedUsers,
+		config.expectedDailyHours,
+		config.expectedHoursByUser,
+		config.weeklyDeadlineWeekday,
+		config.weeklyDeadlineTime,
 		absenceDaysByUser,
 		isLoading,
 	]);

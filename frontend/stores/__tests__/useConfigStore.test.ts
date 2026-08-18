@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	CONFIG_STORAGE_VERSION,
-	Config,
+	type Config,
 	createDefaultConfig,
 	migratePersistedConfigState,
 	normalizeConfig,
@@ -234,5 +234,128 @@ describe('tempo config fields', () => {
 			normalizeConfig({ tempoMode: 'nonsense' } as unknown as Partial<Config>)
 				.tempoMode,
 		).toBe('auto');
+	});
+});
+
+describe('expected-hours config (ADA-392)', () => {
+	it('defaults to 8h/day and an empty override map', () => {
+		const c = createDefaultConfig();
+		expect(c.expectedDailyHours).toBe(8);
+		expect(c.expectedHoursByUser).toEqual({});
+	});
+
+	it('fills the 8h default for a pre-v9 blob missing the field', () => {
+		expect(normalizeConfig({}).expectedDailyHours).toBe(8);
+		expect(normalizeConfig({}).expectedHoursByUser).toEqual({});
+	});
+
+	it('clamps a valid daily-hours value and rejects out-of-range / non-numbers', () => {
+		expect(normalizeConfig({ expectedDailyHours: 6 }).expectedDailyHours).toBe(
+			6,
+		);
+		// Above 24h is clamped to 24.
+		expect(normalizeConfig({ expectedDailyHours: 40 }).expectedDailyHours).toBe(
+			24,
+		);
+		// Zero / negative / non-number fall back to the 8h default.
+		expect(normalizeConfig({ expectedDailyHours: 0 }).expectedDailyHours).toBe(
+			8,
+		);
+		expect(normalizeConfig({ expectedDailyHours: -3 }).expectedDailyHours).toBe(
+			8,
+		);
+		expect(
+			normalizeConfig({
+				expectedDailyHours: 'eight' as unknown as number,
+			}).expectedDailyHours,
+		).toBe(8);
+	});
+
+	it('lowercases override emails and drops invalid entries', () => {
+		const c = normalizeConfig({
+			expectedHoursByUser: {
+				'Bob@Example.com': 6,
+				'  alice@example.com  ': 4,
+				'invalid@example.com': 0,
+				'toohigh@example.com': 30,
+				'nan@example.com': Number.NaN,
+			},
+		});
+		expect(c.expectedHoursByUser).toEqual({
+			'bob@example.com': 6,
+			'alice@example.com': 4,
+		});
+	});
+});
+
+describe('weekly-deadline config (ADA-387)', () => {
+	it('defaults to Friday 18:00', () => {
+		const c = createDefaultConfig();
+		expect(c.weeklyDeadlineWeekday).toBe(5);
+		expect(c.weeklyDeadlineTime).toBe('18:00');
+		// Pre-v10 blobs missing the fields get the same defaults.
+		expect(normalizeConfig({}).weeklyDeadlineWeekday).toBe(5);
+		expect(normalizeConfig({}).weeklyDeadlineTime).toBe('18:00');
+	});
+
+	it('accepts a valid weekday + time and rejects out-of-range values', () => {
+		const c = normalizeConfig({
+			weeklyDeadlineWeekday: 3,
+			weeklyDeadlineTime: '9:05',
+		});
+		expect(c.weeklyDeadlineWeekday).toBe(3);
+		// Zero-pads the hour.
+		expect(c.weeklyDeadlineTime).toBe('09:05');
+
+		// Out-of-range weekday / non-integer / bad time fall back to defaults.
+		expect(
+			normalizeConfig({ weeklyDeadlineWeekday: 0 }).weeklyDeadlineWeekday,
+		).toBe(5);
+		expect(
+			normalizeConfig({ weeklyDeadlineWeekday: 8 }).weeklyDeadlineWeekday,
+		).toBe(5);
+		expect(
+			normalizeConfig({ weeklyDeadlineWeekday: 2.5 }).weeklyDeadlineWeekday,
+		).toBe(5);
+		expect(
+			normalizeConfig({ weeklyDeadlineTime: '25:00' }).weeklyDeadlineTime,
+		).toBe('18:00');
+		expect(
+			normalizeConfig({ weeklyDeadlineTime: 'notatime' }).weeklyDeadlineTime,
+		).toBe('18:00');
+	});
+});
+
+describe('monthly-deadline config (ADA-549)', () => {
+	it('defaults to the 3rd working day at 18:00', () => {
+		const c = createDefaultConfig();
+		expect(c.monthlyDeadlineDay).toBe(3);
+		expect(c.monthlyDeadlineTime).toBe('18:00');
+		// Pre-v11 blobs missing the fields get the same defaults.
+		expect(normalizeConfig({}).monthlyDeadlineDay).toBe(3);
+		expect(normalizeConfig({}).monthlyDeadlineTime).toBe('18:00');
+	});
+
+	it('accepts a valid working-day ordinal + time and rejects out-of-range values', () => {
+		const c = normalizeConfig({
+			monthlyDeadlineDay: 5,
+			monthlyDeadlineTime: '9:05',
+		});
+		expect(c.monthlyDeadlineDay).toBe(5);
+		expect(c.monthlyDeadlineTime).toBe('09:05');
+
+		// Out-of-range / non-integer ordinals fall back to the default (3).
+		expect(normalizeConfig({ monthlyDeadlineDay: 0 }).monthlyDeadlineDay).toBe(
+			3,
+		);
+		expect(normalizeConfig({ monthlyDeadlineDay: 21 }).monthlyDeadlineDay).toBe(
+			3,
+		);
+		expect(
+			normalizeConfig({ monthlyDeadlineDay: 2.5 }).monthlyDeadlineDay,
+		).toBe(3);
+		expect(
+			normalizeConfig({ monthlyDeadlineTime: '25:00' }).monthlyDeadlineTime,
+		).toBe('18:00');
 	});
 });
