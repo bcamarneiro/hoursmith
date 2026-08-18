@@ -26,6 +26,7 @@ type Props = {
 	includeAbsenceInCsv: boolean;
 	includeCsvProvenance: boolean;
 	analyticsOptOut: boolean;
+	memoryJogEnabled: boolean;
 	handleSelectChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 	handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 	themeId: string;
@@ -33,6 +34,7 @@ type Props = {
 	includeAbsenceInCsvId: string;
 	includeCsvProvenanceId: string;
 	analyticsOptOutId: string;
+	memoryJogEnabledId: string;
 };
 
 /**
@@ -45,6 +47,7 @@ export const PreferencesSection: React.FC<Props> = ({
 	includeAbsenceInCsv,
 	includeCsvProvenance,
 	analyticsOptOut,
+	memoryJogEnabled,
 	handleSelectChange,
 	handleChange,
 	themeId,
@@ -52,6 +55,7 @@ export const PreferencesSection: React.FC<Props> = ({
 	includeAbsenceInCsvId,
 	includeCsvProvenanceId,
 	analyticsOptOutId,
+	memoryJogEnabledId,
 }) => {
 	// ADA-451: apply the selected theme live as the user changes it, instead of
 	// only after Save. On unmount (e.g. navigating away without saving) restore
@@ -144,6 +148,22 @@ export const PreferencesSection: React.FC<Props> = ({
 				<small>
 					When checked, Hoursmith stops sending anonymous, privacy-preserving
 					product analytics. No personal data or Jira content is ever collected.
+				</small>
+			</div>
+			<div className={styles.formGroup}>
+				<label>
+					<input
+						type="checkbox"
+						id={memoryJogEnabledId}
+						name="memoryJogEnabled"
+						checked={memoryJogEnabled}
+						onChange={handleChange}
+					/>{' '}
+					Show memory-jog questions on incomplete days
+				</label>
+				<small>
+					Displays contextual prompts on day cards that aren&apos;t fully logged
+					to help you recall unlogged work. Off by default.
 				</small>
 			</div>
 		</fieldset>

@@ -176,6 +176,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const includeAbsenceInCsvId = useId();
 	const includeCsvProvenanceId = useId();
 	const analyticsOptOutId = useId();
+	const memoryJogEnabledId = useId();
 	const isDirty = JSON.stringify(formData) !== JSON.stringify(savedConfig);
 	const canTestJira =
 		!!formData.jiraHost.trim() &&
@@ -563,6 +564,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							includeAbsenceInCsv={formData.includeAbsenceInCsv}
 							includeCsvProvenance={formData.includeCsvProvenance}
 							analyticsOptOut={formData.analyticsOptOut ?? false}
+							memoryJogEnabled={formData.memoryJogEnabled ?? false}
 							handleSelectChange={handleSelectChange}
 							handleChange={handleChange}
 							themeId={themeId}
@@ -570,6 +572,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							includeAbsenceInCsvId={includeAbsenceInCsvId}
 							includeCsvProvenanceId={includeCsvProvenanceId}
 							analyticsOptOutId={analyticsOptOutId}
+							memoryJogEnabledId={memoryJogEnabledId}
 						/>
 					</div>
 

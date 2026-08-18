@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from 'react';
 import type { DaySummary, LoggedWorklog } from '../../../../types/Suggestion';
+import { useConfigStore } from '../../../stores/useConfigStore';
 import { useDashboardStore } from '../../../stores/useDashboardStore';
 import { useWorklogOperations } from '../../hooks/useWorklogOperations';
 import { getAbsenceKindLabel } from '../../utils/absence';
@@ -10,6 +11,7 @@ import {
 	withLocalOffset,
 } from '../../utils/date';
 import { formatHours, formatJiraTimeSpent } from '../../utils/format';
+import { generateMemoryJogQuestions } from '../../utils/memoryJogger';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
 import { toast } from '../ui/Toast';
@@ -17,6 +19,7 @@ import { WorklogForm } from '../worklog/WorklogForm';
 import { CloneWorklogPopover } from './CloneWorklogPopover';
 import * as styles from './DayCard.module.css';
 import { DayNote } from './DayNote';
+import { MemoryJogger } from './MemoryJogger';
 import { SuggestionCard } from './SuggestionCard';
 
 type Props = {
@@ -52,6 +55,11 @@ export const DayCard = memo<Props>(function DayCard({
 }) {
 	const fillDayGap = useDashboardStore((s) => s.fillDayGap);
 	const weekGhosts = useDashboardStore((s) => s.weekGhosts);
+	const memoryJogEnabled = useConfigStore((s) => s.config.memoryJogEnabled);
+	const memoryJogQuestions = useMemo(
+		() => (memoryJogEnabled ? generateMemoryJogQuestions(day) : []),
+		[memoryJogEnabled, day],
+	);
 	const dayGhosts = useMemo(
 		() => weekGhosts.filter((g) => g.date === day.date),
 		[weekGhosts, day.date],
@@ -529,6 +537,10 @@ export const DayCard = memo<Props>(function DayCard({
 								</ul>
 							)}
 						</div>
+					)}
+
+					{memoryJogQuestions.length > 0 && (
+						<MemoryJogger questions={memoryJogQuestions} />
 					)}
 				</>
 			)}

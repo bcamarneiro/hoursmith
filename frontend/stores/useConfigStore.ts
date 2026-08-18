@@ -68,6 +68,12 @@ export interface Config {
 	 * compiling — `createDefaultConfig`/`normalizeConfig` always populate it.
 	 */
 	analyticsOptOut?: boolean;
+	/**
+	 * When true, DayCard renders a collapsible "Need a hint?" section with
+	 * contextual memory-jog questions to help users recall unlogged work on
+	 * incomplete days. Default false (off — users opt in via Preferences).
+	 */
+	memoryJogEnabled?: boolean;
 }
 
 interface ConfigState {
@@ -75,7 +81,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 7;
+export const CONFIG_STORAGE_VERSION = 8;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -187,6 +193,7 @@ export function createDefaultConfig(): Config {
 		includeAbsenceInCsv: true,
 		includeCsvProvenance: false,
 		analyticsOptOut: false,
+		memoryJogEnabled: false,
 	};
 }
 
@@ -291,6 +298,10 @@ export function normalizeConfig(
 			typeof config?.analyticsOptOut === 'boolean'
 				? config.analyticsOptOut
 				: fallback.analyticsOptOut,
+		memoryJogEnabled:
+			typeof config?.memoryJogEnabled === 'boolean'
+				? config.memoryJogEnabled
+				: fallback.memoryJogEnabled,
 	};
 }
 
@@ -307,6 +318,8 @@ export function normalizeConfig(
  *        migrate step is a no-op pass-through normaliser.
  *   v7 → added analyticsOptOut (boolean, default false). No shape change;
  *        `normalizeConfig` fills the field for pre-v7 blobs.
+ *   v8 → added memoryJogEnabled (boolean, default false). No shape change;
+ *        `normalizeConfig` fills the field for pre-v8 blobs.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -314,7 +327,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v7(
+function migrateLegacy_v0_to_v8(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -328,7 +341,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v7(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v8(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and
