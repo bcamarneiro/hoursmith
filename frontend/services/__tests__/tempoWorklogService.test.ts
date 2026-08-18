@@ -263,3 +263,52 @@ describe('fetchTeamMonthWorklogsTempo (ADA-545)', () => {
 		expect(bob?.author?.emailAddress).toBe('acc-bob');
 	});
 });
+
+describe('user JQL filter on the Tempo read path', () => {
+	const twoIssues = {
+		results: [
+			{
+				tempoWorklogId: 1,
+				issue: { id: 1001 },
+				timeSpentSeconds: 3600,
+				startDate: '2026-07-06',
+				startTime: '09:00:00',
+				createdAt: '2026-07-06T09:00:00Z',
+				author: { accountId: 'acc-1' },
+			},
+			{
+				tempoWorklogId: 2,
+				issue: { id: 2002 },
+				timeSpentSeconds: 3600,
+				startDate: '2026-07-07',
+				startTime: '09:00:00',
+				createdAt: '2026-07-07T09:00:00Z',
+				author: { accountId: 'acc-1' },
+			},
+		],
+	};
+
+	// Jira returns only the issue that satisfies the filter.
+	const onlyFirstMatches = {
+		issues: [{ id: '1001', key: 'PAY-1', fields: { summary: 'kept' } }],
+	};
+
+	it('drops worklogs whose issue the filter excluded', async () => {
+		routeFetch({ tempo: twoIssues, jiraSearch: onlyFirstMatches });
+		const out = await fetchMonthWorklogsTempo(
+			{ ...config, jqlFilter: 'project = PAY' } as never,
+			2026,
+			6,
+		);
+		expect(out).toHaveLength(1);
+		expect(out[0]?.issue.key).toBe('PAY-1');
+	});
+
+	it('keeps worklogs with a placeholder when no filter is configured', async () => {
+		routeFetch({ tempo: twoIssues, jiraSearch: onlyFirstMatches });
+		const out = await fetchMonthWorklogsTempo(config as never, 2026, 6);
+		// Without a filter, a missing issue means Jira metadata was unavailable —
+		// dropping the worklog there would silently undercount real hours.
+		expect(out).toHaveLength(2);
+	});
+});

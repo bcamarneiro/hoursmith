@@ -16,6 +16,9 @@ export interface TempoServiceConfig {
 	apiToken: string;
 	corsProxy: string;
 	tempoApiToken: string;
+	/** User's saved JQL filter. Tempo has no JQL, so it is applied via the
+	 * Jira issue-metadata lookup rather than dropped (see tempoMapper). */
+	jqlFilter?: string;
 }
 
 function pad(n: number): string {
@@ -86,7 +89,17 @@ async function enrichAndMap(
 ): Promise<EnrichedJiraWorklog[]> {
 	const ids = worklogs.map((w) => String(w.issue.id));
 	const issueMap = await fetchIssueMetadata(ids, config, signal);
-	return worklogs.map((w) => {
+	// With a filter configured, an issue missing from the map means Jira
+	// excluded it — drop those worklogs. Without one, a miss means metadata was
+	// unavailable, and dropping would silently undercount real hours, so the
+	// mapper's placeholder is the right answer instead.
+	const filtering = Boolean(
+		(config as { jqlFilter?: string }).jqlFilter?.trim(),
+	);
+	const visible = filtering
+		? worklogs.filter((w) => issueMap.has(String(w.issue.id)))
+		: worklogs;
+	return visible.map((w) => {
 		// Personal reads are all the signed-in user, so config.email is right.
 		// Team reads must not do that: the completeness table groups by email, so
 		// stamping one address on every row would merge the whole team into one

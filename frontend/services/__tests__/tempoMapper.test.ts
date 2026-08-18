@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { JiraIssue } from '../../../types/jira';
 import { classifyWorklog } from '../../react/utils/worklogClassifier';
 import {
+	buildIssueMetadataJql,
 	chunkIds,
 	deriveOffsetSuffix,
 	mapTempoWorklog,
@@ -191,5 +192,29 @@ describe('deriveOffsetSuffix', () => {
 		expect(
 			deriveOffsetSuffix('2026-07-27', '09:00:00', '2026-07-25T09:00:00Z'),
 		).toBe('');
+	});
+});
+
+describe('buildIssueMetadataJql — honouring the user JQL filter on Tempo', () => {
+	it('restricts to the requested issue ids when no filter is configured', () => {
+		expect(buildIssueMetadataJql(['1', '2'], '')).toBe('issue in (1,2)');
+	});
+
+	it('ANDs a configured filter so it is not silently ignored', () => {
+		// Tempo has no JQL, so a configured filter would otherwise vanish and the
+		// user would see worklogs they had explicitly filtered out.
+		expect(buildIssueMetadataJql(['1'], 'project = PAY')).toBe(
+			'issue in (1) AND (project = PAY)',
+		);
+	});
+
+	it('parenthesises the filter so an OR cannot widen the id restriction', () => {
+		expect(buildIssueMetadataJql(['1'], 'a = 1 OR b = 2')).toBe(
+			'issue in (1) AND (a = 1 OR b = 2)',
+		);
+	});
+
+	it('ignores a whitespace-only filter', () => {
+		expect(buildIssueMetadataJql(['1'], '   ')).toBe('issue in (1)');
 	});
 });

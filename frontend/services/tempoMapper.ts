@@ -120,15 +120,34 @@ export function chunkIds(ids: string[], size: number): string[][] {
  * stay under JQL/URL limits. Missing issues are simply absent from the map; the
  * mapper substitutes a placeholder so the worklog is never dropped.
  */
+/**
+ * Build the JQL for the issue-metadata lookup, folding in the user's configured
+ * filter.
+ *
+ * Tempo speaks no JQL, so a configured `jqlFilter` has nowhere to go on the
+ * Tempo read path and was previously dropped without a word — the user saw
+ * worklogs they had explicitly filtered out. Since this lookup already asks
+ * Jira about exactly these issues, ANDing the filter here makes non-matching
+ * issues absent from the map, and the caller drops their worklogs.
+ *
+ * The filter is parenthesised so a top-level `OR` inside it cannot widen the
+ * `issue in (...)` restriction.
+ */
+export function buildIssueMetadataJql(ids: string[], jqlFilter = ''): string {
+	const base = `issue in (${ids.join(',')})`;
+	const filter = jqlFilter.trim();
+	return filter ? `${base} AND (${filter})` : base;
+}
+
 export async function fetchIssueMetadata(
 	ids: string[],
-	config: Parameters<typeof searchAllIssues>[0],
+	config: Parameters<typeof searchAllIssues>[0] & { jqlFilter?: string },
 	signal?: AbortSignal,
 ): Promise<Map<string, JiraIssue>> {
 	const map = new Map<string, JiraIssue>();
 	for (const chunk of chunkIds([...new Set(ids)], 100)) {
 		if (chunk.length === 0) continue;
-		const jql = `issue in (${chunk.join(',')})`;
+		const jql = buildIssueMetadataJql(chunk, config.jqlFilter);
 		const issues = await searchAllIssues<JiraIssue>(
 			config,
 			{
