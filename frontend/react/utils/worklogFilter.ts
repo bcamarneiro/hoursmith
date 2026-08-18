@@ -1,6 +1,6 @@
 import type { JiraWorklog } from '../../../types/jira';
-import { classifyWorklog } from './worklogClassifier';
 import { isWeekend, wallClockDay } from './date';
+import { classifyWorklog } from './worklogClassifier';
 
 /** Categories for why a worklog entry should be skipped during summation. */
 export type SkipReason = 'backdated' | 'flagged';
