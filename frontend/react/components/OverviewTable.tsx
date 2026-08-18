@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import type { EnrichedJiraWorklog } from '../../../types/jira';
 import type { UserAbsenceDays } from '../../services/absenceService';
 import { getWorkdayDatesInMonth, isDateInMonth } from '../utils/date';
-import { sumWeekdayTargetSeconds } from '../utils/dayTarget';
+import { sumWeekdayTargetSeconds, isFlaggedDate } from '../utils/dayTarget';
 import { computeCompliancePct } from '../utils/format';
 import { getInitials } from '../utils/text';
 import { classifyWorklog } from '../utils/worklogClassifier';
@@ -61,9 +61,14 @@ export const OverviewTable: React.FC<Props> = ({
 			// The outer date key from `deriveMonthlyReportState` is already
 			// `classifyWorklog(wl).loggedOn` (ADA-219). Backdated entries are
 			// excluded from totals — they show as a side note / ghost only.
+			// Holiday/PTO dates are also skipped — worklogs on flagged dates
+			// don't count toward monthly hours.
+			const absenceMap = absenceDaysByUser?.get(userEmails[user] ?? '');
 			for (const [dateKey, worklogs] of Object.entries(days)) {
 				if (!dateKey) continue;
 				if (!isDateInMonth(dateKey, year, monthZeroIndexed)) continue;
+				const absenceDay = absenceMap?.get(dateKey);
+				if (absenceDay && isFlaggedDate(absenceDay.kind)) continue;
 				for (const wl of worklogs) {
 					if (classifyWorklog(wl).isBackdated) continue;
 					const seconds = wl.timeSpentSeconds ?? 0;
@@ -73,7 +78,6 @@ export const OverviewTable: React.FC<Props> = ({
 				}
 			}
 
-			const absenceMap = absenceDaysByUser?.get(userEmails[user] ?? '');
 			const targetSeconds = sumWeekdayTargetSeconds(
 				workdayDates,
 				(d) => absenceMap?.has(d) ?? false,

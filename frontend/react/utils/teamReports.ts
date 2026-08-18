@@ -7,7 +7,7 @@ import {
 	parseIsoDateLocal,
 	toLocalDateString,
 } from './date';
-import { sumWeekdayTargetSeconds } from './dayTarget';
+import { sumWeekdayTargetSeconds, isFlaggedDate } from './dayTarget';
 import { classifyWorklog } from './worklogClassifier';
 
 function isWeekday(dateStr: string): boolean {
@@ -82,6 +82,11 @@ export function buildTeamSummaries(
 		// Backdated worklogs don't count toward weekly totals — see
 		// AGENTS.md ghost-reconciliation invariant.
 		if (c.isBackdated) continue;
+
+		// Holiday/PTO worklogs are excluded from weekly totals entirely.
+		// Flagged dates (holiday, vacation, off) are not logged time.
+		const memberAbsenceDay = email ? absenceDaysByUser?.get(email)?.get(day) : undefined;
+		if (memberAbsenceDay && isFlaggedDate(memberAbsenceDay.kind)) continue;
 
 		let groupKey: string;
 		if (accountId) {

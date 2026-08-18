@@ -1,21 +1,27 @@
 import { useMemo } from 'react';
 import type { JiraWorklog } from '../../../types/JiraWorklog';
-import { computeDayTargetSeconds } from '../utils/dayTarget';
+import type { AbsenceKind } from '../../../types/absence';
+import { computeDayTargetSeconds, isFlaggedDate } from '../utils/dayTarget';
 import { classifyWorklog } from '../utils/worklogClassifier';
 
 export function useDayCalculation(
 	worklogs: JiraWorklog[],
 	isWeekend: boolean,
 	isAbsent = false,
+	absenceKind?: AbsenceKind,
 ) {
 	const calculations = useMemo(() => {
+		// Flagged dates (holiday/PTO) are excluded from the calculation loop —
+		// their worklog entries don't contribute to the day's totals.
+		const isHolidayOrPto = absenceKind ? isFlaggedDate(absenceKind) : false;
+
 		let countedSeconds = 0;
 		let backdatedSeconds = 0;
 		for (const wl of worklogs) {
 			const seconds = wl.timeSpentSeconds ?? 0;
 			if (classifyWorklog(wl).isBackdated) {
 				backdatedSeconds += seconds;
-			} else {
+			} else if (!isHolidayOrPto) {
 				countedSeconds += seconds;
 			}
 		}

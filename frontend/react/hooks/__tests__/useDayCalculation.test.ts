@@ -113,6 +113,31 @@ describe('useDayCalculation', () => {
 			expect(result.current.baselineSeconds).toBe(0);
 			expect(result.current.missingSeconds).toBe(0);
 		});
+
+		it('filters holiday/vacation worklogs out of day total', () => {
+			const worklogs = [createMockWorklog(14400, '2025-10-15T09:00:00.000Z')];
+
+			const { result } = renderHook(() =>
+				useDayCalculation(worklogs, false, true, 'holiday'),
+			);
+
+			expect(result.current.dayTotalSeconds).toBe(0);
+			expect(result.current.effectiveSeconds).toBe(0);
+			expect(result.current.missingSeconds).toBe(0);
+		});
+
+		it('does not filter sick-day worklogs (partial-day behavior)', () => {
+			const worklogs = [createMockWorklog(14400, '2025-10-15T09:00:00.000Z')];
+
+			const { result } = renderHook(() =>
+				useDayCalculation(worklogs, false, true, 'sick'),
+			);
+
+			expect(result.current.dayTotalSeconds).toBe(14400);
+			expect(result.current.effectiveSeconds).toBe(14400);
+			expect(result.current.baselineSeconds).toBe(14400);
+			expect(result.current.missingSeconds).toBe(0);
+		});
 	});
 
 	describe('backdated worklogs', () => {

@@ -1,6 +1,20 @@
+import type { AbsenceKind } from '../../types/absence';
 import { BASELINE_HOURS } from '../constants/timesheet';
 
 export const BASELINE_DAY_SECONDS = BASELINE_HOURS * 3600;
+
+/**
+ * Return true when an absence kind is a holiday or PTO (vacation/off).
+ * Worklog entries on these dates should be excluded from hour totals
+ * (filtered out of the calculation loop).
+ */
+export function isFlaggedDate(kind?: AbsenceKind): boolean {
+	return (
+		kind === 'holiday' ||
+		kind === 'vacation' ||
+		kind === 'off'
+	);
+}
 
 /**
  * Single source of truth for "what is this day's target?".
@@ -8,12 +22,11 @@ export const BASELINE_DAY_SECONDS = BASELINE_HOURS * 3600;
  * Rules:
  * - Weekend → 0 (no expectation regardless of absence/work).
  * - Weekday, not absent → BASELINE_DAY_SECONDS (full 8h target).
- * - Weekday, absent, 0h logged → 0 (full day off; 100% compliant).
- * - Weekday, absent, 0 < X ≤ 8h logged → X (partial day; still 100% compliant).
- * - Weekday, absent, > 8h logged → BASELINE_DAY_SECONDS (overtime past PTO).
- *
- * Holidays use the same `isAbsent` channel, so a worked-on-holiday is treated
- * the same as a worked-on-vacation.
+ * - Weekday, absent (holiday/PTO) → 0 (flagged dates are filtered out of
+ *   the calculation loop entirely; worklogs on these dates do not count).
+ * - Weekday, absent (sick), 0h logged → 0 (full sick day).
+ * - Weekday, absent (sick), 0 < X ≤ 8h logged → X (partial day).
+ * - Weekday, absent (sick), > 8h logged → BASELINE_DAY_SECONDS (overtime).
  */
 export function computeDayTargetSeconds(
 	isWeekend: boolean,
