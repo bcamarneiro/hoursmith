@@ -220,6 +220,39 @@ function buildSearchIssues(jql: string, fields: string) {
 }
 
 // ── MSW Handlers ────────────────────────────────────────────────────
+// ── Tempo fixtures ──────────────────────────────────────────────────
+/**
+ * A day in the *previous* week, so the seeded Tempo worklogs are always
+ * "worked earlier, logged today" — i.e. genuinely late. That is what makes
+ * the mapper's `createdAt` handling observable in an e2e test.
+ */
+const TEMPO_BACKDATED_DAY = addDaysToIsoDate(prevMonday, 1);
+
+function tempoWorklog(
+	id: number,
+	accountId: string,
+	startDate: string,
+	startTime: string,
+) {
+	return {
+		tempoWorklogId: id,
+		issue: { self: 'https://mock/rest/api/2/issue/10001', id: 10001 },
+		timeSpentSeconds: 3600,
+		billableSeconds: 3600,
+		startDate,
+		startTime,
+		// Local start expressed in UTC — the pair is what lets the mapper
+		// recover the author's offset.
+		startDateTimeUtc: `${startDate}T${startTime}Z`,
+		// Logged today: several days after the work happened.
+		createdAt: `${toLocalDateString(new Date())}T09:12:42Z`,
+		updatedAt: `${toLocalDateString(new Date())}T09:12:50Z`,
+		description: 'Tempo-managed work',
+		author: { accountId },
+		attributes: { values: [] },
+	};
+}
+
 export const handlers = [
 	// Cloud search — `/rest/api/3/search/jql` (CHANGE-2046 replacement for the
 	// removed v2 `/search`). Cursor-paginated in production; the mock returns a
@@ -435,4 +468,78 @@ export const handlers = [
 			return new HttpResponse(null, { status: 204 });
 		},
 	),
+
+	// Current user. `resolveAccountId` calls this before every per-user Tempo
+	// read, so without it the Tempo personal path dies before reaching Tempo at
+	// all — and the failure surfaces as a generic "can't reach Jira" banner,
+	// which points at the wrong thing entirely.
+	http.get('https://*.atlassian.net/rest/api/2/myself', () => {
+		return HttpResponse.json(devUser);
+	}),
+
+	http.get('https://*.atlassian.net/rest/api/3/myself', () => {
+		return HttpResponse.json(devUser);
+	}),
+
+	// ─────────────────────────────────────────────────────────────────
+	// Tempo Cloud v4 (ADA-542). Offline mode serves these so the Tempo
+	// read/write path is exercisable end-to-end without a real instance.
+	//
+	// Payload shape mirrors what a live instance returned on 2026-08-18:
+	// `issue` carries id only (no key), `startTime` has no offset, and the
+	// real logging time lives in `createdAt` — the fields the mapper depends
+	// on to report lateness correctly.
+	// ─────────────────────────────────────────────────────────────────
+
+	// Per-user read — the personal surfaces (My Week, heatmap).
+	http.get('https://api.tempo.io/4/worklogs/user/:accountId', () => {
+		logger.debug('[MSW] Tempo per-user worklogs');
+		return HttpResponse.json({
+			metadata: { count: 1, offset: 0, limit: 1000 },
+			results: [tempoWorklog(1, 'dev001', TEMPO_BACKDATED_DAY, '09:00:00')],
+		});
+	}),
+
+	// Non-user-scoped read — Reports and team completeness (ADA-545). Returns
+	// several authors so a regression to the per-user endpoint is visible.
+	http.get('https://api.tempo.io/4/worklogs', () => {
+		logger.debug('[MSW] Tempo team worklogs');
+		return HttpResponse.json({
+			metadata: { count: 3, offset: 0, limit: 1000 },
+			results: [
+				tempoWorklog(1, 'dev001', TEMPO_BACKDATED_DAY, '09:00:00'),
+				tempoWorklog(2, 'teammate-a', TEMPO_BACKDATED_DAY, '10:00:00'),
+				tempoWorklog(3, 'teammate-b', TEMPO_BACKDATED_DAY, '11:00:00'),
+			],
+		});
+	}),
+
+	// Bulk user lookup so team rows get real emails rather than accountIds.
+	http.get('https://*.atlassian.net/rest/api/3/user/bulk', () => {
+		return HttpResponse.json({
+			values: [
+				{ accountId: 'dev001', emailAddress: 'dev@example.com' },
+				{ accountId: 'teammate-a', emailAddress: 'alice@example.com' },
+				{ accountId: 'teammate-b', emailAddress: 'bob@example.com' },
+			],
+		});
+	}),
+
+	http.post('https://api.tempo.io/4/worklogs', async ({ request }) => {
+		const body = (await request.json()) as Record<string, unknown>;
+		logger.debug('[MSW] Tempo worklog created:', body);
+		return HttpResponse.json({ tempoWorklogId: 9001, ...body });
+	}),
+
+	http.put(
+		'https://api.tempo.io/4/worklogs/:id',
+		async ({ request, params }) => {
+			const body = (await request.json()) as Record<string, unknown>;
+			return HttpResponse.json({ tempoWorklogId: Number(params.id), ...body });
+		},
+	),
+
+	http.delete('https://api.tempo.io/4/worklogs/:id', () => {
+		return new HttpResponse(null, { status: 204 });
+	}),
 ];
