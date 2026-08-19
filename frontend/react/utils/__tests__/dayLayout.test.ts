@@ -42,6 +42,15 @@ describe('workingWindowFromHours', () => {
 		]);
 	});
 
+	it('treats a two-hour lunch as one day, not two', () => {
+		// 9-11 then 14-17. Taking the longest *contiguous* block would discard
+		// the morning and start the day at 14:00 — the opposite of preserving
+		// the break, which is what this function is for.
+		expect(workingWindowFromHours([9, 10, 11, 14, 15, 16, 17])).toEqual([
+			9, 10, 11, 14, 15, 16, 17,
+		]);
+	});
+
 	it('returns nothing when there was no activity', () => {
 		expect(workingWindowFromHours([])).toEqual([]);
 	});
@@ -78,14 +87,20 @@ describe('layOutDay', () => {
 		]);
 	});
 
-	it('skips an inactive hour instead of logging through the break', () => {
-		// Two 1h suggestions on the 7 Aug profile: the second must land at 12:00,
-		// not 10:00→11:00, because 11:00 had no activity.
+	it('jumps over an inactive hour instead of logging through the break', () => {
+		// Three 1h suggestions on the 7 Aug profile: 09:00 and 10:00 are active,
+		// 11:00 is the break, so the third belongs at 12:00.
+		//
+		// The previous version of this test asserted 10:00 for the second and
+		// stopped there — never reaching the hole it claimed to be about. Its
+		// comment said "must land at 12:00" while its assertion said 10:00, so
+		// the gap-skipping it existed to protect was never exercised.
 		const out = layOutDay({
 			date: '2026-08-07',
 			suggestions: [
 				{ id: 'a', seconds: 3600 },
 				{ id: 'b', seconds: 3600 },
+				{ id: 'c', seconds: 3600 },
 			],
 			activeHours: WITH_GAP,
 			existing: [],
@@ -93,7 +108,56 @@ describe('layOutDay', () => {
 		expect(out.map((s) => s.startedAt)).toEqual([
 			'2026-08-07T09:00:00',
 			'2026-08-07T10:00:00',
+			'2026-08-07T12:00:00',
 		]);
+	});
+
+	it('jumps the break when an existing worklog fills the hours before it', () => {
+		const out = layOutDay({
+			date: '2026-08-07',
+			suggestions: [{ id: 'a', seconds: 3600 }],
+			activeHours: WITH_GAP,
+			existing: [{ startedAt: '2026-08-07T09:00:00', seconds: 2 * 3600 }],
+		});
+		expect(out[0]?.startedAt).toBe('2026-08-07T12:00:00');
+	});
+
+	it('never produces an hour past midnight', () => {
+		// Six hours of suggestions on an evening profile would run to 25:00.
+		// `new Date('...T25:00:00')` is Invalid Date — the Jira POST would carry
+		// NaN — and 'T24:00:00' silently parses as the *next* day, putting the
+		// worklog on the wrong date entirely.
+		const out = layOutDay({
+			date: '2026-08-07',
+			suggestions: Array.from({ length: 6 }, (_, i) => ({
+				id: `s${i}`,
+				seconds: 3600,
+			})),
+			activeHours: [20, 21, 22, 23],
+			existing: [],
+		});
+		for (const s of out) {
+			const hour = Number(s.startedAt.slice(11, 13));
+			expect(hour).toBeLessThan(24);
+			expect(Number.isNaN(new Date(s.startedAt).getTime())).toBe(false);
+		}
+	});
+
+	it('reads an existing worklog in local time, not raw UTC digits', () => {
+		// Jira returns `started` with its own offset. Slicing the characters
+		// treats 08:00+00:00 as 08:00 local, so a worklog logged at 09:00 local
+		// would be dodged an hour early — and written over.
+		const out = layOutDay({
+			date: '2026-08-03',
+			suggestions: [{ id: 'a', seconds: 3600 }],
+			activeHours: CONTINUOUS,
+			existing: [
+				{ startedAt: '2026-08-03T09:00:00.000+0100', seconds: 2 * 3600 },
+			],
+		});
+		// 09:00+01:00 is 09:00 local for a +01:00 browser; either way the
+		// suggestion must not start inside those two hours.
+		expect(out[0]?.startedAt).not.toBe('2026-08-03T09:00:00');
 	});
 
 	it('starts after a worklog that is already logged', () => {

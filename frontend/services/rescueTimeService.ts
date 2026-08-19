@@ -127,9 +127,9 @@ export async function fetchRescueTimeData(
 
 	// Group activities by date
 	const byDay = new Map<string, RescueTimeActivity[]>();
-	// Hours (0-23) that saw meaningful activity, per day. Used to lay the day
-	// out; see dayLayout.ts.
-	const activeHoursByDay = new Map<string, Set<number>>();
+	// Seconds per (day, hour), summed across every activity row in that hour.
+	// Thresholded after accumulation; see the comment at the call site.
+	const secondsByDayHour = new Map<string, Map<number, number>>();
 
 	for (const row of rows) {
 		const rawDate = String(row[dateIdx] ?? '');
@@ -139,14 +139,23 @@ export async function fetchRescueTimeData(
 		// RescueTime reports in the account's local timezone — verified against
 		// a live account, whose latest reported hour matched the browser's local
 		// hour exactly. So no conversion belongs here.
-		const hour = Number(rawDate.slice(11, 13));
-		if (Number.isFinite(hour)) {
-			const secondsThisRow = Number(row[secondsIdx] ?? 0);
-			// A stray minute of activity does not make an hour a working hour.
-			if (secondsThisRow >= 300) {
-				const set = activeHoursByDay.get(dateStr) ?? new Set<number>();
-				set.add(hour);
-				activeHoursByDay.set(dateStr, set);
+		// A date-only stamp would slice to '' and Number('') is 0, which passes
+		// isFinite — crediting the whole day to hour 0 and laying every
+		// suggestion out from midnight. Require the characters to be there.
+		if (rawDate.length >= 13) {
+			const hour = Number(rawDate.slice(11, 13));
+			if (Number.isInteger(hour) && hour >= 0 && hour <= 23) {
+				// Accumulate per hour, threshold later: with restrict_kind=activity
+				// a genuinely busy hour is split across many short-lived apps, so a
+				// per-row threshold would drop an hour of twelve four-minute
+				// switches — losing the real start of the day.
+				const perHour =
+					secondsByDayHour.get(dateStr) ?? new Map<number, number>();
+				perHour.set(
+					hour,
+					(perHour.get(hour) ?? 0) + Number(row[secondsIdx] ?? 0),
+				);
+				secondsByDayHour.set(dateStr, perHour);
 			}
 		}
 
@@ -201,9 +210,11 @@ export async function fetchRescueTimeData(
 		result.set(date, {
 			productiveSeconds,
 			topActivities,
-			activeHours: [...(activeHoursByDay.get(date) ?? [])].sort(
-				(a, b) => a - b,
-			),
+			activeHours: [...(secondsByDayHour.get(date) ?? new Map())]
+				// Five minutes in a whole hour is a stray notification, not work.
+				.filter(([, seconds]) => seconds >= 300)
+				.map(([hour]) => hour)
+				.sort((a, b) => a - b),
 		});
 	}
 
