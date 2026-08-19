@@ -1,5 +1,6 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { jiraAuthHeader } from '../../services/jiraAuth';
 import { rewriteForHostedProxy } from '../../services/jiraGateway';
 import { toTempoWriteInput } from '../../services/tempoWriteService';
 import { getWorklogSource } from '../../services/worklogSource';
@@ -99,7 +100,11 @@ export function useWorklogOperations() {
 	// Helper to make authenticated requests
 	const makeRequest = async (url: string, options: RequestInit = {}) => {
 		const headers: Record<string, string> = {
-			Authorization: `Bearer ${config.apiToken}`,
+			Authorization: jiraAuthHeader(
+				config.jiraHost,
+				config.email,
+				config.apiToken,
+			),
 			Accept: 'application/json',
 			'Content-Type': 'application/json',
 			'X-Atlassian-Token': 'no-check',

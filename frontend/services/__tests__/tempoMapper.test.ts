@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { JiraIssue } from '../../../types/jira';
-import { classifyWorklog } from '../../react/utils/worklogClassifier';
 import { deriveMonthlyReportState } from '../../react/utils/monthlyReport';
+import { classifyWorklog } from '../../react/utils/worklogClassifier';
 import {
 	buildIssueMetadataJql,
 	chunkIds,
