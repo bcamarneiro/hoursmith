@@ -144,3 +144,55 @@ END:VCALENDAR`);
 		expect(days).toEqual(['2026-06-08', '2026-06-09', '2026-06-10']);
 	});
 });
+
+describe('calendar suggestions carry the meeting time', () => {
+	it('records when the meeting actually started', async () => {
+		// The layout places a suggestion with a known time at that time. A
+		// meeting is the clearest case: a 14:00 standup belongs at 14:00, and
+		// guessing a slot for it would be strictly worse than the truth we hold.
+		mockIcs(`BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:PAY-71 Standup
+DTSTART:20260805T140000
+DTEND:20260805T150000
+END:VEVENT
+END:VCALENDAR`);
+
+		const suggestions = await fetchCalendarSuggestions(
+			[feed],
+			'',
+			'2026-08-03',
+			'2026-08-09',
+			[],
+		);
+		expect(suggestions[0]?.activityAt).toBe('2026-08-05T14:00:00');
+	});
+
+	it('uses the earliest meeting when a ticket has several that day', async () => {
+		// Two meetings merge into one suggestion; the day should start at the
+		// first of them, not the last.
+		mockIcs(`BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:PAY-71 Afternoon
+DTSTART:20260805T160000
+DTEND:20260805T170000
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:PAY-71 Morning
+DTSTART:20260805T100000
+DTEND:20260805T110000
+END:VEVENT
+END:VCALENDAR`);
+
+		const suggestions = await fetchCalendarSuggestions(
+			[feed],
+			'',
+			'2026-08-03',
+			'2026-08-09',
+			[],
+		);
+		expect(suggestions[0]?.activityAt).toBe('2026-08-05T10:00:00');
+	});
+});

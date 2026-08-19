@@ -9,6 +9,7 @@ import {
 	toLocalDateString,
 	withLocalOffset,
 } from '../../utils/date';
+import { layOutDay } from '../../utils/dayLayout';
 import { formatHours, formatJiraTimeSpent } from '../../utils/format';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
@@ -252,11 +253,33 @@ export const DayCard = memo<Props>(function DayCard({
 	const handleLogAll = async () => {
 		setIsBatchLogging(true);
 		try {
+			// Lay the day out instead of stacking everything on one hour: every
+			// suggestion used to be logged at 09:00, so logging four produced
+			// four overlapping worklogs. The shape comes from RescueTime's
+			// hourly profile where available — which is also why the day can
+			// start earlier than 09:00.
+			const placed = layOutDay({
+				date: day.date,
+				suggestions: loggableSuggestions.map((s) => ({
+					id: s.id,
+					seconds: s.suggestedSeconds,
+					activityAt: s.activityAt,
+				})),
+				activeHours: rt?.activeHours ?? [],
+				existing: day.loggedWorklogs
+					.filter((w) => w.startedAt)
+					.map((w) => ({
+						startedAt: w.startedAt as string,
+						seconds: w.timeSpentSeconds,
+					})),
+			});
+			const startedById = new Map(placed.map((p) => [p.id, p.startedAt]));
+
 			const params = loggableSuggestions.map((s) => ({
 				issueKey: s.issueKey,
 				timeSpent: s.suggestedTimeSpent,
 				comment: '',
-				started: withLocalOffset(`${s.date}T09:00`),
+				started: withLocalOffset(startedById.get(s.id) ?? `${s.date}T09:00`),
 			}));
 
 			if (params.length === 0) {

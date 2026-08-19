@@ -21,6 +21,12 @@ export interface WorklogSuggestion {
 	logged: boolean;
 	/** Calendar event title — present on unmapped calendar suggestions */
 	calendarEventTitle?: string;
+	/**
+	 * When the underlying activity happened, local `YYYY-MM-DDTHH:mm:ss`, when
+	 * the source knows it — a calendar event's start, a commit's timestamp. The
+	 * layout places these at their real time rather than guessing a slot.
+	 */
+	activityAt?: string;
 }
 
 export interface RescueTimeActivity {
@@ -33,6 +39,12 @@ export interface RescueTimeActivity {
 export interface RescueTimeDaySummary {
 	productiveSeconds: number;
 	topActivities: RescueTimeActivity[];
+	/**
+	 * Hours (0-23, local) that saw activity. The shape of the day: where it
+	 * started, and where the breaks were. Used to place suggestions in sequence
+	 * instead of stacking them all on a fixed hour.
+	 */
+	activeHours: number[];
 }
 
 /**
@@ -45,6 +57,11 @@ export interface LoggedWorklog {
 	issueKey: string;
 	issueSummary?: string;
 	timeSpentSeconds: number;
+	/**
+	 * When this worklog starts. Present so newly logged suggestions can be
+	 * placed around already-logged time instead of on top of it.
+	 */
+	startedAt?: string;
 }
 
 export interface DaySummary {

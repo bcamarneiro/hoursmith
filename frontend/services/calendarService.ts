@@ -427,10 +427,26 @@ async function fetchFeed(
 	return parseIcs(icsText);
 }
 
+function pad2(n: number): string {
+	return String(n).padStart(2, '0');
+}
+
+/** Earliest of two local stamps; either may be absent. */
+function earlierOf(a: string | undefined, b: string): string {
+	return !a || b < a ? b : a;
+}
+
 interface GroupedEvent {
 	totalSeconds: number;
 	reasons: string[];
 	eventCount: number;
+	/**
+	 * Local start of the earliest event in this group. A meeting's time is
+	 * genuinely known, so the layout places the suggestion there instead of
+	 * guessing a slot. Earliest, because several meetings on one ticket merge
+	 * into a single suggestion and the day starts at the first of them.
+	 */
+	earliestStart?: string;
 	/** Set for unmapped events — the raw event title */
 	eventTitle?: string;
 }
@@ -522,6 +538,10 @@ export async function fetchCalendarSuggestions(
 		}
 
 		const day = start.iso;
+		// Local wall-clock start, matching the `date` above: both come from the
+		// same parsed instant, so a meeting never lands on a different day than
+		// the stamp that positions it.
+		const localStartStamp = `${start.iso}T${pad2(start.date.getHours())}:${pad2(start.date.getMinutes())}:00`;
 		if (day < weekStart || day > weekEnd) {
 			skippedOutOfRange++;
 			continue;
@@ -561,6 +581,10 @@ export async function fetchCalendarSuggestions(
 				};
 				existing.totalSeconds += durationSeconds;
 				existing.eventCount++;
+				existing.earliestStart = earlierOf(
+					existing.earliestStart,
+					localStartStamp,
+				);
 				existing.reasons.push(`${prefix}${event.summary.slice(0, 60)}`);
 				grouped.set(mapKey, existing);
 			}
@@ -578,6 +602,10 @@ export async function fetchCalendarSuggestions(
 			};
 			existing.totalSeconds += durationSeconds;
 			existing.eventCount++;
+			existing.earliestStart = earlierOf(
+				existing.earliestStart,
+				localStartStamp,
+			);
 			existing.reasons.push(`${prefix}${event.summary.slice(0, 60)}`);
 			grouped.set(mapKey, existing);
 			continue;
@@ -618,6 +646,7 @@ export async function fetchCalendarSuggestions(
 					? `${Math.floor(hours)}h${hours % 1 >= 0.5 ? ' 30m' : ''}`
 					: '30m',
 			suggestedSeconds: cappedSeconds,
+			activityAt: data.earliestStart,
 			confidence: data.eventCount >= 2 ? 'high' : 'medium',
 			reason: `${data.eventCount} calendar event${data.eventCount > 1 ? 's' : ''}: ${data.reasons.slice(0, 2).join('; ')}${data.reasons.length > 2 ? '...' : ''}`,
 			logged: false,

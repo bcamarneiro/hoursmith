@@ -23,6 +23,8 @@ interface WorklogEntry {
 	timeSpentSeconds: number;
 	/** Jira worklog id — carried so the day's real worklogs are addressable. */
 	worklogId?: string;
+	/** When it starts, so new suggestions can be placed around it. */
+	startedAt?: string;
 	/** Backdated entries are tracked but excluded from `loggedByDay` totals. */
 	isBackdated?: boolean;
 }
@@ -276,6 +278,7 @@ export function mergeSuggestions(input: MergeSuggestionsInput): DaySummary[] {
 					issueKey: wl.issueKey,
 					issueSummary: wl.issueSummary,
 					timeSpentSeconds: wl.timeSpentSeconds,
+					startedAt: wl.startedAt,
 				});
 				loggedWorklogsByDay.set(day, list);
 			}
