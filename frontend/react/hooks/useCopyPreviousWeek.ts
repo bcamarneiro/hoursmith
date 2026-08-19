@@ -5,10 +5,10 @@ import type { WorklogItem } from '../../services/monthWorklogService';
 import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
-import { useUIStore } from '../../stores/useUIStore';
 import { addDaysToIsoDate } from '../utils/date';
 import { classifyWorklog } from '../utils/worklogClassifier';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
+import { useTempoSuspected } from './useTempoSuspected';
 import { readMonth } from './worklogReadRouter';
 
 /**
@@ -76,7 +76,7 @@ export function deriveWeekWorklogs(
 
 export function useCopyPreviousWeek() {
 	const config = useConfigStore((s) => s.config);
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const tempoSuspected = useTempoSuspected();
 	const source = getWorklogSource({
 		tempoMode: config.tempoMode,
 		tempoApiToken: config.tempoApiToken,

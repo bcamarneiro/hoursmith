@@ -2,12 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
-import { useUIStore } from '../../stores/useUIStore';
 import { addDaysToIsoDate, parseIsoDateLocal } from '../utils/date';
 import { buildManagerTrendModel } from '../utils/teamReports';
 import { useAbsenceDaysByUser } from './useAbsenceDays';
 import { useEffectiveProxyUrl } from './useEffectiveProxyUrl';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
+import { useTempoSuspected } from './useTempoSuspected';
 import { readMonth } from './worklogReadRouter';
 
 function getMonthsInRange(startDate: string, endDate: string) {
@@ -35,7 +35,7 @@ export function useReportsTrendData(
 ) {
 	const queryClient = useQueryClient();
 	const rawConfig = useConfigStore((state) => state.config);
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const tempoSuspected = useTempoSuspected();
 	const source = getWorklogSource({
 		tempoMode: rawConfig.tempoMode,
 		tempoApiToken: rawConfig.tempoApiToken,

@@ -5,8 +5,8 @@ import type { WorklogFetchProgress } from '../../../types/worklogLoading';
 import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { useUIStore } from '../../stores/useUIStore';
 import { monthWorklogsQueryKey, useMonthWorklogs } from './useMonthWorklogs';
+import { useTempoSuspected } from './useTempoSuspected';
 
 function adjacentMonths(year: number, month: number) {
 	const prev =
@@ -36,7 +36,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 	const corsProxy = useConfigStore((state) => state.config.corsProxy);
 	const tempoMode = useConfigStore((state) => state.config.tempoMode);
 	const tempoApiToken = useConfigStore((state) => state.config.tempoApiToken);
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const tempoSuspected = useTempoSuspected();
 	const source = getWorklogSource({
 		tempoMode,
 		tempoApiToken,

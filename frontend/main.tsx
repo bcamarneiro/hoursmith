@@ -38,7 +38,11 @@ async function startApp() {
 				jiraHost: 'mock.atlassian.net',
 				email: 'dev@example.com',
 				apiToken: 'mock-token',
-				corsProxy: persisted.corsProxy,
+				// corsProxy deliberately NOT carried over: with one set, request
+				// URLs become `${proxy}/https://mock.atlassian.net/...`, which none
+				// of the MSW handlers match, so every mocked call falls through and
+				// offline mode stops working. The Tempo settings alone are what
+				// this needs to preserve.
 				tempoApiToken: persisted.tempoApiToken,
 				tempoMode: persisted.tempoMode,
 			});

@@ -24,6 +24,7 @@ import { classifyWorklog } from '../utils/worklogClassifier';
 import { useAbsenceDays } from './useAbsenceDays';
 import { useEffectiveProxyUrl } from './useEffectiveProxyUrl';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
+import { useTempoSuspected } from './useTempoSuspected';
 import { readMonth } from './worklogReadRouter';
 
 interface WorklogEntry {
@@ -130,7 +131,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const apiToken = useConfigStore((s) => s.config.apiToken);
 	const tempoMode = useConfigStore((s) => s.config.tempoMode);
 	const tempoApiToken = useConfigStore((s) => s.config.tempoApiToken);
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const tempoSuspected = useTempoSuspected();
 	const source = getWorklogSource({
 		tempoMode,
 		tempoApiToken,

@@ -200,30 +200,39 @@ export function mapTempoWriteResponse(
 	issue: JiraIssue,
 	email: string,
 	displayName?: string,
-): EnrichedJiraWorklog {
+	/**
+	 * What we sent. Used when Tempo's echo is unusable (a 204, or a non-JSON
+	 * body): the worklog exists, and we already know its date, duration and
+	 * description, so the row is rebuilt from the request instead of being
+	 * fabricated with zeroes. An earlier version invented `startDate: ''`,
+	 * which made `worklogMonth()` return null — and `patchMonthCaches` reads a
+	 * null month as "every month", so a single unusable response appended a
+	 * 0-second, id-"0" row to every cached month at once.
+	 */
+	sent?: TempoWriteInput,
+): EnrichedJiraWorklog | null {
 	const wl = response as TempoWorklog | null;
-	if (!wl?.issue) {
-		// `tempoWrite` returns null for a 204 and for a non-JSON body, so a
-		// write that succeeded but answered with no usable payload must not
-		// throw here — that would report "failed to create" for a worklog Tempo
-		// actually created. Fall back to the request's own issue.
+	if (wl?.issue) {
 		return mapTempoWorklog(
-			{
-				tempoWorklogId: Number(
-					(wl as { tempoWorklogId?: number } | null)?.tempoWorklogId ?? 0,
-				),
-				issue: { id: Number(issue.id) },
-				timeSpentSeconds: 0,
-				startDate: '',
-			} as TempoWorklog,
-			new Map([[String(issue.id), issue]]),
+			wl,
+			new Map([[String(wl.issue.id), issue]]),
 			email,
 			displayName,
 		);
 	}
+	if (!sent) return null;
+	const id = (wl as { tempoWorklogId?: number } | null)?.tempoWorklogId;
+	if (!id) return null;
 	return mapTempoWorklog(
-		wl,
-		new Map([[String(wl.issue?.id ?? issue.id), issue]]),
+		{
+			tempoWorklogId: id,
+			issue: { id: Number(issue.id) },
+			timeSpentSeconds: sent.timeSpentSeconds,
+			startDate: sent.startDate,
+			startTime: sent.startTime,
+			description: sent.description,
+		},
+		new Map([[String(issue.id), issue]]),
 		email,
 		displayName,
 	);

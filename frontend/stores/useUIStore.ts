@@ -27,6 +27,14 @@ interface UIState {
 
 	// Transient flag: at least one worklog author looks like the Tempo app account
 	tempoSuspected: boolean;
+	/**
+	 * Connection the suspicion belongs to. Persisted with the flag so detection
+	 * survives a reload — without it, `auto` mode (the default) resolves to
+	 * Jira on every cold load until a read completes, and a write in that window
+	 * goes to the wrong backend. Scoped by fingerprint so switching jiraHost
+	 * does not carry the suspicion to an instance that has no Tempo.
+	 */
+	tempoSuspectedFingerprint: string | null;
 
 	// Persisted evidence that the saved Jira connection has already worked
 	jiraConnectionEvidenceAt: string | null;
@@ -41,7 +49,7 @@ interface UIState {
 	resetPreferences: () => void;
 	dismissInstallPrompt: () => void;
 	resetInstallPrompt: () => void;
-	setTempoSuspected: (v: boolean) => void;
+	setTempoSuspected: (v: boolean, fingerprint?: string) => void;
 	markJiraConnectionEvidence: (
 		fingerprint: string,
 		source: 'test' | 'fetch',
@@ -146,6 +154,7 @@ export const useUIStore = create<UIState>()(
 			expandedUsers: {},
 			installPromptDismissed: false,
 			tempoSuspected: false,
+			tempoSuspectedFingerprint: null,
 			jiraConnectionEvidenceAt: null,
 			jiraConnectionEvidenceFingerprint: null,
 			jiraConnectionEvidenceSource: null,
@@ -196,7 +205,11 @@ export const useUIStore = create<UIState>()(
 				set({ installPromptDismissed: false });
 			},
 
-			setTempoSuspected: (v: boolean) => set({ tempoSuspected: v }),
+			setTempoSuspected: (v: boolean, fingerprint?: string) =>
+				set({
+					tempoSuspected: v,
+					tempoSuspectedFingerprint: v ? (fingerprint ?? null) : null,
+				}),
 
 			markJiraConnectionEvidence: (fingerprint, source, at) => {
 				set({
@@ -229,6 +242,8 @@ export const useUIStore = create<UIState>()(
 				jiraConnectionEvidenceFingerprint:
 					state.jiraConnectionEvidenceFingerprint,
 				jiraConnectionEvidenceSource: state.jiraConnectionEvidenceSource,
+				tempoSuspected: state.tempoSuspected,
+				tempoSuspectedFingerprint: state.tempoSuspectedFingerprint,
 			}),
 			merge: (persisted, current) => {
 				const persistedState = normalizeUIPersistedState(

@@ -91,7 +91,10 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 				started: withLocalOffset(`${suggestion.date}T09:00`),
 			});
 			markLogged(suggestion.id);
-			const worklogId = worklog.id;
+			// createWorklog returns null when the backend accepted the write but
+			// answered with nothing placeable; the worklog exists, we just cannot
+			// offer Undo for it.
+			const worklogId = worklog?.id;
 			const undoAction = worklogId
 				? {
 						action: {

@@ -1,7 +1,10 @@
 import type React from 'react';
 import { useRef, useState } from 'react';
 import { describeServiceError } from '../../../../services/serviceErrors';
-import { buildTempoRequest } from '../../../../services/tempoGateway';
+import {
+	buildTempoRequest,
+	describeTempoNetworkError,
+} from '../../../../services/tempoGateway';
 import type {
 	AbsenceAssignment,
 	CalendarFeed,
@@ -211,7 +214,15 @@ export const IntegrationsSection: React.FC<Props> = ({
 				loading: false,
 				result: {
 					success: false,
-					message: describeServiceError(error).message,
+					// In direct mode the browser blocks the request before Tempo
+					// sees it, and the generic message reads like a bad token —
+					// sending the user to check credentials that are fine. This is
+					// the surface where that matters most: it is where they came to
+					// verify the token.
+					message: describeTempoNetworkError(
+						corsProxy,
+						describeServiceError(error).message,
+					),
 				},
 			});
 		}

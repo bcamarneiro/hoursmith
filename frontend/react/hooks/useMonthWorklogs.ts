@@ -11,6 +11,7 @@ import {
 	buildJiraConnectionFingerprint,
 	useUIStore,
 } from '../../stores/useUIStore';
+import { useTempoSuspected } from './useTempoSuspected';
 import { readMonth } from './worklogReadRouter';
 
 interface UseMonthWorklogsOptions {
@@ -66,7 +67,7 @@ export function useMonthWorklogs(
 	options: UseMonthWorklogsOptions,
 ) {
 	const config = useConfigStore((s) => s.config);
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const tempoSuspected = useTempoSuspected();
 	const source = getWorklogSource({
 		tempoMode: config.tempoMode,
 		tempoApiToken: config.tempoApiToken,

@@ -5,7 +5,6 @@ import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useTeamStore } from '../../stores/useTeamStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { useUIStore } from '../../stores/useUIStore';
 import {
 	type ReportPreset,
 	useUserDataStore,
@@ -28,6 +27,7 @@ import {
 	useReportsURLState,
 } from '../hooks/useReportsURLState';
 import { useTeamData } from '../hooks/useTeamData';
+import { useTempoSuspected } from '../hooks/useTempoSuspected';
 import { useTimesheetDataFetcher } from '../hooks/useTimesheetDataFetcher';
 import { readMonth } from '../hooks/worklogReadRouter';
 import { describeFreshness } from '../utils/dataFreshness';
@@ -171,7 +171,7 @@ export const ReportsPage: React.FC = () => {
 	const goPrevMonth = useTimesheetStore((state) => state.goPrevMonth);
 	const goNextMonth = useTimesheetStore((state) => state.goNextMonth);
 	const config = useConfigStore((state) => state.config);
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const tempoSuspected = useTempoSuspected();
 	const source = getWorklogSource({
 		tempoMode: config.tempoMode,
 		tempoApiToken: config.tempoApiToken,

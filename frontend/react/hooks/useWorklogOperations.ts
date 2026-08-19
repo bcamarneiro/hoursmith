@@ -11,7 +11,7 @@ import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import type { EnrichedJiraWorklog } from '../../stores/useTimesheetStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { useUIStore } from '../../stores/useUIStore';
+import { useTempoSuspected } from './useTempoSuspected';
 import {
 	assertWritableRow,
 	writeCreate,
@@ -84,7 +84,7 @@ function toJiraDatetime(dateStr: string): string {
 
 export function useWorklogOperations() {
 	const config = useConfigStore((state) => state.config);
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	const tempoSuspected = useTempoSuspected();
 	// Writes follow reads. Scope is 'personal' because a user only ever creates,
 	// edits or deletes their OWN worklogs — there is no team-scoped write.
 	const writeSource = getWorklogSource({
@@ -192,10 +192,26 @@ export function useWorklogOperations() {
 			// `started` or `comment`, so storing it raw yields a dateless row that
 			// never patches into the month cache and can never be matched again
 			// for edit or delete. Map it into the shape the store expects.
-			const enrichedWorklog: EnrichedJiraWorklog =
+			const mapped =
 				writeSource === 'tempo'
-					? mapTempoWriteResponse(newWorklog, issue, config.email)
-					: { ...newWorklog, issue: issue };
+					? mapTempoWriteResponse(
+							newWorklog,
+							issue,
+							config.email,
+							undefined,
+							toTempoWriteInput(params),
+						)
+					: ({ ...newWorklog, issue: issue } as EnrichedJiraWorklog);
+
+			if (!mapped) {
+				// Tempo accepted the write but returned nothing we can place on a
+				// day. Refetching is the honest response: inventing a row would
+				// put a dateless entry into every cached month (patchMonthCaches
+				// reads a null month as "all months").
+				await queryClient.invalidateQueries({ queryKey: ['monthWorklogs'] });
+				return null;
+			}
+			const enrichedWorklog: EnrichedJiraWorklog = mapped;
 
 			const currentData = useTimesheetStore.getState().data;
 			// Patch the month cache(s) instead of invalidating: the search API is
@@ -267,15 +283,25 @@ export function useWorklogOperations() {
 			// one. Map it once here and reuse that everywhere below: the store,
 			// the month-cache patch, and the moved-month calculation all need the
 			// mapped shape, and previously only the store got it.
-			const toStoredRow = (issue: EnrichedJiraWorklog['issue']) =>
+			const sentInput = toTempoWriteInput({ ...params, issueKey });
+			const toStoredRow = (
+				issue: EnrichedJiraWorklog['issue'],
+				fallback: EnrichedJiraWorklog,
+			): EnrichedJiraWorklog =>
 				writeSource === 'tempo'
-					? mapTempoWriteResponse(updatedWorklog, issue, config.email)
+					? (mapTempoWriteResponse(
+							updatedWorklog,
+							issue,
+							config.email,
+							undefined,
+							sentInput,
+						) ?? fallback)
 					: ({ ...updatedWorklog, issue } as EnrichedJiraWorklog);
 
 			const currentData = useTimesheetStore.getState().data;
 			const existingRow = currentData?.find((wl) => wl.id === worklogId);
 			const updatedData = currentData?.map((wl) =>
-				wl.id === worklogId ? toStoredRow(wl.issue) : wl,
+				wl.id === worklogId ? toStoredRow(wl.issue, wl) : wl,
 			);
 
 			// Patch the month cache(s) directly rather than refetching from the
@@ -287,17 +313,17 @@ export function useWorklogOperations() {
 			// reading it raw made this always null, and the "moved to another
 			// month" cleanup below never ran — leaving a stale copy in the old
 			// month and double-counting the hours across both.
-			const mappedForMonth = toStoredRow(
-				existingRow?.issue ?? { id: '', key: '', fields: {} },
-			);
-			const newMonth = mappedForMonth.started
+			const mappedForMonth = existingRow
+				? toStoredRow(existingRow.issue, existingRow)
+				: null;
+			const newMonth = mappedForMonth?.started
 				? worklogMonth(mappedForMonth)
 				: null;
 			patchMonthCaches(
 				queryClient,
 				(worklogs) =>
 					worklogs.map((wl) =>
-						wl.id === worklogId ? toStoredRow(wl.issue) : wl,
+						wl.id === worklogId ? toStoredRow(wl.issue, wl) : wl,
 					),
 				null,
 			);
@@ -395,10 +421,23 @@ export function useWorklogOperations() {
 					)) as EnrichedJiraWorklog;
 
 					// Add to store
-					const enrichedWorklog: EnrichedJiraWorklog =
+					const mappedEntry =
 						writeSource === 'tempo'
-							? mapTempoWriteResponse(newWorklog, issue, config.email)
-							: { ...newWorklog, issue: issue };
+							? mapTempoWriteResponse(
+									newWorklog,
+									issue,
+									config.email,
+									undefined,
+									toTempoWriteInput(entry),
+								)
+							: ({ ...newWorklog, issue: issue } as EnrichedJiraWorklog);
+					if (!mappedEntry) {
+						// Created, but not placeable — count it and let the refetch
+						// below pick it up rather than caching a dateless row.
+						successCount++;
+						continue;
+					}
+					const enrichedWorklog: EnrichedJiraWorklog = mappedEntry;
 
 					const updatedData = [
 						...(useTimesheetStore.getState().data || []),
