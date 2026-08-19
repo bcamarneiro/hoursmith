@@ -5,9 +5,7 @@ import {
 import {
 	fetchMonthWorklogsTempo,
 	fetchTeamMonthWorklogsTempo,
-	fetchWeekWorklogsTempo,
 } from '../../services/tempoWorklogService';
-import { fetchWeekWorklogs } from '../../services/worklogService';
 import type { WorklogReadScope } from '../../services/worklogSource';
 import type { Config } from '../../stores/useConfigStore';
 
@@ -28,19 +26,23 @@ export function readMonth(
 	if (source !== 'tempo') {
 		return fetchMonthWorklogs(config, year, month, options, signal);
 	}
-	return options?.scope === 'team'
-		? fetchTeamMonthWorklogsTempo(config, year, month, signal)
-		: fetchMonthWorklogsTempo(config, year, month, signal);
-}
+	// Pass the caller's filter, never `config.jqlFilter`: callers key their
+	// caches on the filter they asked for, so substituting the saved one makes
+	// those keys describe data they do not hold.
+	const jqlFilter = options?.jqlFilter ?? '';
 
-export function readWeek(
-	source: 'jira' | 'tempo',
-	config: Config,
-	weekStart: string,
-	weekEnd: string,
-	signal?: AbortSignal,
-) {
-	return source === 'tempo'
-		? fetchWeekWorklogsTempo(config, weekStart, weekEnd, signal)
-		: fetchWeekWorklogs(config, weekStart, weekEnd, signal);
+	// `onProgress` and `currentUserOnly` are deliberately not forwarded:
+	//   - onProgress: the Tempo fetchers report no phase-by-phase progress, so
+	//     there is nothing to emit. Callers see the loading state, just not a
+	//     percentage.
+	//   - currentUserOnly: `scope` already selects the per-user vs team
+	//     endpoint, which is the same decision expressed once. Forwarding both
+	//     would let them disagree.
+	// Named here because silently ignoring an option is exactly how this
+	// integration lost `created`, `scope` and `jqlFilter` in the first place —
+	// each looked forwarded and was not.
+
+	return options?.scope === 'team'
+		? fetchTeamMonthWorklogsTempo(config, year, month, signal, jqlFilter)
+		: fetchMonthWorklogsTempo(config, year, month, signal, jqlFilter);
 }

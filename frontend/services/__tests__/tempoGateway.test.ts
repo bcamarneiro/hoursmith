@@ -62,7 +62,10 @@ describe('buildTempoRequest', () => {
 		);
 		expect(headers.authorization).toBe('Bearer secret');
 	});
-	it('direct: hits api.tempo.io with bearer token', () => {
+	it('direct: builds the raw api.tempo.io URL', () => {
+		// Kept buildable for offline/dev, where a service worker intercepts
+		// before the network. A real browser CORS-fails it, and
+		// describeTempoNetworkError explains why (see tempoDirectMode.test.ts).
 		stubBridge({});
 		const { url } = buildTempoRequest(
 			'secret',

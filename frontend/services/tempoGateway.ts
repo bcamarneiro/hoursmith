@@ -55,6 +55,10 @@ export function buildTempoRequest(
 	const qs = params.toString();
 	const upstream = `${TEMPO_BASE}/${cleanPath}${qs ? `?${qs}` : ''}`;
 	const proxy = userConfiguredProxy.trim().replace(/\/$/, '');
+	// `direct` mode (no proxy) stays buildable on purpose. A real browser will
+	// CORS-fail it — that is what `describeTempoNetworkError` explains — but
+	// offline/dev mode serves Tempo through a service worker that intercepts
+	// before the network, so refusing here would make the path untestable.
 	const url = proxy ? `${proxy}/${upstream}` : upstream;
 	return { url, headers: { authorization: `Bearer ${tempoToken}` } };
 }
@@ -66,4 +70,28 @@ function hostedTempoEndpoint(hostedProxyUrl: string): string {
 	return trimmed.endsWith(suffix)
 		? `${trimmed.slice(0, -suffix.length)}/api/tempo`
 		: `${trimmed}/api/tempo`;
+}
+
+/**
+ * Explain a failed Tempo fetch, naming the missing proxy when that is the
+ * cause.
+ *
+ * `api.tempo.io` sends no CORS headers, so with neither a hosted relay nor a
+ * user CORS proxy the browser kills the request before Tempo sees it. The
+ * resulting generic network error reads like a bad token and sends people to
+ * check credentials that are fine.
+ *
+ * Phrased from the mode rather than from the error text, because a blocked
+ * cross-origin request is deliberately indistinguishable from a network
+ * failure to the page.
+ */
+export function describeTempoNetworkError(
+	userConfiguredProxy: string,
+	fallback: string,
+): string {
+	if (getTempoGatewayMode(userConfiguredProxy) !== 'direct') return fallback;
+	return (
+		'Tempo needs a proxy: api.tempo.io does not allow direct browser access. ' +
+		'Set a CORS proxy in Settings (npm run cors-proxy), or use Hoursmith Premium.'
+	);
 }

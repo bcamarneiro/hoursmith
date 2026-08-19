@@ -100,6 +100,10 @@ export function mapTempoWorklog(
 	const started = `${wl.startDate}T${startTime}${offset}`;
 	return {
 		id: String(wl.tempoWorklogId),
+		// Records which backend this row's `id` belongs to. Jira and Tempo ids
+		// are separate spaces, so a write must not target a row from the other
+		// one (see assertWritableRow).
+		worklogSource: 'tempo',
 		issueId,
 		started,
 		created: wl.createdAt ?? started,

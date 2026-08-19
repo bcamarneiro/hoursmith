@@ -258,6 +258,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					false,
 					jqlFilter,
 					source,
+					'personal',
 				);
 
 			let githubUser: {

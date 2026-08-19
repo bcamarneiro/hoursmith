@@ -60,6 +60,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			jqlFilter,
 			'jira',
+			'team',
 		);
 
 		// Dashboard (via queryClient.fetchQuery)
@@ -71,6 +72,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			jqlFilter,
 			'jira',
+			'team',
 		);
 
 		// Heatmap (via useMonthWorklogs)
@@ -82,6 +84,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			jqlFilter,
 			'jira',
+			'team',
 		);
 
 		expect(teamKey).toEqual(dashboardKey);
@@ -99,6 +102,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			jqlFilter,
 			'jira',
+			'team',
 		);
 
 		const dashboardKey = monthWorklogsQueryKey(
@@ -109,6 +113,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			jqlFilter,
 			'jira',
+			'team',
 		);
 
 		expect(teamKey).toEqual(dashboardKey);
@@ -124,6 +129,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			'project = X',
 			'jira',
+			'team',
 		);
 
 		expect(key).toEqual([
@@ -135,6 +141,9 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			'project = X',
 			'jira',
+			// Jira collapses both scopes to one entry so the surfaces keep
+			// sharing a fetch; only Tempo splits them.
+			'shared',
 		]);
 	});
 
@@ -147,6 +156,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			'',
 			'jira',
+			'team',
 		);
 
 		const keyWithFilter = monthWorklogsQueryKey(
@@ -157,6 +167,7 @@ describe('monthWorklogs query key consistency', () => {
 			false,
 			'project = X',
 			'jira',
+			'team',
 		);
 
 		expect(keyNoFilter).not.toEqual(keyWithFilter);

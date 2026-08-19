@@ -604,6 +604,7 @@ export const ReportsPage: React.FC = () => {
 							false,
 							'',
 							source,
+							'team',
 						),
 						queryFn: ({ signal }) =>
 							readMonth(source, config, year, month, { scope: 'team' }, signal),

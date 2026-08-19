@@ -74,6 +74,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 			false,
 			jqlFilter || '',
 			source,
+			'team',
 		);
 		const nextKey = monthWorklogsQueryKey(
 			next.year,
@@ -83,6 +84,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 			false,
 			jqlFilter || '',
 			source,
+			'team',
 		);
 		const prevData =
 			(queryClient.getQueryData(prevKey) as
@@ -142,6 +144,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 				false,
 				jqlFilter || '',
 				source,
+				'team',
 			);
 			const nextKey = monthWorklogsQueryKey(
 				next.year,
@@ -151,6 +154,7 @@ export function useTimesheetDataFetcher(options?: { enabled?: boolean }) {
 				false,
 				jqlFilter || '',
 				source,
+				'team',
 			);
 			const prevData = queryClient.getQueryData(prevKey) as
 				| EnrichedJiraWorklog[]

@@ -82,6 +82,7 @@ export function useReportsTrendData(
 							false,
 							'',
 							source,
+							'team',
 						),
 						queryFn: ({ signal }) =>
 							readMonth(source, config, year, month, { scope: 'team' }, signal),

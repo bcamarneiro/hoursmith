@@ -40,8 +40,13 @@ export default async function handler(request: Request): Promise<Response> {
 		return new Response(null, { status: 204, headers: corsHeaders(origin) });
 	}
 
-	// Plan 1: read methods only.
-	if (request.method !== 'GET') {
+	// Reads (Plan 1) plus worklog writes (Plan 2, ADA-544). Writes must be
+	// allowed here or they would work in direct and self-hosted mode and fail
+	// only on hosted Premium — the tier people pay for. The list stays explicit
+	// rather than open: Tempo needs nothing else, and an allowlist keeps the
+	// relay from becoming a general-purpose proxy.
+	const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE'];
+	if (!ALLOWED_METHODS.includes(request.method)) {
 		logProxy({
 			userId: null,
 			upstreamStatus: 405,
@@ -50,9 +55,12 @@ export default async function handler(request: Request): Promise<Response> {
 		});
 		return jsonResponse(
 			405,
-			{ error: 'method_not_allowed', detail: 'Only GET is supported.' },
+			{
+				error: 'method_not_allowed',
+				detail: `Supported methods: ${ALLOWED_METHODS.join(', ')}.`,
+			},
 			origin,
-			{ allow: 'GET, OPTIONS' },
+			{ allow: `${ALLOWED_METHODS.join(', ')}, OPTIONS` },
 		);
 	}
 
@@ -133,11 +141,16 @@ export default async function handler(request: Request): Promise<Response> {
 	}
 
 	// 5. Forward to the Tempo API.
+	// Read the body once, here: a Request body is a stream and cannot be
+	// re-read downstream.
+	const body = request.method === 'GET' ? undefined : await request.text();
+
 	const upstream = await forwardToTempo({
 		path,
 		search: params.toString(),
 		tempoToken,
-		method: 'GET',
+		method: request.method,
+		body: body || undefined,
 	});
 
 	logProxy({
@@ -146,7 +159,19 @@ export default async function handler(request: Request): Promise<Response> {
 		durationMs: Date.now() - start,
 	});
 
-	return upstream;
+	// `forwardToTempo` returns the upstream body with only a content-type. The
+	// browser needs our CORS headers on it too, or a perfectly good 200 is
+	// blocked and surfaces as an opaque network error (jiraForward does the
+	// same at its own return site).
+	const headers = new Headers(upstream.headers);
+	for (const [k, v] of Object.entries(corsHeaders(origin))) {
+		headers.set(k, v);
+	}
+	return new Response(upstream.body, {
+		status: upstream.status,
+		statusText: upstream.statusText,
+		headers,
+	});
 }
 
 function jsonResponse(

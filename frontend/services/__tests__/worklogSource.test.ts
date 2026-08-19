@@ -9,9 +9,13 @@ describe('looksLikeTempoManaged', () => {
 			]),
 		).toBe(true);
 	});
-	it('true for a Tempo display name even without accountType', () => {
+	it('false for a Tempo-ish name with no app accountType', () => {
+		// Previously true. A name match alone also matches a human called Tempo,
+		// and in auto mode that silently re-routes reads and writes on an
+		// instance with no Tempo at all. A missed detection is cheap by
+		// comparison — the user picks the mode manually.
 		expect(looksLikeTempoManaged([{ displayName: 'Tempo Timesheets' }])).toBe(
-			true,
+			false,
 		);
 	});
 	it('false for ordinary human authors', () => {
@@ -21,6 +25,43 @@ describe('looksLikeTempoManaged', () => {
 	});
 	it('false for an empty list', () => {
 		expect(looksLikeTempoManaged([])).toBe(false);
+	});
+});
+
+describe('looksLikeTempoManaged — false positives (review #13)', () => {
+	it('does not fire on a human whose display name contains "tempo"', () => {
+		// In auto mode with a token present this would silently re-route every
+		// read and write to Tempo on an instance that does not use Tempo.
+		expect(
+			looksLikeTempoManaged([
+				{ accountType: 'atlassian', displayName: 'Tempo Ribeiro' },
+			]),
+		).toBe(false);
+	});
+
+	it('does not fire on an unrelated app account', () => {
+		expect(
+			looksLikeTempoManaged([
+				{ accountType: 'app', displayName: 'Automation for Jira' },
+			]),
+		).toBe(false);
+	});
+
+	it('still fires on the Tempo app account', () => {
+		expect(
+			looksLikeTempoManaged([
+				{ accountType: 'app', displayName: 'Tempo Timesheets' },
+			]),
+		).toBe(true);
+	});
+
+	it('still fires when the app account is among human authors', () => {
+		expect(
+			looksLikeTempoManaged([
+				{ accountType: 'atlassian', displayName: 'Real Person' },
+				{ accountType: 'app', displayName: 'Tempo' },
+			]),
+		).toBe(true);
 	});
 });
 

@@ -11,11 +11,13 @@
  * issue keys, so each write resolves the key to an id via Jira first.
  */
 
+import type { EnrichedJiraWorklog, JiraIssue } from '../../types/jira';
 import { parseTimeSpentToSeconds } from '../react/utils/timeSpent';
 import { resolveAccountId } from './jiraIdentity';
 import { searchAllIssues } from './jiraSearch';
 import { fromHttpResponse, fromNetworkError } from './serviceErrors';
-import { buildTempoRequest } from './tempoGateway';
+import { buildTempoRequest, describeTempoNetworkError } from './tempoGateway';
+import { mapTempoWorklog, type TempoWorklog } from './tempoMapper';
 import type { TempoServiceConfig } from './tempoWorklogService';
 
 export interface TempoWriteInput {
@@ -99,7 +101,11 @@ async function tempoWrite(
 			signal,
 		});
 	} catch (err) {
-		throw fromNetworkError('Tempo worklog write', err);
+		const generic = fromNetworkError('Tempo worklog write', err);
+		throw new Error(
+			describeTempoNetworkError(config.corsProxy, generic.message),
+			{ cause: generic },
+		);
 	}
 	if (!res.ok) throw fromHttpResponse('Tempo worklog write', res.status);
 	if (res.status === 204) return null;
@@ -171,5 +177,34 @@ export async function deleteWorklogTempo(
 		'DELETE',
 		undefined,
 		signal,
+	);
+}
+
+/**
+ * Map a Tempo write response onto the shape the timesheet store and month
+ * caches expect.
+ *
+ * Tempo echoes a *Tempo* worklog: `tempoWorklogId`, `startDate`/`startTime`,
+ * `description` — none of `id`, `started` or `comment`. Storing that raw leaves
+ * a row that renders without a date, never patches into the month cache
+ * (`worklogMonth()` returns null), and can never be matched again for edit or
+ * delete because `wl.id` is undefined. Reuses `mapTempoWorklog` so writes and
+ * reads produce identical rows.
+ *
+ * The issue is passed in because the caller has already resolved it — Tempo's
+ * response carries only a numeric issue id.
+ */
+export function mapTempoWriteResponse(
+	response: unknown,
+	issue: JiraIssue,
+	email: string,
+	displayName?: string,
+): EnrichedJiraWorklog {
+	const wl = response as TempoWorklog;
+	return mapTempoWorklog(
+		wl,
+		new Map([[String(wl.issue?.id ?? issue.id), issue]]),
+		email,
+		displayName,
 	);
 }

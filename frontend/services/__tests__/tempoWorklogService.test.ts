@@ -10,7 +10,9 @@ const config = {
 	jiraHost: 'x.atlassian.net',
 	email: 'me@x.com',
 	apiToken: 't',
-	corsProxy: '',
+	// Tempo is unreachable from a browser without a proxy, so every realistic
+	// self-hosted config has one.
+	corsProxy: 'https://proxy.example',
 	tempoApiToken: 'tempo-tok',
 };
 
@@ -296,9 +298,11 @@ describe('user JQL filter on the Tempo read path', () => {
 	it('drops worklogs whose issue the filter excluded', async () => {
 		routeFetch({ tempo: twoIssues, jiraSearch: onlyFirstMatches });
 		const out = await fetchMonthWorklogsTempo(
-			{ ...config, jqlFilter: 'project = PAY' } as never,
+			config as never,
 			2026,
 			6,
+			undefined,
+			'project = PAY',
 		);
 		expect(out).toHaveLength(1);
 		expect(out[0]?.issue.key).toBe('PAY-1');
@@ -379,5 +383,72 @@ describe('real display names reach Reports (ADA-545)', () => {
 		routeWithBulk(page, { values: [] });
 		const out = await fetchMonthWorklogsTempo(config as never, 2026, 6);
 		expect(out[0]?.author?.displayName).toBe('Me Myself');
+	});
+});
+
+describe('jqlFilter comes from the caller, not the saved config (review #9)', () => {
+	function captureJql(tempoPage: object) {
+		const urls: string[] = [];
+		vi.spyOn(bridge, 'getProxyOverrideState').mockReturnValue({
+			hostedProxyUrl: null,
+			userOverride: false,
+			supabaseAccessToken: null,
+		});
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				urls.push(url);
+				if (url.includes('/user/bulk'))
+					return new Response(JSON.stringify({ values: [] }), { status: 200 });
+				if (url.includes('/myself'))
+					return new Response(JSON.stringify({ accountId: 'acc-me' }), {
+						status: 200,
+					});
+				if (url.includes('api.tempo.io'))
+					return new Response(JSON.stringify(tempoPage), { status: 200 });
+				return new Response(JSON.stringify({ issues: [] }), { status: 200 });
+			}),
+		);
+		return urls;
+	}
+
+	const page = {
+		results: [
+			{
+				tempoWorklogId: 1,
+				issue: { id: 1001 },
+				timeSpentSeconds: 3600,
+				startDate: '2026-07-06',
+				startTime: '09:00:00',
+				createdAt: '2026-07-06T09:00:00Z',
+				author: { accountId: 'acc-1' },
+			},
+		],
+	};
+
+	const withSavedFilter = { ...config, jqlFilter: 'project = SAVED' };
+
+	it('applies no filter when the caller passes none', async () => {
+		// Reports deliberately reads unfiltered and builds its cache key with an
+		// empty filter. Applying the saved filter anyway makes the key a lie:
+		// the rows are filtered, and editing the filter in Settings does not
+		// invalidate the entry.
+		const urls = captureJql(page);
+		await fetchTeamMonthWorklogsTempo(withSavedFilter as never, 2026, 6);
+		const search = urls.find((u) => u.includes('search/jql')) ?? '';
+		expect(decodeURIComponent(search)).not.toContain('SAVED');
+	});
+
+	it('applies the filter the caller passes', async () => {
+		const urls = captureJql(page);
+		await fetchTeamMonthWorklogsTempo(
+			withSavedFilter as never,
+			2026,
+			6,
+			undefined,
+			'project = ASKED',
+		);
+		const search = urls.find((u) => u.includes('search/jql')) ?? '';
+		expect(decodeURIComponent(search)).toContain('ASKED');
 	});
 });

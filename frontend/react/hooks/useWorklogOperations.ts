@@ -2,13 +2,21 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { jiraAuthHeader } from '../../services/jiraAuth';
 import { rewriteForHostedProxy } from '../../services/jiraGateway';
-import { toTempoWriteInput } from '../../services/tempoWriteService';
+import {
+	mapTempoWriteResponse,
+	toTempoWriteInput,
+} from '../../services/tempoWriteService';
 import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import type { EnrichedJiraWorklog } from '../../stores/useTimesheetStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { useUIStore } from '../../stores/useUIStore';
-import { writeCreate, writeDelete, writeUpdate } from './worklogWriteRouter';
+import {
+	assertWritableRow,
+	writeCreate,
+	writeDelete,
+	writeUpdate,
+} from './worklogWriteRouter';
 
 /**
  * Which month a worklog belongs to, in the same 0-indexed shape used by the
@@ -179,11 +187,14 @@ export function useWorklogOperations() {
 				toTempoWriteInput(params),
 			)) as EnrichedJiraWorklog;
 
-			// Add the new worklog to the store with issue info
-			const enrichedWorklog: EnrichedJiraWorklog = {
-				...newWorklog,
-				issue: issue,
-			};
+			// Tempo echoes a Tempo worklog, not a Jira one — it has no `id`,
+			// `started` or `comment`, so storing it raw yields a dateless row that
+			// never patches into the month cache and can never be matched again
+			// for edit or delete. Map it into the shape the store expects.
+			const enrichedWorklog: EnrichedJiraWorklog =
+				writeSource === 'tempo'
+					? mapTempoWriteResponse(newWorklog, issue, config.email)
+					: { ...newWorklog, issue: issue };
 
 			const currentData = useTimesheetStore.getState().data;
 			// Patch the month cache(s) instead of invalidating: the search API is
@@ -220,6 +231,13 @@ export function useWorklogOperations() {
 			throw new Error('Jira client not configured');
 		}
 
+		// In auto mode the source can flip after the store was filled, leaving
+		// ids from the other backend in it (ADA-544).
+		assertWritableRow(
+			useTimesheetStore.getState().data?.find((wl) => wl.id === worklogId),
+			writeSource,
+		);
+
 		setIsLoading(true);
 		setError(null);
 
@@ -243,14 +261,15 @@ export function useWorklogOperations() {
 				toTempoWriteInput({ ...params, issueKey }),
 			)) as EnrichedJiraWorklog;
 
-			// Update in the store
+			// Update in the store. As with create, a raw Tempo echo would strip
+			// the row's id and date — and here it would *destroy* an existing
+			// good row rather than just adding a broken one.
 			const currentData = useTimesheetStore.getState().data;
 			const updatedData = currentData?.map((wl) => {
 				if (wl.id === worklogId) {
-					return {
-						...updatedWorklog,
-						issue: wl.issue,
-					};
+					return writeSource === 'tempo'
+						? mapTempoWriteResponse(updatedWorklog, wl.issue, config.email)
+						: { ...updatedWorklog, issue: wl.issue };
 				}
 				return wl;
 			});
@@ -344,24 +363,34 @@ export function useWorklogOperations() {
 						continue;
 					}
 
-					// Create the worklog
+					// Create the worklog. This must route like the single-create
+					// path: clone-to-days (DayCard) uses this, and on a
+					// Tempo-managed instance a Jira-native POST is authored by the
+					// human — invisible to the reads, or double-counted once Tempo
+					// imports it. It was previously hard-wired to Jira.
 					const worklogUrl = buildUrl(
 						`/rest/api/2/issue/${entry.issueKey}/worklog`,
 					);
-					const newWorklog = await makeRequest(worklogUrl, {
-						method: 'POST',
-						body: JSON.stringify({
-							timeSpent: entry.timeSpent,
-							comment: entry.comment,
-							started: toJiraDatetime(entry.started),
-						}),
-					});
+					const newWorklog = (await writeCreate(
+						writeSource,
+						config,
+						() =>
+							makeRequest(worklogUrl, {
+								method: 'POST',
+								body: JSON.stringify({
+									timeSpent: entry.timeSpent,
+									comment: entry.comment,
+									started: toJiraDatetime(entry.started),
+								}),
+							}),
+						toTempoWriteInput(entry),
+					)) as EnrichedJiraWorklog;
 
 					// Add to store
-					const enrichedWorklog: EnrichedJiraWorklog = {
-						...newWorklog,
-						issue: issue,
-					};
+					const enrichedWorklog: EnrichedJiraWorklog =
+						writeSource === 'tempo'
+							? mapTempoWriteResponse(newWorklog, issue, config.email)
+							: { ...newWorklog, issue: issue };
 
 					const updatedData = [
 						...(useTimesheetStore.getState().data || []),
@@ -376,7 +405,10 @@ export function useWorklogOperations() {
 
 					created.push({
 						issueKey: entry.issueKey,
-						worklogId: newWorklog.id,
+						// The mapped row, not the raw response: a Tempo echo has no
+						// `id`, so the caller would get `undefined` here and could
+						// never undo or edit what it just created.
+						worklogId: enrichedWorklog.id ?? '',
 					});
 					successCount++;
 				} catch {
@@ -394,6 +426,13 @@ export function useWorklogOperations() {
 		if (!config.jiraHost || !config.apiToken) {
 			throw new Error('Jira client not configured');
 		}
+
+		// Deleting the wrong worklog is the worst outcome here, so a stale row
+		// from the other backend is refused rather than guessed at.
+		assertWritableRow(
+			useTimesheetStore.getState().data?.find((wl) => wl.id === worklogId),
+			writeSource,
+		);
 
 		setIsLoading(true);
 		setError(null);

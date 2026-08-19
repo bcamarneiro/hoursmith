@@ -23,6 +23,33 @@ import {
 
 export type WorklogWriteSource = 'jira' | 'tempo';
 
+/**
+ * Refuse a write whose target row came from the other backend.
+ *
+ * Jira and Tempo worklog ids are separate id spaces, and in `auto` mode the
+ * active source can flip mid-session: the first read is Jira (detection has not
+ * run yet) and fills the store with Jira ids, then detection switches the
+ * source to Tempo. An edit or delete in that window would send a Jira id to
+ * `PUT`/`DELETE /4/worklogs/{id}`, which 404s at best and mutates an unrelated
+ * worklog at worst.
+ *
+ * Rows with no recorded source are treated as Jira, which is what they were
+ * before the field existed. An unknown row is allowed through: the guard exists
+ * to catch a *known* mismatch, not to gate writes on cache completeness.
+ */
+export function assertWritableRow(
+	row: { worklogSource?: unknown; [key: string]: unknown } | undefined,
+	writeSource: WorklogWriteSource,
+): void {
+	if (!row) return;
+	const rowSource = row.worklogSource === 'tempo' ? 'tempo' : 'jira';
+	if (rowSource === writeSource) return;
+	throw new Error(
+		`This worklog was loaded from ${rowSource} but ${writeSource} is now the active source. ` +
+			'Refresh before editing it, so the change lands on the right worklog.',
+	);
+}
+
 export async function writeCreate<T>(
 	source: WorklogWriteSource,
 	config: TempoServiceConfig,

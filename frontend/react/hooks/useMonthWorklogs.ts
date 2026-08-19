@@ -38,6 +38,7 @@ export function monthWorklogsQueryKey(
 	currentUserOnly: boolean,
 	jqlFilter: string,
 	source: 'jira' | 'tempo',
+	scope: WorklogReadScope,
 ) {
 	return [
 		'monthWorklogs',
@@ -48,6 +49,14 @@ export function monthWorklogsQueryKey(
 		currentUserOnly,
 		jqlFilter,
 		source,
+		// Scope only changes the *data* on Tempo, where the two scopes hit
+		// different endpoints (`worklogs/user/{id}` vs `worklogs`); sharing one
+		// entry there lets whichever surface loads first win, so Reports can
+		// silently render My Week's single-user rows as the whole team.
+		// On Jira both scopes hit the same endpoint with the same result, so
+		// they deliberately keep sharing an entry — that cross-surface
+		// deduplication is why My Week and Reports don't double-fetch a month.
+		source === 'tempo' ? scope : 'shared',
 	];
 }
 
@@ -81,6 +90,7 @@ export function useMonthWorklogs(
 			currentUserOnly,
 			jqlFilter,
 			source,
+			options.scope,
 		),
 		queryFn: ({ signal }) =>
 			readMonth(
@@ -149,6 +159,7 @@ export function useMonthWorklogs(
 					currentUserOnly,
 					jqlFilter,
 					source,
+					options.scope,
 				),
 				queryFn: ({ signal }) =>
 					readMonth(

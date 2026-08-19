@@ -118,6 +118,7 @@ export function useCopyPreviousWeek() {
 					false,
 					jqlFilter,
 					source,
+					'personal',
 				);
 
 			const month1Data = await queryClient.fetchQuery({

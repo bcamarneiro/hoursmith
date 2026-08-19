@@ -2,13 +2,12 @@ import type { EnrichedJiraWorklog } from '../../types/jira';
 import { resolveIdentity } from './jiraIdentity';
 import { jiraRequest } from './jiraRequest';
 import { fromHttpResponse, fromNetworkError } from './serviceErrors';
-import { buildTempoRequest } from './tempoGateway';
+import { buildTempoRequest, describeTempoNetworkError } from './tempoGateway';
 import {
 	fetchIssueMetadata,
 	mapTempoWorklog,
 	type TempoWorklog,
 } from './tempoMapper';
-import type { WorklogEntry } from './worklogService';
 
 export interface TempoServiceConfig {
 	jiraHost: string;
@@ -64,7 +63,13 @@ async function fetchAllTempoWorklogs(
 		try {
 			res = await fetch(url, { headers, signal });
 		} catch (err) {
-			throw fromNetworkError('Tempo worklogs', err);
+			// A direct-mode failure is a missing proxy, not a bad token — say so
+			// rather than letting the generic network message mislead.
+			const generic = fromNetworkError('Tempo worklogs', err);
+			throw new Error(
+				describeTempoNetworkError(config.corsProxy, generic.message),
+				{ cause: generic },
+			);
 		}
 		if (!res.ok) throw fromHttpResponse('Tempo worklogs', res.status);
 		const page = (await res.json()) as TempoPage;
@@ -92,16 +97,23 @@ async function enrichAndMap(
 	signal?: AbortSignal,
 	identityByAccountId?: Map<string, AuthorIdentity>,
 	fallbackDisplayName?: string,
+	// Explicit, and NOT defaulted to `config.jqlFilter`: callers build their
+	// cache keys from the filter they intend to apply, so silently substituting
+	// the saved one makes those keys describe data they do not hold — and a
+	// filter change in Settings then fails to invalidate them.
+	jqlFilter = '',
 ): Promise<EnrichedJiraWorklog[]> {
 	const ids = worklogs.map((w) => String(w.issue.id));
-	const issueMap = await fetchIssueMetadata(ids, config, signal);
+	const issueMap = await fetchIssueMetadata(
+		ids,
+		{ ...config, jqlFilter },
+		signal,
+	);
 	// With a filter configured, an issue missing from the map means Jira
 	// excluded it — drop those worklogs. Without one, a miss means metadata was
 	// unavailable, and dropping would silently undercount real hours, so the
 	// mapper's placeholder is the right answer instead.
-	const filtering = Boolean(
-		(config as { jqlFilter?: string }).jqlFilter?.trim(),
-	);
+	const filtering = Boolean(jqlFilter.trim());
 	const visible = filtering
 		? worklogs.filter((w) => issueMap.has(String(w.issue.id)))
 		: worklogs;
@@ -180,6 +192,7 @@ export async function fetchMonthWorklogsTempo(
 	year: number,
 	month: number, // 0-indexed
 	signal?: AbortSignal,
+	jqlFilter = '',
 ): Promise<EnrichedJiraWorklog[]> {
 	if (!config.jiraHost || !config.apiToken || !config.tempoApiToken) return [];
 	const identity = await resolveIdentity(config, signal);
@@ -200,6 +213,7 @@ export async function fetchMonthWorklogsTempo(
 		signal,
 		undefined,
 		identity.displayName,
+		jqlFilter,
 	);
 }
 
@@ -213,6 +227,7 @@ export async function fetchTeamMonthWorklogsTempo(
 	year: number,
 	month: number, // 0-indexed
 	signal?: AbortSignal,
+	jqlFilter = '',
 ): Promise<EnrichedJiraWorklog[]> {
 	if (!config.jiraHost || !config.apiToken || !config.tempoApiToken) return [];
 	const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -224,40 +239,5 @@ export async function fetchTeamMonthWorklogsTempo(
 		worklogs.map((w) => w.author?.accountId ?? ''),
 		signal,
 	);
-	return enrichAndMap(config, worklogs, signal, emails);
-}
-
-export async function fetchWeekWorklogsTempo(
-	config: TempoServiceConfig,
-	weekStart: string,
-	weekEnd: string,
-	signal?: AbortSignal,
-): Promise<WorklogEntry[]> {
-	if (!config.jiraHost || !config.apiToken || !config.tempoApiToken) return [];
-	const identity = await resolveIdentity(config, signal);
-	const worklogs = await fetchAllTempoWorklogs(
-		config,
-		identity.accountId,
-		weekStart,
-		weekEnd,
-		signal,
-	);
-	const enriched = await enrichAndMap(
-		config,
-		worklogs,
-		signal,
-		undefined,
-		identity.displayName,
-	);
-	return enriched
-		.filter((wl) => {
-			const day = (wl.started ?? '').slice(0, 10);
-			return day >= weekStart && day <= weekEnd;
-		})
-		.map((wl) => ({
-			date: (wl.started ?? '').slice(0, 10),
-			issueKey: wl.issue.key,
-			issueSummary: wl.issue.fields.summary,
-			timeSpentSeconds: wl.timeSpentSeconds ?? 0,
-		}));
+	return enrichAndMap(config, worklogs, signal, emails, undefined, jqlFilter);
 }

@@ -52,6 +52,7 @@ const OCT_KEY = monthWorklogsQueryKey(
 	false,
 	'',
 	'jira',
+	'team',
 );
 
 beforeEach(() => {
@@ -122,6 +123,7 @@ describe('useWorklogOperations cache patching (ADA-452)', () => {
 			false,
 			'',
 			'jira',
+			'team',
 		);
 		queryClient.setQueryData<EnrichedJiraWorklog[]>(novKey, []);
 
