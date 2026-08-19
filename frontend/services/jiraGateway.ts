@@ -4,10 +4,11 @@
  * Three modes exist today:
  *
  *   1. `direct`      — browser talks straight to `https://<jiraHost>/<path>`.
- *                       Auth: `Authorization: Bearer <apiToken>`.
+ *                       Auth: see `jiraAuth.ts` — Basic on Cloud, Bearer on
+ *                       Server/DC. Cloud 403s on Bearer with an API token.
  *   2. `self-hosted` — user-configured cors-anywhere-style proxy:
  *                       `${userProxy}/https://<jiraHost>/<path>`.
- *                       Auth: `Authorization: Bearer <apiToken>`.
+ *                       Auth: same as direct.
  *   3. `hosted`      — Hoursmith Premium proxy at `${origin}/api/proxy/<path>`.
  *                       Auth: `Authorization: Bearer <supabaseJwt>`. Jira
  *                       credentials travel in `X-Jira-Auth: Basic <b64>`, and

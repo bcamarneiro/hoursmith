@@ -1,5 +1,6 @@
 import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
+import { jiraAuthHeader } from './jiraAuth';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { fetchSearchPage } from './jiraSearch';
 
@@ -51,7 +52,11 @@ export async function fetchWeekWorklogs(
 		: `https://${config.jiraHost}`;
 
 	const headers = {
-		Authorization: `Bearer ${config.apiToken}`,
+		Authorization: jiraAuthHeader(
+			config.jiraHost,
+			config.email ?? '',
+			config.apiToken,
+		),
 		Accept: 'application/json',
 		'X-Atlassian-Token': 'no-check',
 	};
