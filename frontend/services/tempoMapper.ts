@@ -86,6 +86,7 @@ export function mapTempoWorklog(
 	wl: TempoWorklog,
 	issueMap: Map<string, JiraIssue>,
 	email: string,
+	displayName?: string,
 ): EnrichedJiraWorklog {
 	const issueId = String(wl.issue.id);
 	const issue =
@@ -104,7 +105,16 @@ export function mapTempoWorklog(
 		created: wl.createdAt ?? started,
 		timeSpentSeconds: wl.timeSpentSeconds,
 		comment: wl.description ?? '',
-		author: { accountId: wl.author?.accountId, emailAddress: email },
+		author: {
+			accountId: wl.author?.accountId,
+			emailAddress: email,
+			// MUST be non-empty. `deriveMonthlyReportState` skips any worklog whose
+			// author has no displayName, so an empty one makes every Tempo row
+			// vanish from Reports with no error — the page just reports "No
+			// worklogs found" (observed against a live instance 2026-08-19).
+			// Tempo itself only sends an accountId, hence the fallback chain.
+			displayName: displayName || email || wl.author?.accountId || 'Unknown',
+		},
 		issue,
 	};
 }

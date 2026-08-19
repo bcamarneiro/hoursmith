@@ -312,3 +312,72 @@ describe('user JQL filter on the Tempo read path', () => {
 		expect(out).toHaveLength(2);
 	});
 });
+
+describe('real display names reach Reports (ADA-545)', () => {
+	function routeWithBulk(tempoPage: object, bulk: object) {
+		vi.spyOn(bridge, 'getProxyOverrideState').mockReturnValue({
+			hostedProxyUrl: null,
+			userOverride: false,
+			supabaseAccessToken: null,
+		});
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				if (url.includes('/user/bulk'))
+					return new Response(JSON.stringify(bulk), { status: 200 });
+				if (url.includes('/myself'))
+					return new Response(
+						JSON.stringify({
+							accountId: 'acc-me',
+							displayName: 'Me Myself',
+						}),
+						{ status: 200 },
+					);
+				if (url.includes('api.tempo.io'))
+					return new Response(JSON.stringify(tempoPage), { status: 200 });
+				if (url.includes('/search/jql'))
+					return new Response(
+						JSON.stringify({
+							issues: [{ id: '1001', key: 'PAY-1', fields: { summary: 's' } }],
+						}),
+						{ status: 200 },
+					);
+				throw new Error(`unexpected url ${url}`);
+			}),
+		);
+	}
+
+	const page = {
+		results: [
+			{
+				tempoWorklogId: 1,
+				issue: { id: 1001 },
+				timeSpentSeconds: 3600,
+				startDate: '2026-07-06',
+				startTime: '09:00:00',
+				createdAt: '2026-07-06T09:00:00Z',
+				author: { accountId: 'acc-alice' },
+			},
+		],
+	};
+
+	it('uses each teammate real display name from Jira', async () => {
+		routeWithBulk(page, {
+			values: [
+				{
+					accountId: 'acc-alice',
+					emailAddress: 'alice@x.com',
+					displayName: 'Alice Alpha',
+				},
+			],
+		});
+		const out = await fetchTeamMonthWorklogsTempo(config as never, 2026, 6);
+		expect(out[0]?.author?.displayName).toBe('Alice Alpha');
+	});
+
+	it('uses the signed-in user display name for a personal read', async () => {
+		routeWithBulk(page, { values: [] });
+		const out = await fetchMonthWorklogsTempo(config as never, 2026, 6);
+		expect(out[0]?.author?.displayName).toBe('Me Myself');
+	});
+});

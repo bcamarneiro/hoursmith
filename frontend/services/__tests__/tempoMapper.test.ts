@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { JiraIssue } from '../../../types/jira';
 import { classifyWorklog } from '../../react/utils/worklogClassifier';
+import { deriveMonthlyReportState } from '../../react/utils/monthlyReport';
 import {
 	buildIssueMetadataJql,
 	chunkIds,
@@ -216,5 +217,63 @@ describe('buildIssueMetadataJql — honouring the user JQL filter on Tempo', () 
 
 	it('ignores a whitespace-only filter', () => {
 		expect(buildIssueMetadataJql(['1'], '   ')).toBe('issue in (1)');
+	});
+});
+
+describe('author identity survives into Reports', () => {
+	const worklog = {
+		tempoWorklogId: 1,
+		issue: { id: 1001 },
+		timeSpentSeconds: 3600,
+		startDate: '2026-07-27',
+		startTime: '09:00:00',
+		createdAt: '2026-07-27T09:00:00Z',
+		description: 'work',
+		author: { accountId: 'acc-1' },
+	};
+	const issue = {
+		id: '1001',
+		key: 'PAY-1',
+		fields: { summary: 'Ship the thing' },
+	};
+
+	it('carries a displayName, which Reports requires to group at all', () => {
+		const mapped = mapTempoWorklog(
+			worklog,
+			new Map([['1001', issue]]),
+			'me@x.com',
+			'Bruno Camarneiro',
+		);
+		expect(mapped.author?.displayName).toBe('Bruno Camarneiro');
+	});
+
+	it('appears in the monthly report instead of being silently dropped', () => {
+		const mapped = mapTempoWorklog(
+			worklog,
+			new Map([['1001', issue]]),
+			'me@x.com',
+			'Bruno Camarneiro',
+		);
+		// deriveMonthlyReportState skips any worklog with no author.displayName,
+		// so a Tempo worklog without one vanishes from Reports with no error —
+		// the page just says "No worklogs found".
+		const state = deriveMonthlyReportState([mapped], '', '');
+		expect(state.users).toHaveLength(1);
+		expect(state.visibleEntries).toHaveLength(1);
+	});
+
+	it('falls back to the email when no display name is known', () => {
+		const mapped = mapTempoWorklog(
+			worklog,
+			new Map([['1001', issue]]),
+			'me@x.com',
+		);
+		// Still must be non-empty, or the row disappears from Reports.
+		expect(mapped.author?.displayName).toBe('me@x.com');
+	});
+
+	it('falls back to the accountId when neither name nor email is known', () => {
+		const mapped = mapTempoWorklog(worklog, new Map([['1001', issue]]), '');
+		expect(mapped.author?.displayName).toBe('acc-1');
 	});
 });

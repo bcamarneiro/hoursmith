@@ -1,5 +1,5 @@
 import type { EnrichedJiraWorklog } from '../../types/jira';
-import { resolveAccountId } from './jiraIdentity';
+import { resolveIdentity } from './jiraIdentity';
 import { jiraRequest } from './jiraRequest';
 import { fromHttpResponse, fromNetworkError } from './serviceErrors';
 import { buildTempoRequest } from './tempoGateway';
@@ -81,11 +81,17 @@ async function fetchAllTempoWorklogs(
 	return all;
 }
 
+export interface AuthorIdentity {
+	email: string;
+	displayName: string;
+}
+
 async function enrichAndMap(
 	config: TempoServiceConfig,
 	worklogs: TempoWorklog[],
 	signal?: AbortSignal,
-	emailByAccountId?: Map<string, string>,
+	identityByAccountId?: Map<string, AuthorIdentity>,
+	fallbackDisplayName?: string,
 ): Promise<EnrichedJiraWorklog[]> {
 	const ids = worklogs.map((w) => String(w.issue.id));
 	const issueMap = await fetchIssueMetadata(ids, config, signal);
@@ -105,12 +111,17 @@ async function enrichAndMap(
 		// stamping one address on every row would merge the whole team into one
 		// person. Fall back to the accountId, which at least stays distinct.
 		const accountId = w.author?.accountId;
-		const email = emailByAccountId
-			? accountId
-				? (emailByAccountId.get(accountId) ?? accountId)
-				: ''
+		const identity = accountId
+			? identityByAccountId?.get(accountId)
+			: undefined;
+		const email = identityByAccountId
+			? (identity?.email ?? accountId ?? '')
 			: config.email;
-		return mapTempoWorklog(w, issueMap, email);
+		// A non-empty display name is load-bearing: Reports drops authors
+		// without one (see tempoMapper).
+		const displayName =
+			identity?.displayName || fallbackDisplayName || email || accountId;
+		return mapTempoWorklog(w, issueMap, email, displayName);
 	});
 }
 
@@ -125,8 +136,8 @@ export async function fetchEmailsByAccountId(
 	config: TempoServiceConfig,
 	accountIds: string[],
 	signal?: AbortSignal,
-): Promise<Map<string, string>> {
-	const map = new Map<string, string>();
+): Promise<Map<string, AuthorIdentity>> {
+	const map = new Map<string, AuthorIdentity>();
 	const unique = [...new Set(accountIds.filter(Boolean))];
 	// Jira caps `/user/bulk` at 200 ids per call.
 	for (let i = 0; i < unique.length; i += 200) {
@@ -139,11 +150,22 @@ export async function fetchEmailsByAccountId(
 				config as unknown as Parameters<typeof jiraRequest>[0],
 				`/rest/api/3/user/bulk?maxResults=200&${query}`,
 				signal,
-			)) as { values?: Array<{ accountId?: string; emailAddress?: string }> };
+			)) as {
+				values?: Array<{
+					accountId?: string;
+					emailAddress?: string;
+					displayName?: string;
+				}>;
+			};
 			for (const user of json.values ?? []) {
-				if (user.accountId && user.emailAddress) {
-					map.set(user.accountId, user.emailAddress);
-				}
+				if (!user.accountId) continue;
+				// Jira privacy settings can hide the email while still exposing the
+				// display name, so store whatever came back and let the caller fall
+				// back per field.
+				map.set(user.accountId, {
+					email: user.emailAddress ?? user.accountId,
+					displayName: user.displayName ?? '',
+				});
 			}
 		} catch {
 			// A failed lookup degrades attribution to accountIds; it must not take
@@ -160,7 +182,8 @@ export async function fetchMonthWorklogsTempo(
 	signal?: AbortSignal,
 ): Promise<EnrichedJiraWorklog[]> {
 	if (!config.jiraHost || !config.apiToken || !config.tempoApiToken) return [];
-	const accountId = await resolveAccountId(config, signal);
+	const identity = await resolveIdentity(config, signal);
+	const accountId = identity.accountId;
 	const daysInMonth = new Date(year, month + 1, 0).getDate();
 	const from = `${year}-${pad(month + 1)}-01`;
 	const to = `${year}-${pad(month + 1)}-${pad(daysInMonth)}`;
@@ -171,7 +194,13 @@ export async function fetchMonthWorklogsTempo(
 		to,
 		signal,
 	);
-	return enrichAndMap(config, worklogs, signal);
+	return enrichAndMap(
+		config,
+		worklogs,
+		signal,
+		undefined,
+		identity.displayName,
+	);
 }
 
 /**
@@ -205,15 +234,21 @@ export async function fetchWeekWorklogsTempo(
 	signal?: AbortSignal,
 ): Promise<WorklogEntry[]> {
 	if (!config.jiraHost || !config.apiToken || !config.tempoApiToken) return [];
-	const accountId = await resolveAccountId(config, signal);
+	const identity = await resolveIdentity(config, signal);
 	const worklogs = await fetchAllTempoWorklogs(
 		config,
-		accountId,
+		identity.accountId,
 		weekStart,
 		weekEnd,
 		signal,
 	);
-	const enriched = await enrichAndMap(config, worklogs, signal);
+	const enriched = await enrichAndMap(
+		config,
+		worklogs,
+		signal,
+		undefined,
+		identity.displayName,
+	);
 	return enriched
 		.filter((wl) => {
 			const day = (wl.started ?? '').slice(0, 10);
