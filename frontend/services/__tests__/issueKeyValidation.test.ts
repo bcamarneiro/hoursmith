@@ -54,6 +54,20 @@ describe('filterToRealIssueKeys', () => {
 		expect(out.size).toBe(0);
 	});
 
+	it('degrades to no filtering on a Server/DC 400 rather than dropping the day', async () => {
+		// Jira Server rejects the whole `issue in (...)` clause when any key is
+		// unknown — which is precisely the case this function is called with.
+		// Falling back to "keep everything" restores the pre-existing behaviour
+		// instead of emptying the suggestion list on those deployments.
+		vi.spyOn(jiraSearch, 'searchAllIssues').mockRejectedValue(
+			new Error(
+				"An issue with key 'WEB-000' does not exist for field 'issue'.",
+			),
+		);
+		const out = await filterToRealIssueKeys(config, ['PAY-1', 'WEB-000']);
+		expect(out.size).toBe(2);
+	});
+
 	it('keeps every key when the lookup fails, rather than losing real work', async () => {
 		// Validation is a filter for noise, not a gate on correctness. If Jira is
 		// unreachable, dropping everything would silently hide a day's activity —

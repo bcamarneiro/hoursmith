@@ -16,6 +16,14 @@
  * This filters *noise*, so a failed lookup keeps every candidate: hiding a
  * day's real activity because Jira was briefly unreachable is a worse outcome
  * than showing one suggestion that turns out to be bogus.
+ *
+ * Behaviour differs by deployment, and the fallback is what makes that safe:
+ *   - **Cloud** answers 200 and simply omits keys it does not know (verified
+ *     against a live instance), so filtering works as intended.
+ *   - **Server / DC** has historically rejected the whole clause with a 400
+ *     when any key is unknown. That lands in the catch below, every candidate
+ *     is kept, and the result is exactly the pre-existing behaviour — no
+ *     filtering, but nothing lost either.
  */
 
 import { searchAllIssues } from './jiraSearch';
