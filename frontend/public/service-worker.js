@@ -82,7 +82,13 @@ self.addEventListener('fetch', (event) => {
 				// terminated before the cache is written.
 				event.waitUntil(networkPromise);
 
-				return cachedResponse || Response.error();
+				// Fall back to the network result before giving up. The promise
+				// above has already resolved by the time we get here; discarding
+				// it meant a missing shell cache (evicted under storage
+				// pressure, a partial precache on install, or site data cleared
+				// while the SW stayed registered) turned every navigation into a
+				// network error — the app unreachable while fully online.
+				return cachedResponse || (await networkPromise) || Response.error();
 			}),
 		);
 		return;
