@@ -9,12 +9,10 @@ import {
 } from '../../services/githubService';
 import { fetchGitlabSuggestions } from '../../services/gitlabService';
 import { fetchJiraActivitySuggestions } from '../../services/jiraActivityService';
-import {
-	fetchMonthWorklogs,
-	type WorklogItem,
-} from '../../services/monthWorklogService';
+import type { WorklogItem } from '../../services/monthWorklogService';
 import { fetchRescueTimeData } from '../../services/rescueTimeService';
 import { mergeSuggestions } from '../../services/suggestionMerger';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import {
@@ -26,6 +24,8 @@ import { classifyWorklog } from '../utils/worklogClassifier';
 import { useAbsenceDays } from './useAbsenceDays';
 import { useEffectiveProxyUrl } from './useEffectiveProxyUrl';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
+import { useTempoSuspected } from './useTempoSuspected';
+import { readMonth } from './worklogReadRouter';
 
 interface WorklogEntry {
 	date: string;
@@ -129,6 +129,16 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 	const jiraHost = useConfigStore((s) => s.config.jiraHost);
 	const email = useConfigStore((s) => s.config.email);
 	const apiToken = useConfigStore((s) => s.config.apiToken);
+	const tempoMode = useConfigStore((s) => s.config.tempoMode);
+	const tempoApiToken = useConfigStore((s) => s.config.tempoApiToken);
+	const tempoSuspected = useTempoSuspected();
+	const source = getWorklogSource({
+		tempoMode,
+		tempoApiToken,
+		tempoSuspected,
+		// My Week only ever shows the signed-in user.
+		scope: 'personal',
+	});
 	// For Jira requests, use the effective proxy URL — auto-resolves to the
 	// hosted Premium endpoint when entitled (ADA-273). The `monthWorklogService`
 	// + friends additionally re-route URL/headers via `rewriteForHostedProxy`.
@@ -238,6 +248,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 			const jqlFilter = jqlFilterValue?.trim() || '';
 			const fetchOpts = {
 				jqlFilter: jqlFilter || undefined,
+				scope: 'personal' as const,
 			};
 			const buildKey = (y: number, m: number) =>
 				monthWorklogsQueryKey(
@@ -247,6 +258,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 					config.corsProxy,
 					false,
 					jqlFilter,
+					source,
+					'personal',
 				);
 
 			let githubUser: {
@@ -277,7 +290,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 						const month1Data = await queryClient.fetchQuery({
 							queryKey: buildKey(startYear, startMonth),
 							queryFn: ({ signal: s }) =>
-								fetchMonthWorklogs(
+								readMonth(
+									source,
 									config,
 									startYear,
 									startMonth,
@@ -295,7 +309,8 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 							const month2Data = await queryClient.fetchQuery({
 								queryKey: buildKey(endYear, endMonth),
 								queryFn: ({ signal: s }) =>
-									fetchMonthWorklogs(
+									readMonth(
+										source,
 										config,
 										endYear,
 										endMonth,
@@ -482,6 +497,7 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 		corsProxy,
 		userConfiguredProxy,
 		jqlFilterValue,
+		source,
 		gitlabToken,
 		gitlabHost,
 		githubToken,

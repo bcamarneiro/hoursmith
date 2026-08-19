@@ -26,6 +26,8 @@ const baseConfig: Config = {
 	githubToken: '',
 	githubHost: '',
 	rescueTimeApiKey: '',
+	tempoApiToken: '',
+	tempoMode: 'auto',
 	calendarFeeds: [],
 	absenceAssignments: [],
 	complianceReminderEnabled: false,

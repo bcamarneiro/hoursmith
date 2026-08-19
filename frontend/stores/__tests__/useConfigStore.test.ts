@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	CONFIG_STORAGE_VERSION,
+	type Config,
 	createDefaultConfig,
 	migratePersistedConfigState,
 	normalizeConfig,
@@ -207,6 +208,32 @@ describe('github config fields', () => {
 		});
 		expect(c.githubToken).toBe('tok');
 		expect(c.githubHost).toBe('github.example.com');
+	});
+});
+
+describe('tempo config fields', () => {
+	it('defaults tempoApiToken to empty and tempoMode to auto', () => {
+		const cfg = createDefaultConfig();
+		expect(cfg.tempoApiToken).toBe('');
+		expect(cfg.tempoMode).toBe('auto');
+	});
+
+	it('normalizes a missing tempoMode to auto and trims the token', () => {
+		const cfg = normalizeConfig({
+			tempoApiToken: '  abc  ',
+		} as Partial<Config>);
+		expect(cfg.tempoApiToken).toBe('abc');
+		expect(cfg.tempoMode).toBe('auto');
+	});
+
+	it('keeps a valid tempoMode and rejects an invalid one', () => {
+		expect(
+			normalizeConfig({ tempoMode: 'tempo' } as Partial<Config>).tempoMode,
+		).toBe('tempo');
+		expect(
+			normalizeConfig({ tempoMode: 'nonsense' } as unknown as Partial<Config>)
+				.tempoMode,
+		).toBe('auto');
 	});
 });
 

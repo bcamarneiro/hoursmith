@@ -25,6 +25,18 @@ interface UIState {
 	// Product adoption preferences
 	installPromptDismissed: boolean;
 
+	// Transient flag: at least one worklog author looks like the Tempo app account
+	tempoSuspected: boolean;
+	/**
+	 * Which Jira *instance* the suspicion belongs to — see
+	 * `buildTempoInstanceKey`. Persisted with the flag so detection survives a
+	 * reload: without it, `auto` (the default) resolves to Jira on every cold
+	 * load until a read completes, and a write in that window goes to the wrong
+	 * backend. Scoped so switching jiraHost does not carry the suspicion to an
+	 * instance that has no Tempo.
+	 */
+	tempoSuspectedFingerprint: string | null;
+
 	// Persisted evidence that the saved Jira connection has already worked
 	jiraConnectionEvidenceAt: string | null;
 	jiraConnectionEvidenceFingerprint: string | null;
@@ -38,6 +50,7 @@ interface UIState {
 	resetPreferences: () => void;
 	dismissInstallPrompt: () => void;
 	resetInstallPrompt: () => void;
+	setTempoSuspected: (v: boolean, fingerprint?: string) => void;
 	markJiraConnectionEvidence: (
 		fingerprint: string,
 		source: 'test' | 'fetch',
@@ -67,7 +80,9 @@ function normalizeExpandedUsers(
 	);
 }
 
-function normalizeUIPersistedState(persisted: Partial<UIState> | undefined) {
+export function normalizeUIPersistedState(
+	persisted: Partial<UIState> | undefined,
+) {
 	const jiraConnectionEvidenceAt =
 		typeof persisted?.jiraConnectionEvidenceAt === 'string'
 			? persisted.jiraConnectionEvidenceAt
@@ -94,6 +109,22 @@ function normalizeUIPersistedState(persisted: Partial<UIState> | undefined) {
 				: '',
 		expandedUsers: normalizeExpandedUsers(persisted?.expandedUsers),
 		installPromptDismissed: persisted?.installPromptDismissed === true,
+		// Must be listed here, not only in `partialize`: `merge` spreads this
+		// object over the defaults, so any key omitted below is reset on every
+		// load — which made persisting the flag a no-op.
+		//
+		// A suspicion with no fingerprint is dropped rather than trusted: it
+		// cannot be scoped to an instance, so it would apply to whatever Jira is
+		// configured next, including one with no Tempo.
+		tempoSuspected:
+			persisted?.tempoSuspected === true &&
+			typeof persisted?.tempoSuspectedFingerprint === 'string' &&
+			persisted.tempoSuspectedFingerprint.trim().length > 0,
+		tempoSuspectedFingerprint:
+			typeof persisted?.tempoSuspectedFingerprint === 'string' &&
+			persisted.tempoSuspectedFingerprint.trim()
+				? persisted.tempoSuspectedFingerprint
+				: null,
 		jiraConnectionEvidenceAt:
 			jiraConnectionEvidenceAt && jiraConnectionEvidenceFingerprint
 				? jiraConnectionEvidenceAt
@@ -104,6 +135,28 @@ function normalizeUIPersistedState(persisted: Partial<UIState> | undefined) {
 				? jiraConnectionEvidenceSource
 				: null,
 	};
+}
+
+/**
+ * Identity of the Jira *instance*, for scoping Tempo detection.
+ *
+ * Deliberately not `buildJiraConnectionFingerprint`: that includes the proxy,
+ * and the proxy differs by code path — hooks that use `useEffectiveProxyUrl`
+ * (My Week, the trend chart) see the hosted relay while others see the raw
+ * configured value. Keying on it made the recorded and compared fingerprints
+ * disagree for hosted users, so detection was ignored entirely and `auto` mode
+ * flapped depending on which read ran last.
+ *
+ * Whether Tempo manages an instance is a property of the instance, not of how
+ * the request reaches it.
+ */
+export function buildTempoInstanceKey(
+	config: Pick<Config, 'jiraHost' | 'email'>,
+): string {
+	return [
+		config.jiraHost.trim().toLowerCase(),
+		config.email.trim().toLowerCase(),
+	].join('::');
 }
 
 export function buildJiraConnectionFingerprint(
@@ -141,6 +194,8 @@ export const useUIStore = create<UIState>()(
 			selectedProject: '',
 			expandedUsers: {},
 			installPromptDismissed: false,
+			tempoSuspected: false,
+			tempoSuspectedFingerprint: null,
 			jiraConnectionEvidenceAt: null,
 			jiraConnectionEvidenceFingerprint: null,
 			jiraConnectionEvidenceSource: null,
@@ -191,6 +246,12 @@ export const useUIStore = create<UIState>()(
 				set({ installPromptDismissed: false });
 			},
 
+			setTempoSuspected: (v: boolean, fingerprint?: string) =>
+				set({
+					tempoSuspected: v,
+					tempoSuspectedFingerprint: v ? (fingerprint ?? null) : null,
+				}),
+
 			markJiraConnectionEvidence: (fingerprint, source, at) => {
 				set({
 					jiraConnectionEvidenceAt: at ?? new Date().toISOString(),
@@ -222,6 +283,8 @@ export const useUIStore = create<UIState>()(
 				jiraConnectionEvidenceFingerprint:
 					state.jiraConnectionEvidenceFingerprint,
 				jiraConnectionEvidenceSource: state.jiraConnectionEvidenceSource,
+				tempoSuspected: state.tempoSuspected,
+				tempoSuspectedFingerprint: state.tempoSuspectedFingerprint,
 			}),
 			merge: (persisted, current) => {
 				const persistedState = normalizeUIPersistedState(

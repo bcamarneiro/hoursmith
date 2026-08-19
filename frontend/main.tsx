@@ -28,13 +28,23 @@ async function startApp() {
 			});
 			logger.debug('[OFFLINE MODE] MSW started successfully');
 
-			// Set up default configuration for offline mode
-			const { setConfig } = useConfigStore.getState();
+			// Set up default configuration for offline mode. Tempo settings are
+			// carried over from whatever is already persisted rather than reset:
+			// otherwise offline mode could never exercise the Tempo path, since
+			// this runs on every load and would clear the token (ADA-542).
+			const { config: persisted, setConfig } = useConfigStore.getState();
 			setConfig({
 				...createDefaultConfig(),
 				jiraHost: 'mock.atlassian.net',
 				email: 'dev@example.com',
 				apiToken: 'mock-token',
+				// corsProxy deliberately NOT carried over: with one set, request
+				// URLs become `${proxy}/https://mock.atlassian.net/...`, which none
+				// of the MSW handlers match, so every mocked call falls through and
+				// offline mode stops working. The Tempo settings alone are what
+				// this needs to preserve.
+				tempoApiToken: persisted.tempoApiToken,
+				tempoMode: persisted.tempoMode,
 			});
 			logger.debug('[OFFLINE MODE] Default configuration set');
 

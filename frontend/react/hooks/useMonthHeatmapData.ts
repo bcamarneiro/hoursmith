@@ -67,6 +67,9 @@ export function useMonthHeatmapData(): MonthHeatmapResult {
 	const { year, month } = getWeekMonthAnchor(weekStart);
 
 	const { data: worklogs, isLoading } = useMonthWorklogs(year, month, {
+		// Buckets are filtered to `email` below, so Tempo's user-scoped read is
+		// the right source here.
+		scope: 'personal',
 		jqlFilter: jqlFilter?.trim() || undefined,
 		prefetchAdjacent: true,
 	});

@@ -3,10 +3,12 @@ import type { WorklogFetchProgress } from '../../types/worklogLoading';
 import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
+import { buildTempoInstanceKey, useUIStore } from '../stores/useUIStore';
 import { jiraAuthHeader } from './jiraAuth';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { searchAllIssues } from './jiraSearch';
 import { fromHttpResponse } from './serviceErrors';
+import { looksLikeTempoManaged } from './worklogSource';
 
 export type WorklogAuthor = JiraUser;
 export type WorklogItem = EnrichedJiraWorklog;
@@ -161,6 +163,36 @@ export async function fetchMonthWorklogs(
 			},
 		},
 	);
+
+	const embeddedAuthors = issues.flatMap(
+		(i) =>
+			i.fields.worklog?.worklogs?.map((w) => ({
+				accountType: (w.author as { accountType?: string } | undefined)
+					?.accountType,
+				displayName: w.author?.displayName,
+			})) ?? [],
+	);
+	// Set *and clear*: the flag was previously one-way, so switching jiraHost to
+	// a non-Tempo instance mid-session kept the suspicion, and in `auto` mode
+	// with a token present every read and write then routed to Tempo against an
+	// instance that does not use it. A read that sees no Tempo-app author is
+	// positive evidence the current instance is not Tempo-managed.
+	// Clearing needs the same confidence as setting. A narrowed read — a JQL
+	// filter, currentUserOnly, an adjacent-month prefetch — can legitimately
+	// contain no Tempo-app author on an instance that is Tempo-managed, and
+	// clearing on that evidence flips reads *and writes* back to native Jira
+	// mid-session. So: any Tempo-app author sets it; only a full, unfiltered
+	// read is allowed to clear it.
+	if (embeddedAuthors.length > 0) {
+		const instanceKey = buildTempoInstanceKey(config);
+		const isTempo = looksLikeTempoManaged(embeddedAuthors);
+		const narrowedRead = Boolean(
+			options?.currentUserOnly || options?.jqlFilter?.trim(),
+		);
+		if (isTempo || !narrowedRead) {
+			useUIStore.getState().setTempoSuspected(isTempo, instanceKey);
+		}
+	}
 
 	throwIfAborted(signal);
 

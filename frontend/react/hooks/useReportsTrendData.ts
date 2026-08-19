@@ -1,12 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { fetchMonthWorklogs } from '../../services/monthWorklogService';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { addDaysToIsoDate, parseIsoDateLocal } from '../utils/date';
 import { buildManagerTrendModel } from '../utils/teamReports';
 import { useAbsenceDaysByUser } from './useAbsenceDays';
 import { useEffectiveProxyUrl } from './useEffectiveProxyUrl';
 import { monthWorklogsQueryKey } from './useMonthWorklogs';
+import { useTempoSuspected } from './useTempoSuspected';
+import { readMonth } from './worklogReadRouter';
 
 function getMonthsInRange(startDate: string, endDate: string) {
 	const cursor = parseIsoDateLocal(startDate);
@@ -33,6 +35,14 @@ export function useReportsTrendData(
 ) {
 	const queryClient = useQueryClient();
 	const rawConfig = useConfigStore((state) => state.config);
+	const tempoSuspected = useTempoSuspected();
+	const source = getWorklogSource({
+		tempoMode: rawConfig.tempoMode,
+		tempoApiToken: rawConfig.tempoApiToken,
+		tempoSuspected,
+		// Trend chart spans the whole team — see ADA-545.
+		scope: 'team',
+	});
 	// Auto-resolve to the hosted Premium proxy when entitled (ADA-273).
 	const effectiveProxy = useEffectiveProxyUrl();
 	const config = useMemo(
@@ -55,6 +65,7 @@ export function useReportsTrendData(
 			config.jiraHost,
 			config.corsProxy,
 			config.allowedUsers,
+			source,
 		],
 		enabled,
 		staleTime: 15 * 60 * 1000,
@@ -70,9 +81,11 @@ export function useReportsTrendData(
 							config.corsProxy,
 							false,
 							'',
+							source,
+							'team',
 						),
 						queryFn: ({ signal }) =>
-							fetchMonthWorklogs(config, year, month, {}, signal),
+							readMonth(source, config, year, month, { scope: 'team' }, signal),
 						staleTime: 15 * 60 * 1000,
 					}),
 				),

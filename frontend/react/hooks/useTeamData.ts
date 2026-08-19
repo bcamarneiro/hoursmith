@@ -27,12 +27,14 @@ export function useTeamData(
 
 	// Primary month query (no prefetch — team page navigates by week, not month)
 	const month1 = useMonthWorklogs(startYear, startMonth, {
+		scope: 'team',
 		enabled,
 		onProgress: setMonth1Progress,
 	});
 
 	// Second month query (only when week spans two months)
 	const month2 = useMonthWorklogs(endYear, endMonth, {
+		scope: 'team',
 		enabled: enabled && spansMonths,
 		onProgress: setMonth2Progress,
 	});

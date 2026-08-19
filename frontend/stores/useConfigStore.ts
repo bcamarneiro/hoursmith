@@ -44,6 +44,15 @@ export interface Config {
 	githubToken: string;
 	githubHost: string;
 	rescueTimeApiKey: string;
+	/** Tempo Cloud API token. Empty unless the user connects Tempo. */
+	tempoApiToken: string;
+	/**
+	 * Worklog source selection.
+	 * - `auto`  : Tempo when a token is present AND Tempo is detected; else Jira.
+	 * - `jira`  : force native Jira worklogs.
+	 * - `tempo` : force Tempo (covers the empty-worklog case detection can't see).
+	 */
+	tempoMode: 'auto' | 'jira' | 'tempo';
 	calendarFeeds: CalendarFeed[];
 	absenceAssignments: AbsenceAssignment[];
 	complianceReminderEnabled: boolean;
@@ -107,7 +116,7 @@ interface ConfigState {
 	setConfig: (newConfig: Config) => void;
 }
 
-export const CONFIG_STORAGE_VERSION = 11;
+export const CONFIG_STORAGE_VERSION = 12;
 
 function normalizeHost(value: unknown): string {
 	if (typeof value !== 'string') return '';
@@ -213,6 +222,8 @@ export function createDefaultConfig(): Config {
 		githubToken: '',
 		githubHost: '',
 		rescueTimeApiKey: '',
+		tempoApiToken: '',
+		tempoMode: 'auto',
 		calendarFeeds: [],
 		absenceAssignments: [],
 		complianceReminderEnabled: false,
@@ -377,6 +388,16 @@ export function normalizeConfig(
 			typeof config?.rescueTimeApiKey === 'string'
 				? config.rescueTimeApiKey.trim()
 				: fallback.rescueTimeApiKey.trim(),
+		tempoApiToken:
+			typeof config?.tempoApiToken === 'string'
+				? config.tempoApiToken.trim()
+				: fallback.tempoApiToken.trim(),
+		tempoMode:
+			config?.tempoMode === 'jira' ||
+			config?.tempoMode === 'tempo' ||
+			config?.tempoMode === 'auto'
+				? config.tempoMode
+				: fallback.tempoMode,
 		calendarFeeds: normalizedCalendarFeeds,
 		absenceAssignments: normalizedAbsenceAssignments,
 		complianceReminderEnabled:
@@ -458,6 +479,14 @@ export function normalizeConfig(
  *   v11 → added monthlyDeadlineDay (Nth working day of next month, default 3) +
  *        monthlyDeadlineTime ("HH:MM", default "18:00"). No shape change;
  *        `normalizeConfig` fills them for pre-v11 blobs.
+ *   v12 → added tempoApiToken (string, default '') + tempoMode
+ *        ('auto' | 'jira' | 'tempo', default 'auto') for Tempo-managed Jira
+ *        instances (ADA-543). No shape change; `normalizeConfig` fills them for
+ *        pre-v12 blobs, so existing installs keep reading worklogs from Jira.
+ *        NOTE: the Tempo branch originally shipped these as v9; `main` had
+ *        independently used v9–v11 for the fields above, so they were renumbered
+ *        to v12 on merge. A persisted blob claiming v9 is `main`'s v9
+ *        (expectedDailyHours), never the pre-merge Tempo v9.
  * Each "v0_to_vN" helper is a defensive normaliser that accepts whatever
  * legacy shape was on disk and produces a valid current Config. Today,
  * all branches collapse to `normalizeConfig` because every persisted
@@ -465,7 +494,7 @@ export function normalizeConfig(
  * Keep the explicit branching so future schema changes can be added
  * without re-introducing the no-op pattern.
  */
-function migrateLegacy_v0_to_v11(
+function migrateLegacy_v0_to_v12(
 	legacyConfig: Partial<Config> | undefined,
 ): Config {
 	return normalizeConfig(legacyConfig);
@@ -479,7 +508,7 @@ export function migratePersistedConfigState(
 	const legacyConfig = persistedState?.config;
 
 	if (version < CONFIG_STORAGE_VERSION) {
-		return { config: migrateLegacy_v0_to_v11(legacyConfig) };
+		return { config: migrateLegacy_v0_to_v12(legacyConfig) };
 	}
 
 	// Same-version path: still normalise to absorb hand-edited blobs and

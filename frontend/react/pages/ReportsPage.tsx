@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchMonthWorklogs } from '../../services/monthWorklogService';
+import { getWorklogSource } from '../../services/worklogSource';
 import { useConfigStore } from '../../stores/useConfigStore';
 import { useTeamStore } from '../../stores/useTeamStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
@@ -27,7 +27,9 @@ import {
 	useReportsURLState,
 } from '../hooks/useReportsURLState';
 import { useTeamData } from '../hooks/useTeamData';
+import { useTempoSuspected } from '../hooks/useTempoSuspected';
 import { useTimesheetDataFetcher } from '../hooks/useTimesheetDataFetcher';
+import { readMonth } from '../hooks/worklogReadRouter';
 import { describeFreshness } from '../utils/dataFreshness';
 import { addDaysToIsoDate, monthLabel } from '../utils/date';
 import { downloadAsFile, downloadBinaryFile } from '../utils/downloadFile';
@@ -169,6 +171,14 @@ export const ReportsPage: React.FC = () => {
 	const goPrevMonth = useTimesheetStore((state) => state.goPrevMonth);
 	const goNextMonth = useTimesheetStore((state) => state.goNextMonth);
 	const config = useConfigStore((state) => state.config);
+	const tempoSuspected = useTempoSuspected();
+	const source = getWorklogSource({
+		tempoMode: config.tempoMode,
+		tempoApiToken: config.tempoApiToken,
+		tempoSuspected,
+		// Reports aggregates every teammate — see ADA-545.
+		scope: 'team',
+	});
 	const jiraDomain = config.jiraHost;
 	const allowedUsers = config.allowedUsers;
 
@@ -593,9 +603,11 @@ export const ReportsPage: React.FC = () => {
 							config.corsProxy,
 							false,
 							'',
+							source,
+							'team',
 						),
 						queryFn: ({ signal }) =>
-							fetchMonthWorklogs(config, year, month, {}, signal),
+							readMonth(source, config, year, month, { scope: 'team' }, signal),
 						staleTime: 15 * 60 * 1000,
 					}),
 				),

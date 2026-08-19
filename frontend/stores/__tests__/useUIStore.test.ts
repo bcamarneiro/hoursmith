@@ -222,6 +222,14 @@ describe('useUIStore', () => {
 		});
 	});
 
+	describe('tempoSuspected', () => {
+		it('tracks tempoSuspected (default false)', () => {
+			expect(useUIStore.getState().tempoSuspected).toBe(false);
+			useUIStore.getState().setTempoSuspected(true);
+			expect(useUIStore.getState().tempoSuspected).toBe(true);
+		});
+	});
+
 	describe('jira connection evidence', () => {
 		it('marks Jira connection evidence with a fingerprint and source', () => {
 			act(() => {

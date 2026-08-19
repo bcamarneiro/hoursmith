@@ -180,8 +180,15 @@ export const DayCard = memo<Props>(function DayCard({
 			);
 			setEditingWorklog(null);
 			toast.success('Worklog updated');
-		} catch {
-			toast.error('Failed to update worklog');
+		} catch (err) {
+			// Surface the message when there is one: the cross-source write guard
+			// explains that a refresh fixes it, and a fixed string would throw
+			// that away and leave the user with no way forward.
+			toast.error(
+				err instanceof Error && err.message
+					? err.message
+					: 'Failed to update worklog',
+			);
 		}
 	};
 
@@ -191,8 +198,12 @@ export const DayCard = memo<Props>(function DayCard({
 			await deleteWorklog(deleteTarget.issueKey, deleteTarget.worklogId);
 			setDeleteTarget(null);
 			toast.success('Worklog deleted');
-		} catch {
-			toast.error('Failed to delete worklog');
+		} catch (err) {
+			toast.error(
+				err instanceof Error && err.message
+					? err.message
+					: 'Failed to delete worklog',
+			);
 		}
 	};
 

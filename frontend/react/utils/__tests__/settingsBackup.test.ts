@@ -20,6 +20,8 @@ const defaultConfig = {
 	githubToken: '',
 	githubHost: '',
 	rescueTimeApiKey: '',
+	tempoApiToken: '',
+	tempoMode: 'auto' as const,
 	calendarFeeds: [],
 	absenceAssignments: [],
 	complianceReminderEnabled: false,

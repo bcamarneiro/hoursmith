@@ -16,6 +16,7 @@ import {
 	SETTINGS_SECTION_IDS,
 } from '../../constants/settingsSections';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useTempoSuspected } from '../../hooks/useTempoSuspected';
 import { downloadAsFile } from '../../utils/downloadFile';
 import { splitCsvEmailList, uniqueEmailEntries } from '../../utils/emailList';
 import {
@@ -148,6 +149,11 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		(state) => state.replaceFormData,
 	);
 
+	// Instance-scoped, like every other consumer: reading the raw flag would
+	// keep showing "this Jira logs time through Tempo" after Settings is
+	// pointed at a host that has none.
+	const tempoSuspected = useTempoSuspected();
+
 	const calendarMappings = useUserDataStore((s) => s.calendarMappings);
 	const addCalendarMapping = useUserDataStore((s) => s.addCalendarMapping);
 	const removeCalendarMapping = useUserDataStore(
@@ -182,6 +188,7 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 	const gitlabHostId = useId();
 	const rescueTimeKeyId = useId();
 	const githubTokenId = useId();
+	const tempoApiTokenId = useId();
 	const timeRoundingId = useId();
 	const themeId = useId();
 	const includeAbsenceInCsvId = useId();
@@ -605,6 +612,12 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 							rescueTimeKeyId={rescueTimeKeyId}
 							githubToken={formData.githubToken}
 							githubTokenId={githubTokenId}
+							tempoApiToken={formData.tempoApiToken}
+							tempoMode={formData.tempoMode}
+							corsProxy={formData.corsProxy}
+							tempoApiTokenId={tempoApiTokenId}
+							tempoSuspected={tempoSuspected}
+							handleSelectChange={handleSelectChange}
 							gitlabStatus={gitlabStatus}
 							rescueTimeStatus={rescueTimeStatus}
 							calendarStatus={calendarStatus}
