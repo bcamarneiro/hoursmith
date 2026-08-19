@@ -177,13 +177,21 @@ export async function fetchMonthWorklogs(
 	// with a token present every read and write then routed to Tempo against an
 	// instance that does not use it. A read that sees no Tempo-app author is
 	// positive evidence the current instance is not Tempo-managed.
+	// Clearing needs the same confidence as setting. A narrowed read — a JQL
+	// filter, currentUserOnly, an adjacent-month prefetch — can legitimately
+	// contain no Tempo-app author on an instance that is Tempo-managed, and
+	// clearing on that evidence flips reads *and writes* back to native Jira
+	// mid-session. So: any Tempo-app author sets it; only a full, unfiltered
+	// read is allowed to clear it.
 	if (embeddedAuthors.length > 0) {
-		useUIStore
-			.getState()
-			.setTempoSuspected(
-				looksLikeTempoManaged(embeddedAuthors),
-				buildTempoInstanceKey(config),
-			);
+		const instanceKey = buildTempoInstanceKey(config);
+		const isTempo = looksLikeTempoManaged(embeddedAuthors);
+		const narrowedRead = Boolean(
+			options?.currentUserOnly || options?.jqlFilter?.trim(),
+		);
+		if (isTempo || !narrowedRead) {
+			useUIStore.getState().setTempoSuspected(isTempo, instanceKey);
+		}
 	}
 
 	throwIfAborted(signal);

@@ -211,3 +211,40 @@ describe('getWorklogTempo', () => {
 		expect(out.timeSpent).toBe('1h 30m');
 	});
 });
+
+describe('updateWorklogTempo — authorship', () => {
+	it('does not reassign a teammate worklog to the person editing it', async () => {
+		const calls = captureFetch();
+		await updateWorklogTempo(config, '491168', {
+			issueKey: 'PAY-1',
+			timeSpentSeconds: 7200,
+			startDate: '2026-07-28',
+			startTime: '10:00:00',
+			description: 'edited',
+		});
+		const body = calls.find((c) => c.method === 'PUT')?.body as {
+			authorAccountId?: string;
+		};
+		// Reports renders one grid per teammate and lets a lead edit any row.
+		// Sending the signed-in accountId moves the worklog's authorship in
+		// Tempo: the teammate's month silently loses the hours and the lead's
+		// gains them. Jira's native PUT does not change the author either.
+		expect(body?.authorAccountId).toBeUndefined();
+	});
+
+	it('keeps the original author when the caller knows it', async () => {
+		const calls = captureFetch();
+		await updateWorklogTempo(config, '491168', {
+			issueKey: 'PAY-1',
+			timeSpentSeconds: 7200,
+			startDate: '2026-07-28',
+			startTime: '10:00:00',
+			description: 'edited',
+			authorAccountId: 'acc-teammate',
+		});
+		const body = calls.find((c) => c.method === 'PUT')?.body as {
+			authorAccountId?: string;
+		};
+		expect(body?.authorAccountId).toBe('acc-teammate');
+	});
+});

@@ -30,6 +30,13 @@ export interface TempoWriteInput {
 	startTime: string;
 	description: string;
 	remainingEstimateSeconds?: number;
+	/**
+	 * Whose worklog this is. Only meaningful on update: Reports shows a grid
+	 * per teammate and lets a lead edit any row, so stamping the signed-in user
+	 * would move the worklog's authorship in Tempo — the teammate's month
+	 * silently loses the hours and the editor's gains them.
+	 */
+	authorAccountId?: string;
 }
 
 /**
@@ -147,17 +154,19 @@ export async function updateWorklogTempo(
 	input: TempoWriteInput,
 	signal?: AbortSignal,
 ): Promise<unknown> {
-	const [issueId, authorAccountId] = await Promise.all([
-		resolveIssueId(config, input.issueKey, signal),
-		resolveAccountId(config, signal),
-	]);
+	const issueId = await resolveIssueId(config, input.issueKey, signal);
 	return tempoWrite(
 		config,
 		`worklogs/${tempoWorklogId}`,
 		'PUT',
 		{
 			issueId,
-			authorAccountId,
+			// Only sent when the caller knows the original author. Defaulting to
+			// the signed-in user would reassign a teammate's worklog to whoever
+			// edited it; Jira's native PUT does not change the author either.
+			...(input.authorAccountId
+				? { authorAccountId: input.authorAccountId }
+				: {}),
 			timeSpentSeconds: input.timeSpentSeconds,
 			startDate: input.startDate,
 			startTime: input.startTime,

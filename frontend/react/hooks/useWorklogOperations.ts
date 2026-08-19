@@ -69,6 +69,28 @@ function patchMonthCaches(
 	}
 }
 
+/**
+ * Which cached months currently contain `worklogId`, read before any patch.
+ *
+ * Must be captured up front: `patchMonthCaches(..., null)` rewrites the row in
+ * every cached month, so asking afterwards which month a row belongs to always
+ * answers with the new one.
+ */
+function collectMonthsHoldingWorklog(
+	queryClient: QueryClient,
+	worklogId: string,
+): Array<{ year: number; month: number }> {
+	const months: Array<{ year: number; month: number }> = [];
+	const entries = queryClient.getQueriesData<EnrichedJiraWorklog[]>({
+		queryKey: ['monthWorklogs'],
+	});
+	for (const [key, prev] of entries) {
+		if (!prev?.some((wl) => wl.id === worklogId)) continue;
+		months.push({ year: key[1] as number, month: key[2] as number });
+	}
+	return months;
+}
+
 /** Format a date string to Jira's expected format: 2026-03-02T09:00:00.000+0000 */
 function toJiraDatetime(dateStr: string): string {
 	const d = new Date(dateStr);
@@ -275,7 +297,14 @@ export function useWorklogOperations() {
 						}),
 					}),
 				worklogId,
-				toTempoWriteInput({ ...params, issueKey }),
+				{
+					...toTempoWriteInput({ ...params, issueKey }),
+					// Preserve whose worklog it is: Reports lets a lead edit a
+					// teammate's row, and omitting this would reassign it to them.
+					authorAccountId: useTimesheetStore
+						.getState()
+						.data?.find((wl) => wl.id === worklogId)?.author?.accountId,
+				},
 			)) as EnrichedJiraWorklog;
 
 			// A raw Tempo echo would strip the row's id and date — and on update it
@@ -326,6 +355,16 @@ export function useWorklogOperations() {
 			const newMonth = mappedForMonth.started
 				? worklogMonth(mappedForMonth)
 				: null;
+			// Which months hold this row *before* the patch. The patch below
+			// rewrites the row in every cached month, so reading the month back
+			// out afterwards always yields the new one — which is why the
+			// cleanup pass was a no-op: it compared the new month against
+			// itself and never found a move.
+			const monthsHoldingRow = collectMonthsHoldingWorklog(
+				queryClient,
+				worklogId,
+			);
+
 			patchMonthCaches(
 				queryClient,
 				(worklogs) =>
@@ -336,23 +375,16 @@ export function useWorklogOperations() {
 			);
 			// Drop stale copies from months the worklog no longer belongs to.
 			if (newMonth) {
-				patchMonthCaches(
-					queryClient,
-					(worklogs) => {
-						const existing = worklogs.find((wl) => wl.id === worklogId);
-						if (!existing) return worklogs;
-						const wlMonth = worklogMonth(existing);
-						if (
-							wlMonth &&
-							(wlMonth.year !== newMonth.year ||
-								wlMonth.month !== newMonth.month)
-						) {
-							return worklogs.filter((wl) => wl.id !== worklogId);
-						}
-						return worklogs;
-					},
-					null,
-				);
+				for (const stale of monthsHoldingRow) {
+					if (stale.year === newMonth.year && stale.month === newMonth.month) {
+						continue;
+					}
+					patchMonthCaches(
+						queryClient,
+						(worklogs) => worklogs.filter((wl) => wl.id !== worklogId),
+						stale,
+					);
+				}
 			}
 			setData(updatedData || null);
 

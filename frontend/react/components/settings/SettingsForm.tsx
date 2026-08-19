@@ -10,13 +10,13 @@ import {
 	useConfigStore,
 } from '../../../stores/useConfigStore';
 import { useSettingsFormStore } from '../../../stores/useSettingsFormStore';
-import { useUIStore } from '../../../stores/useUIStore';
 import { useUserDataStore } from '../../../stores/useUserDataStore';
 import {
 	SETTINGS_RAIL_ITEMS,
 	SETTINGS_SECTION_IDS,
 } from '../../constants/settingsSections';
 import { useFeatureFlag } from '../../hooks/useFeatureFlag';
+import { useTempoSuspected } from '../../hooks/useTempoSuspected';
 import { downloadAsFile } from '../../utils/downloadFile';
 import { splitCsvEmailList, uniqueEmailEntries } from '../../utils/emailList';
 import {
@@ -149,7 +149,10 @@ export const SettingsForm: React.FC<SettingsFormProps> = ({
 		(state) => state.replaceFormData,
 	);
 
-	const tempoSuspected = useUIStore((s) => s.tempoSuspected);
+	// Instance-scoped, like every other consumer: reading the raw flag would
+	// keep showing "this Jira logs time through Tempo" after Settings is
+	// pointed at a host that has none.
+	const tempoSuspected = useTempoSuspected();
 
 	const calendarMappings = useUserDataStore((s) => s.calendarMappings);
 	const addCalendarMapping = useUserDataStore((s) => s.addCalendarMapping);
