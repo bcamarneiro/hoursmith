@@ -9,6 +9,7 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -50,6 +51,10 @@ jobs:
 
   e2e-smoke:
     runs-on: ubuntu-latest
+    # Without a ceiling a stalled step runs until GitHub's 6h default, burning
+    # the runner budget and leaving the PR "pending" rather than failing. Real
+    # runs finish in 2-3 minutes.
+    timeout-minutes: 20
     needs: quality
 
     steps:
@@ -66,6 +71,9 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
+        # Observed hanging indefinitely on the browser download (2026-08-18/19),
+        # which is a CDN fetch, not a test. Fail fast so a rerun can recover.
+        timeout-minutes: 8
         run: npx playwright install --with-deps chromium
 
       - name: Start offline server
@@ -109,6 +117,7 @@ jobs:
   # mock Supabase env). Complements the deployed-staging `e2e-sandbox` workflow.
   e2e-premium-lifecycle:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: quality
 
     steps:
@@ -125,6 +134,9 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
+        # Observed hanging indefinitely on the browser download (2026-08-18/19),
+        # which is a CDN fetch, not a test. Fail fast so a rerun can recover.
+        timeout-minutes: 8
         run: npx playwright install --with-deps chromium
 
       - name: Start premium offline server
