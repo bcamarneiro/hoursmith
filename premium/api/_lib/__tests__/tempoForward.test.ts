@@ -88,3 +88,43 @@ describe('forwardToTempo', () => {
 		expect(res.status).toBe(400);
 	});
 });
+
+describe('forwardToTempo — null-body statuses', () => {
+	it('relays a 204 instead of turning a successful delete into a 502', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(null, { status: 204 })),
+		);
+		const res = await forwardToTempo({
+			path: 'worklogs/491168',
+			search: '',
+			tempoToken: 'tok',
+			method: 'DELETE',
+		});
+		// `new Response(body, { status: 204 })` throws for any non-null body in
+		// Node and the Edge runtime, and the throw was caught by the
+		// upstream-failure handler — so Tempo's successful DELETE (which answers
+		// 204) was reported as a failure while the worklog was in fact gone.
+		//
+		// Asserting on the body rather than only the status matters: the jsdom
+		// test environment permits a body on a 204, so a status-only assertion
+		// passes even with the bug present.
+		expect(res.status).toBe(204);
+		expect(res.body).toBeNull();
+	});
+
+	it('relays a 304 without a body', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => new Response(null, { status: 304 })),
+		);
+		const res = await forwardToTempo({
+			path: 'worklogs',
+			search: '',
+			tempoToken: 'tok',
+			method: 'GET',
+		});
+		expect(res.status).toBe(304);
+		expect(res.body).toBeNull();
+	});
+});

@@ -4,6 +4,7 @@ import * as bridge from '../proxyUrlBridge';
 import {
 	createWorklogTempo,
 	deleteWorklogTempo,
+	getWorklogTempo,
 	updateWorklogTempo,
 } from '../tempoWriteService';
 
@@ -167,5 +168,46 @@ describe('deleteWorklogTempo', () => {
 			vi.fn(async () => new Response('nope', { status: 403 })),
 		);
 		await expect(deleteWorklogTempo(config, '491168')).rejects.toThrow();
+	});
+});
+
+describe('getWorklogTempo', () => {
+	it('reads the worklog from Tempo, not from Jira', async () => {
+		const calls = captureFetch({
+			tempo: {
+				tempoWorklogId: 491168,
+				issue: { id: 426364 },
+				timeSpentSeconds: 5400,
+				startDate: '2026-07-27',
+				startTime: '09:00:00',
+				description: 'work',
+			},
+		});
+		await getWorklogTempo(config, '491168');
+		const read = calls.find((c) => c.url.includes('worklogs/491168'));
+		// The edit modal loads the current values before opening. Fetching a
+		// Tempo worklog id from Jira's API cannot work — the ids are different
+		// spaces — so editing failed at the first step with a generic toast.
+		expect(read?.url).toContain('api.tempo.io');
+		expect(read?.url).not.toContain('/rest/api/2/issue/');
+	});
+
+	it('returns the fields the edit form needs, in Jira vocabulary', async () => {
+		captureFetch({
+			tempo: {
+				tempoWorklogId: 491168,
+				issue: { id: 426364 },
+				timeSpentSeconds: 5400,
+				startDate: '2026-07-27',
+				startTime: '09:00:00',
+				startDateTimeUtc: '2026-07-27T08:00:00Z',
+				description: 'fixed the thing',
+			},
+		});
+		const out = await getWorklogTempo(config, '491168');
+		expect(out.comment).toBe('fixed the thing');
+		expect(out.started).toBe('2026-07-27T09:00:00+01:00');
+		// The form edits a Jira-style duration string.
+		expect(out.timeSpent).toBe('1h 30m');
 	});
 });

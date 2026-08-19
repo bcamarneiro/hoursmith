@@ -33,9 +33,15 @@ export type WorklogWriteSource = 'jira' | 'tempo';
  * `PUT`/`DELETE /4/worklogs/{id}`, which 404s at best and mutates an unrelated
  * worklog at worst.
  *
- * Rows with no recorded source are treated as Jira, which is what they were
- * before the field existed. An unknown row is allowed through: the guard exists
- * to catch a *known* mismatch, not to gate writes on cache completeness.
+ * A row that is absent entirely (not in the store) is allowed through — the
+ * guard cannot judge what it cannot see, and blocking there would gate every
+ * write on cache completeness.
+ *
+ * A row that IS present but carries no `worklogSource` is treated as Jira,
+ * because that is what such rows were before the field existed. That means a
+ * pre-field cached row is refused while Tempo is active, which is deliberate:
+ * a stale row is exactly the case where the id may belong to the other
+ * backend, and a refresh is cheap next to deleting the wrong worklog.
  */
 export function assertWritableRow(
 	row: { worklogSource?: unknown; [key: string]: unknown } | undefined,

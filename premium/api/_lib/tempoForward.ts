@@ -14,6 +14,9 @@
 
 const TEMPO_BASE = 'https://api.tempo.io/4';
 
+/** Statuses the Response constructor refuses to pair with a body. */
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
+
 export interface ForwardOptions {
 	path: string;
 	search: string;
@@ -75,7 +78,14 @@ export async function forwardToTempo(opts: ForwardOptions): Promise<Response> {
 			body: opts.body,
 		});
 		const text = await upstream.text();
-		return new Response(text, {
+		// 204/205/304 must carry no body: the Response constructor rejects one
+		// (in Node and the Edge runtime — though not in the jsdom test
+		// environment, which is why the unit tests could not see this). The
+		// throw landed in the catch below and became a 502, so Tempo's
+		// successful DELETE — which answers 204 — was reported to the user as a
+		// failure while the worklog had in fact been deleted.
+		const body = NULL_BODY_STATUSES.has(upstream.status) ? null : text;
+		return new Response(body, {
 			status: upstream.status,
 			headers: {
 				'content-type':

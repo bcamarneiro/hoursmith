@@ -12,6 +12,7 @@
  */
 
 import type { EnrichedJiraWorklog, JiraIssue } from '../../types/jira';
+import { formatJiraTimeSpent } from '../react/utils/format';
 import { parseTimeSpentToSeconds } from '../react/utils/timeSpent';
 import { resolveAccountId } from './jiraIdentity';
 import { searchAllIssues } from './jiraSearch';
@@ -83,7 +84,7 @@ async function resolveIssueId(
 async function tempoWrite(
 	config: TempoServiceConfig,
 	path: string,
-	method: 'POST' | 'PUT' | 'DELETE',
+	method: 'GET' | 'POST' | 'PUT' | 'DELETE',
 	body?: unknown,
 	signal?: AbortSignal,
 ): Promise<unknown> {
@@ -200,11 +201,63 @@ export function mapTempoWriteResponse(
 	email: string,
 	displayName?: string,
 ): EnrichedJiraWorklog {
-	const wl = response as TempoWorklog;
+	const wl = response as TempoWorklog | null;
+	if (!wl?.issue) {
+		// `tempoWrite` returns null for a 204 and for a non-JSON body, so a
+		// write that succeeded but answered with no usable payload must not
+		// throw here — that would report "failed to create" for a worklog Tempo
+		// actually created. Fall back to the request's own issue.
+		return mapTempoWorklog(
+			{
+				tempoWorklogId: Number(
+					(wl as { tempoWorklogId?: number } | null)?.tempoWorklogId ?? 0,
+				),
+				issue: { id: Number(issue.id) },
+				timeSpentSeconds: 0,
+				startDate: '',
+			} as TempoWorklog,
+			new Map([[String(issue.id), issue]]),
+			email,
+			displayName,
+		);
+	}
 	return mapTempoWorklog(
 		wl,
 		new Map([[String(wl.issue?.id ?? issue.id), issue]]),
 		email,
 		displayName,
 	);
+}
+
+/**
+ * Read a single worklog from Tempo for the edit form.
+ *
+ * The edit modal loads current values before opening, and its caller speaks
+ * Jira's vocabulary (`timeSpent` string, one ISO `started`). Fetching a Tempo
+ * worklog id from Jira's REST API cannot work — the ids are different spaces —
+ * so before this existed, editing on a Tempo instance failed at the first step
+ * with a generic "could not load this worklog" toast, making the Tempo write
+ * path unreachable from the main entry point.
+ */
+export async function getWorklogTempo(
+	config: TempoServiceConfig,
+	tempoWorklogId: string,
+	signal?: AbortSignal,
+): Promise<{ timeSpent: string; comment: string; started: string }> {
+	const wl = (await tempoWrite(
+		config,
+		`worklogs/${tempoWorklogId}`,
+		'GET',
+		undefined,
+		signal,
+	)) as TempoWorklog | null;
+	if (!wl) {
+		throw new Error(`Tempo worklog ${tempoWorklogId} could not be loaded.`);
+	}
+	const mapped = mapTempoWorklog(wl, new Map(), '');
+	return {
+		timeSpent: formatJiraTimeSpent(wl.timeSpentSeconds ?? 0),
+		comment: wl.description ?? '',
+		started: mapped.started ?? '',
+	};
 }

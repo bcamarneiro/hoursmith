@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { jiraAuthHeader } from '../../services/jiraAuth';
 import { rewriteForHostedProxy } from '../../services/jiraGateway';
 import {
+	getWorklogTempo,
 	mapTempoWriteResponse,
 	toTempoWriteInput,
 } from '../../services/tempoWriteService';
@@ -261,35 +262,42 @@ export function useWorklogOperations() {
 				toTempoWriteInput({ ...params, issueKey }),
 			)) as EnrichedJiraWorklog;
 
-			// Update in the store. As with create, a raw Tempo echo would strip
-			// the row's id and date — and here it would *destroy* an existing
-			// good row rather than just adding a broken one.
+			// A raw Tempo echo would strip the row's id and date — and on update it
+			// *destroys* an existing good row rather than merely adding a broken
+			// one. Map it once here and reuse that everywhere below: the store,
+			// the month-cache patch, and the moved-month calculation all need the
+			// mapped shape, and previously only the store got it.
+			const toStoredRow = (issue: EnrichedJiraWorklog['issue']) =>
+				writeSource === 'tempo'
+					? mapTempoWriteResponse(updatedWorklog, issue, config.email)
+					: ({ ...updatedWorklog, issue } as EnrichedJiraWorklog);
+
 			const currentData = useTimesheetStore.getState().data;
-			const updatedData = currentData?.map((wl) => {
-				if (wl.id === worklogId) {
-					return writeSource === 'tempo'
-						? mapTempoWriteResponse(updatedWorklog, wl.issue, config.email)
-						: { ...updatedWorklog, issue: wl.issue };
-				}
-				return wl;
-			});
+			const existingRow = currentData?.find((wl) => wl.id === worklogId);
+			const updatedData = currentData?.map((wl) =>
+				wl.id === worklogId ? toStoredRow(wl.issue) : wl,
+			);
 
 			// Patch the month cache(s) directly rather than refetching from the
 			// eventually-consistent search API, which may still return the old
 			// value. The worklog can move months (started changed), so patch the
 			// old month (find + replace, dropping if it moved out) and, if it now
 			// belongs elsewhere, ensure it lands there too. (ADA-452)
-			const newMonth = updatedWorklog?.started
-				? worklogMonth({
-						...updatedWorklog,
-						issue: { id: '', key: '', fields: {} },
-					} as EnrichedJiraWorklog)
+			// Derived from the *mapped* row: a Tempo echo carries no `started`, so
+			// reading it raw made this always null, and the "moved to another
+			// month" cleanup below never ran — leaving a stale copy in the old
+			// month and double-counting the hours across both.
+			const mappedForMonth = toStoredRow(
+				existingRow?.issue ?? { id: '', key: '', fields: {} },
+			);
+			const newMonth = mappedForMonth.started
+				? worklogMonth(mappedForMonth)
 				: null;
 			patchMonthCaches(
 				queryClient,
 				(worklogs) =>
 					worklogs.map((wl) =>
-						wl.id === worklogId ? { ...updatedWorklog, issue: wl.issue } : wl,
+						wl.id === worklogId ? toStoredRow(wl.issue) : wl,
 					),
 				null,
 			);
@@ -482,6 +490,13 @@ export function useWorklogOperations() {
 	): Promise<{ timeSpent: string; comment: string; started: string }> => {
 		if (!config.jiraHost || !config.apiToken) {
 			throw new Error('Jira client not configured');
+		}
+		// Must follow the write source: this loads the current values for the
+		// edit modal, and a Tempo worklog id means nothing to Jira's API. Left
+		// unrouted, editing failed here — before the Tempo PUT path was ever
+		// reached.
+		if (writeSource === 'tempo') {
+			return getWorklogTempo(config, worklogId);
 		}
 		const worklogUrl = buildUrl(
 			`/rest/api/2/issue/${issueKey}/worklog/${worklogId}`,

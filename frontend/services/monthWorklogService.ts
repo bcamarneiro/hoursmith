@@ -172,8 +172,16 @@ export async function fetchMonthWorklogs(
 				displayName: w.author?.displayName,
 			})) ?? [],
 	);
-	if (looksLikeTempoManaged(embeddedAuthors))
-		useUIStore.getState().setTempoSuspected(true);
+	// Set *and clear*: the flag was previously one-way, so switching jiraHost to
+	// a non-Tempo instance mid-session kept the suspicion, and in `auto` mode
+	// with a token present every read and write then routed to Tempo against an
+	// instance that does not use it. A read that sees no Tempo-app author is
+	// positive evidence the current instance is not Tempo-managed.
+	if (embeddedAuthors.length > 0) {
+		useUIStore
+			.getState()
+			.setTempoSuspected(looksLikeTempoManaged(embeddedAuthors));
+	}
 
 	throwIfAborted(signal);
 
