@@ -23,6 +23,7 @@
  * Linear: ADA-383.
  */
 
+import { jiraAuthHeader } from './jiraAuth';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { fromHttpResponseAsync } from './serviceErrors';
 
@@ -59,8 +60,14 @@ function buildSearchBaseUrl(config: JiraSearchConfig): string {
 		: `https://${config.jiraHost}`;
 }
 
-const SEARCH_HEADERS = (apiToken: string): Record<string, string> => ({
-	Authorization: `Bearer ${apiToken}`,
+const SEARCH_HEADERS = (
+	config: Pick<JiraSearchConfig, 'jiraHost' | 'email' | 'apiToken'>,
+): Record<string, string> => ({
+	Authorization: jiraAuthHeader(
+		config.jiraHost,
+		config.email ?? '',
+		config.apiToken,
+	),
 	Accept: 'application/json',
 	'X-Atlassian-Token': 'no-check',
 });
@@ -76,7 +83,7 @@ export function buildJiraRequest(
 	path: string,
 ): { url: string; headers: Record<string, string> } {
 	const base = buildSearchBaseUrl(config);
-	const headers = SEARCH_HEADERS(config.apiToken);
+	const headers = SEARCH_HEADERS(config);
 	const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
 	return rewriteForHostedProxy(url, headers, {
 		jiraHost: config.jiraHost,
@@ -116,7 +123,7 @@ export async function fetchSearchPage<T = unknown>(
 	signal?: AbortSignal,
 ): Promise<SearchPageResult<T>> {
 	const base = buildSearchBaseUrl(config);
-	const headers = SEARCH_HEADERS(config.apiToken);
+	const headers = SEARCH_HEADERS(config);
 	const cloud = isCloudJira(config.jiraHost);
 
 	const query = new URLSearchParams();

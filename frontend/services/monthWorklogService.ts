@@ -3,6 +3,7 @@ import type { WorklogFetchProgress } from '../../types/worklogLoading';
 import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
+import { jiraAuthHeader } from './jiraAuth';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { searchAllIssues } from './jiraSearch';
 import { fromHttpResponse } from './serviceErrors';
@@ -87,7 +88,11 @@ export async function fetchMonthWorklogs(
 
 	const base = buildBaseUrl(config);
 	const headers: Record<string, string> = {
-		Authorization: `Bearer ${config.apiToken}`,
+		Authorization: jiraAuthHeader(
+			config.jiraHost,
+			config.email ?? '',
+			config.apiToken,
+		),
 		Accept: 'application/json',
 		'X-Atlassian-Token': 'no-check',
 	};

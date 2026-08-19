@@ -12,6 +12,7 @@ import {
 	describeGitlabConnectionError,
 	normalizeGitlabHost,
 } from '../services/gitlabService';
+import { jiraAuthHeader } from '../services/jiraAuth';
 import {
 	getJiraGatewayMode,
 	type JiraGatewayMode,
@@ -317,7 +318,11 @@ export const useSettingsFormStore = create<SettingsFormState>((set, get) => ({
 						: normalizedConfig.jiraHost;
 
 			const baseHeaders: Record<string, string> = {
-				Authorization: `Bearer ${normalizedConfig.apiToken}`,
+				Authorization: jiraAuthHeader(
+					normalizedConfig.jiraHost,
+					normalizedConfig.email,
+					normalizedConfig.apiToken,
+				),
 				Accept: 'application/json',
 				'X-Atlassian-Token': 'no-check',
 			};
