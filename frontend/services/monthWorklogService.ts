@@ -3,10 +3,7 @@ import type { WorklogFetchProgress } from '../../types/worklogLoading';
 import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
 import type { Config } from '../stores/useConfigStore';
-import {
-	buildJiraConnectionFingerprint,
-	useUIStore,
-} from '../stores/useUIStore';
+import { buildTempoInstanceKey, useUIStore } from '../stores/useUIStore';
 import { jiraAuthHeader } from './jiraAuth';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { searchAllIssues } from './jiraSearch';
@@ -185,7 +182,7 @@ export async function fetchMonthWorklogs(
 			.getState()
 			.setTempoSuspected(
 				looksLikeTempoManaged(embeddedAuthors),
-				buildJiraConnectionFingerprint(config),
+				buildTempoInstanceKey(config),
 			);
 	}
 

@@ -52,6 +52,14 @@ async function fetchAllTempoWorklogs(
 	});
 	let path = accountId === null ? 'worklogs' : `worklogs/user/${accountId}`;
 
+	// Tempo sends `metadata.next` whenever `count === limit`, which on some
+	// deployments includes the final page — so a naive follow-the-link loop can
+	// revisit the same page forever, accumulating duplicates. Track the URLs
+	// already fetched and stop when one repeats. The hard cap is a backstop for
+	// a server that returns a genuinely endless chain of distinct pages.
+	const seen = new Set<string>();
+	let pages = 0;
+
 	while (params) {
 		const { url, headers } = buildTempoRequest(
 			config.tempoApiToken,
@@ -76,7 +84,8 @@ async function fetchAllTempoWorklogs(
 		all.push(...(page.results ?? []));
 
 		const next = page.metadata?.next;
-		if (!next) break;
+		if (!next || seen.has(next) || ++pages > 200) break;
+		seen.add(next);
 		// `next` is an absolute api.tempo.io URL; re-extract path + query so the
 		// gateway re-wraps it for the active mode rather than calling it raw.
 		const u = new URL(next);

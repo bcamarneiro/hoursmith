@@ -313,10 +313,17 @@ export function useWorklogOperations() {
 			// reading it raw made this always null, and the "moved to another
 			// month" cleanup below never ran — leaving a stale copy in the old
 			// month and double-counting the hours across both.
-			const mappedForMonth = existingRow
-				? toStoredRow(existingRow.issue, existingRow)
-				: null;
-			const newMonth = mappedForMonth?.started
+			// Derived without requiring the row to be in the timesheet store: My
+			// Week edits never populate that store (it is filled by the Reports
+			// fetcher), so keying off it skipped the moved-month cleanup on the
+			// Jira path too — leaving the old month's copy behind and
+			// double-counting the hours across both.
+			const placeholderIssue = { id: '', key: '', fields: {} };
+			const mappedForMonth = toStoredRow(
+				existingRow?.issue ?? placeholderIssue,
+				{ ...updatedWorklog, issue: placeholderIssue } as EnrichedJiraWorklog,
+			);
+			const newMonth = mappedForMonth.started
 				? worklogMonth(mappedForMonth)
 				: null;
 			patchMonthCaches(

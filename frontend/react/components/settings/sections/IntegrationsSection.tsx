@@ -1,6 +1,9 @@
 import type React from 'react';
 import { useRef, useState } from 'react';
-import { describeServiceError } from '../../../../services/serviceErrors';
+import {
+	describeServiceError,
+	fromHttpResponseAsync,
+} from '../../../../services/serviceErrors';
 import {
 	buildTempoRequest,
 	describeTempoNetworkError,
@@ -193,9 +196,7 @@ export const IntegrationsSection: React.FC<Props> = ({
 			);
 			const res = await fetch(req.url, { headers: req.headers });
 			if (!res.ok) {
-				const err = await import('../../../../services/serviceErrors').then(
-					(m) => m.fromHttpResponseAsync('Tempo', res),
-				);
+				const err = await fromHttpResponseAsync('Tempo', res);
 				setTempoTest({
 					loading: false,
 					result: {

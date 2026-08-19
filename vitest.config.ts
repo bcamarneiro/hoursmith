@@ -14,7 +14,7 @@ export default defineConfig({
 		// Serverless/Edge handlers are not browser code, and happy-dom's web
 		// APIs are more permissive than the runtimes they actually ship to —
 		// it accepts `new Response(body, { status: 204 })`, which Node and the
-		// Edge runtime both reject. Running them under jsdom hid a real 204
+		// Edge runtime both reject. Running them under happy-dom hid a real 204
 		// bug in the Tempo relay. Test them where they run.
 		environmentMatchGlobs: [
 			['api/**', 'node'],

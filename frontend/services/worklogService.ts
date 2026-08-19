@@ -1,10 +1,8 @@
 import { logger } from '../react/utils/logger';
 import { classifyWorklog } from '../react/utils/worklogClassifier';
-import { useUIStore } from '../stores/useUIStore';
 import { jiraAuthHeader } from './jiraAuth';
 import { rewriteForHostedProxy } from './jiraGateway';
 import { fetchSearchPage } from './jiraSearch';
-import { looksLikeTempoManaged } from './worklogSource';
 
 export interface WorklogEntry {
 	date: string;
@@ -70,18 +68,6 @@ export async function fetchWeekWorklogs(
 		{ jql, fields: 'key,summary,worklog', maxResults: 50 },
 		signal,
 	);
-
-	const authors = issues.flatMap(
-		(i) =>
-			i.fields.worklog?.worklogs?.map((w) => ({
-				accountType: (w.author as { accountType?: string } | undefined)
-					?.accountType,
-				displayName: (w.author as { displayName?: string } | undefined)
-					?.displayName,
-			})) ?? [],
-	);
-	if (looksLikeTempoManaged(authors))
-		useUIStore.getState().setTempoSuspected(true);
 
 	const entries: WorklogEntry[] = [];
 	const email = config.email.toLowerCase();

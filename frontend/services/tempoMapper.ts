@@ -1,4 +1,5 @@
 import type { EnrichedJiraWorklog, JiraIssue } from '../../types/jira';
+import { formatJiraTimeSpent } from '../react/utils/format';
 import { searchAllIssues } from './jiraSearch';
 
 export interface TempoWorklog {
@@ -108,6 +109,11 @@ export function mapTempoWorklog(
 		started,
 		created: wl.createdAt ?? started,
 		timeSpentSeconds: wl.timeSpentSeconds,
+		// The edit modals prefill from `timeSpent` (DayCell reads it directly;
+		// DayCard only survives without it by falling back on its own). Without
+		// this, editing a Tempo worklog from the timesheet grid opens with a
+		// blank duration and submitting writes zero seconds.
+		timeSpent: formatJiraTimeSpent(wl.timeSpentSeconds ?? 0),
 		comment: wl.description ?? '',
 		author: {
 			accountId: wl.author?.accountId,
