@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as jiraSearch from '../jiraSearch';
 import { filterToRealIssueKeys } from '../issueKeyValidation';
+import * as jiraSearch from '../jiraSearch';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -77,5 +77,29 @@ describe('filterToRealIssueKeys', () => {
 		);
 		const out = await filterToRealIssueKeys(config, ['PAY-1', 'WEB-000']);
 		expect([...out].sort()).toEqual(['PAY-1', 'WEB-000']);
+	});
+});
+
+describe('filterToRealIssueKeys — boundaries', () => {
+	it('rethrows an abort instead of resolving as if nothing was wrong', async () => {
+		// Swallowing this would let a cancelled week-change resolve with a full
+		// suggestion list, which the caller then has to notice was stale.
+		const abort = new Error('Aborted');
+		abort.name = 'AbortError';
+		vi.spyOn(jiraSearch, 'searchAllIssues').mockRejectedValue(abort);
+		await expect(filterToRealIssueKeys(config, ['PAY-1'])).rejects.toThrow(
+			/Aborted/,
+		);
+	});
+
+	it('does not call Jira when none is configured', async () => {
+		const spy = vi.spyOn(jiraSearch, 'searchAllIssues');
+		const out = await filterToRealIssueKeys(
+			{ ...config, jiraHost: '', apiToken: '' },
+			['PAY-1'],
+		);
+		expect(spy).not.toHaveBeenCalled();
+		// Keys pass through: a GitHub-only user still gets their suggestions.
+		expect(out.has('PAY-1')).toBe(true);
 	});
 });

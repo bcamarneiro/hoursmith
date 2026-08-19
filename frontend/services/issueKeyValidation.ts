@@ -4,8 +4,10 @@
  * Branch names and commit messages contain text shaped like an issue key that
  * is not one. Two real examples from a live account:
  *
- *   - `APP-A-132/Bancontact-Integration` — a branch naming convention;
- *     `APP-A-132` 404s in Jira.
+ *   - `APP-A-132/Bancontact-Integration` — a branch naming convention. Note
+ *     the extractor yields `A-132` here, not `APP-A-132`, because the hyphen
+ *     satisfies its boundary check; neither exists in Jira, so the outcome is
+ *     the same, but `A-132` is what actually reaches this function.
  *   - `WEB-000` — a placeholder used when no ticket applies.
  *
  * Neither is fixable by pattern alone. Widening the regex to admit the first
@@ -38,6 +40,9 @@ export async function filterToRealIssueKeys(
 ): Promise<Set<string>> {
 	const unique = [...new Set([...candidates].filter(Boolean))];
 	if (unique.length === 0) return new Set();
+	// A GitHub-only user has no Jira to ask. Without this the dashboard fires a
+	// request at `https:///rest/...` on every load and every week change.
+	if (!config.jiraHost || !config.apiToken) return new Set(unique);
 
 	const real = new Set<string>();
 	try {
@@ -56,8 +61,11 @@ export async function filterToRealIssueKeys(
 				if (issue.key) real.add(issue.key);
 			}
 		}
-	} catch {
-		// Unreachable Jira must not erase the day's activity — see above.
+	} catch (err) {
+		// An abort is the caller changing week, not a Jira failure — swallowing
+		// it would resolve a cancelled fetch with a full suggestion list.
+		if (err instanceof Error && err.name === 'AbortError') throw err;
+		// Anything else: unreachable Jira must not erase the day's activity.
 		return new Set(unique);
 	}
 	return real;

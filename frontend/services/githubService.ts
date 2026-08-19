@@ -320,6 +320,14 @@ export async function fetchGithubSuggestions(
 		}
 	>();
 	const rank = { high: 2, medium: 1, low: 0 };
+	// A key seen in a commit, PR or review came from something a human wrote
+	// about real work; a key seen only in a branch name may be an invented
+	// convention. Only the latter is weak enough to discard on Jira's say-so.
+	const keysWithStrongEvidence = new Set<string>();
+	for (const [mapKey] of grouped) {
+		const [, issueKey, type] = mapKey.split('::');
+		if (type !== 'branch') keysWithStrongEvidence.add(issueKey);
+	}
 	for (const [mapKey, entry] of grouped) {
 		const [day, issueKey] = mapKey.split('::');
 		const dayIssueKey = `${day}::${issueKey}`;
@@ -344,17 +352,23 @@ export async function fetchGithubSuggestions(
 	// that is not a ticket — `APP-A-132/…` is a naming convention and `WEB-000`
 	// a placeholder, both observed on a live account. One JQL settles the whole
 	// batch; a lookup failure keeps everything (see filterToRealIssueKeys).
-	const candidateKeys = new Set(
-		[...merged.keys()].map((k) => k.split('::')[1]),
+	// Only branch-only keys are checked. A JQL search returns just the issues
+	// this user may browse, so validating everything would erase a push that
+	// references another team's ticket — real work, hidden. That is precisely
+	// the trade filterToRealIssueKeys says it will not make.
+	const branchOnlyKeys = new Set(
+		[...merged.keys()]
+			.map((k) => k.split('::')[1])
+			.filter((key) => !keysWithStrongEvidence.has(key)),
 	);
-	const realKeys = jiraConfig
-		? await filterToRealIssueKeys(jiraConfig, candidateKeys, signal)
-		: candidateKeys;
+	const realBranchKeys = jiraConfig
+		? await filterToRealIssueKeys(jiraConfig, branchOnlyKeys, signal)
+		: branchOnlyKeys;
 
 	const suggestions: WorklogSuggestion[] = [];
 	for (const [dayIssueKey, data] of merged) {
 		const [day, issueKey] = dayIssueKey.split('::');
-		if (!realKeys.has(issueKey)) continue;
+		if (branchOnlyKeys.has(issueKey) && !realBranchKeys.has(issueKey)) continue;
 		const capped = Math.min(data.seconds, 6 * 3600);
 		const hours = capped / 3600;
 		suggestions.push({

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import * as jiraSearch from '../jiraSearch';
-import { fetchJiraActivitySuggestions } from '../jiraActivityService';
 import type { Config } from '../../stores/useConfigStore';
+import { fetchJiraActivitySuggestions } from '../jiraActivityService';
+import * as jiraSearch from '../jiraSearch';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -22,8 +22,8 @@ function history(created: string, fields: string[]) {
 
 function mockIssues(issues: unknown[]) {
 	return vi
-		.spyOn(jiraSearch, 'fetchSearchPage')
-		.mockResolvedValue({ issues } as never);
+		.spyOn(jiraSearch, 'searchAllIssues')
+		.mockResolvedValue(issues as never);
 }
 
 /**
@@ -51,6 +51,29 @@ describe('fetchJiraActivitySuggestions — activity it was ignoring', () => {
 			'2026-08-09',
 		);
 		expect(out.map((s) => s.issueKey)).toContain('PAY-53');
+	});
+
+	it('says why an edit-only day was suggested, instead of a blank reason', async () => {
+		// These days reach the 30m floor via a code path that counts nothing, so
+		// the reason rendered as an empty line: a suggestion with no stated
+		// justification is one the user cannot judge.
+		mockIssues([
+			{
+				key: 'PAY-53',
+				fields: { summary: 'Apple Pay' },
+				changelog: {
+					histories: [
+						history('2026-08-05T10:00:00.000+0000', ['assignee', 'labels']),
+					],
+				},
+			},
+		]);
+		const out = await fetchJiraActivitySuggestions(
+			config,
+			'2026-08-03',
+			'2026-08-09',
+		);
+		expect(out[0]?.reason).toMatch(/edit/i);
 	});
 
 	it('still rates a transition above a bare field edit', async () => {
@@ -106,11 +129,13 @@ describe('fetchJiraActivitySuggestions — activity it was ignoring', () => {
 		expect(out).toHaveLength(0);
 	});
 
-	it('looks at more than twenty issues', async () => {
-		// A busy week touches far more than twenty tickets; the cap silently
-		// truncated the week to whichever twenty Jira returned first.
+	it('pages through the week instead of taking one capped page', async () => {
+		// A busy week touches far more than one page of tickets, and the widened
+		// query above is what makes that likely. Raising the cap alone would
+		// only move the truncation point.
 		const spy = mockIssues([]);
 		await fetchJiraActivitySuggestions(config, '2026-08-03', '2026-08-09');
+		expect(spy).toHaveBeenCalled();
 		const params = spy.mock.calls[0]?.[1] as { maxResults: number };
 		expect(params.maxResults).toBeGreaterThan(20);
 	});
@@ -134,6 +159,24 @@ describe('fetchJiraActivitySuggestions — reach of the query', () => {
 		const { jql } = spy.mock.calls[0]?.[1] as { jql: string };
 		expect(jql).toContain('assignee = currentUser()');
 		expect(jql).toContain('worklogAuthor = currentUser()');
+	});
+
+	it('includes the whole of the last day, not up to its midnight', async () => {
+		// Verified against a live instance: DURING ("2026-08-05","2026-08-05")
+		// returns nothing while ("2026-08-05","2026-08-05 23:59") returns two
+		// issues. A bare end date means 00:00, so every week silently lost its
+		// final day — and weekEnd is inclusive everywhere else in this file.
+		const spy = mockIssues([]);
+		await fetchJiraActivitySuggestions(config, '2026-08-03', '2026-08-09');
+		const { jql } = spy.mock.calls[0]?.[1] as { jql: string };
+		expect(jql).toContain('"2026-08-09 23:59"');
+	});
+
+	it('orders by recency so a truncated page keeps the newest work', async () => {
+		const spy = mockIssues([]);
+		await fetchJiraActivitySuggestions(config, '2026-08-03', '2026-08-09');
+		const { jql } = spy.mock.calls[0]?.[1] as { jql: string };
+		expect(jql).toContain('ORDER BY updated DESC');
 	});
 
 	it('bounds the changed-by clause to the requested week', async () => {
