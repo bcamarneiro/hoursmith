@@ -1,0 +1,72 @@
+/**
+ * Keep only the issue keys Jira actually knows about.
+ *
+ * Branch names and commit messages contain text shaped like an issue key that
+ * is not one. Two real examples from a live account:
+ *
+ *   - `APP-A-132/Bancontact-Integration` — a branch naming convention. Note
+ *     the extractor yields `A-132` here, not `APP-A-132`, because the hyphen
+ *     satisfies its boundary check; neither exists in Jira, so the outcome is
+ *     the same, but `A-132` is what actually reaches this function.
+ *   - `WEB-000` — a placeholder used when no ticket applies.
+ *
+ * Neither is fixable by pattern alone. Widening the regex to admit the first
+ * would admit every hyphenated branch prefix, and a hard-coded blocklist needs
+ * a new entry for each convention a team invents. Jira is the one source that
+ * knows which keys exist, and a single JQL answers for the whole batch.
+ *
+ * This filters *noise*, so a failed lookup keeps every candidate: hiding a
+ * day's real activity because Jira was briefly unreachable is a worse outcome
+ * than showing one suggestion that turns out to be bogus.
+ *
+ * Behaviour differs by deployment, and the fallback is what makes that safe:
+ *   - **Cloud** answers 200 and simply omits keys it does not know (verified
+ *     against a live instance), so filtering works as intended.
+ *   - **Server / DC** has historically rejected the whole clause with a 400
+ *     when any key is unknown. That lands in the catch below, every candidate
+ *     is kept, and the result is exactly the pre-existing behaviour — no
+ *     filtering, but nothing lost either.
+ */
+
+import { searchAllIssues } from './jiraSearch';
+
+/** Jira caps a JQL `IN` clause well above this; chunk to stay under URL limits. */
+const CHUNK_SIZE = 100;
+
+export async function filterToRealIssueKeys(
+	config: Parameters<typeof searchAllIssues>[0],
+	candidates: Iterable<string>,
+	signal?: AbortSignal,
+): Promise<Set<string>> {
+	const unique = [...new Set([...candidates].filter(Boolean))];
+	if (unique.length === 0) return new Set();
+	// A GitHub-only user has no Jira to ask. Without this the dashboard fires a
+	// request at `https:///rest/...` on every load and every week change.
+	if (!config.jiraHost || !config.apiToken) return new Set(unique);
+
+	const real = new Set<string>();
+	try {
+		for (let i = 0; i < unique.length; i += CHUNK_SIZE) {
+			const chunk = unique.slice(i, i + CHUNK_SIZE);
+			const issues = await searchAllIssues<{ key?: string }>(
+				config,
+				{
+					jql: `issue in (${chunk.map((k) => `"${k}"`).join(',')})`,
+					fields: 'summary',
+					maxResults: CHUNK_SIZE,
+				},
+				{ signal },
+			);
+			for (const issue of issues) {
+				if (issue.key) real.add(issue.key);
+			}
+		}
+	} catch (err) {
+		// An abort is the caller changing week, not a Jira failure — swallowing
+		// it would resolve a cancelled fetch with a full suggestion list.
+		if (err instanceof Error && err.name === 'AbortError') throw err;
+		// Anything else: unreachable Jira must not erase the day's activity.
+		return new Set(unique);
+	}
+	return real;
+}

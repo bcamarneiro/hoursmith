@@ -1,11 +1,12 @@
 // frontend/services/githubService.ts
 import type { WorklogSuggestion } from '../../types/Suggestion';
+import { filterToRealIssueKeys } from './issueKeyValidation';
 import { extractJiraKeys } from './jiraKeys';
 import { fromRichMessage, ServiceError } from './serviceErrors';
 
 const GITHUB_API_VERSION = '2022-11-28';
 
-type ActivityType = 'push' | 'pr-action' | 'review';
+type ActivityType = 'push' | 'pr-action' | 'review' | 'branch';
 
 interface ActivityEntry {
 	type: ActivityType;
@@ -18,6 +19,10 @@ const TIME_ESTIMATES: Record<ActivityType, { perUnit: number; max: number }> = {
 	push: { perUnit: 3600, max: 4 * 3600 },
 	'pr-action': { perUnit: 1800, max: 2 * 3600 },
 	review: { perUnit: 900, max: 2 * 3600 },
+	// Deliberately the smallest estimate: a branch event proves the ticket was
+	// touched that day, not how long for. It exists to surface the ticket, and
+	// the user adjusts from there.
+	branch: { perUnit: 900, max: 1800 },
 };
 
 interface GithubEvent {
@@ -25,6 +30,8 @@ interface GithubEvent {
 	created_at: string;
 	payload?: {
 		ref?: string;
+		/** 'branch' | 'tag' on Create/Delete events. */
+		ref_type?: string;
 		commits?: { message?: string }[];
 		action?: string;
 		pull_request?: { title?: string; head?: { ref?: string } };
@@ -127,14 +134,22 @@ function estimateConfidence(
 ): 'high' | 'medium' | 'low' {
 	if (type === 'push') return count >= 3 ? 'high' : 'medium';
 	if (type === 'pr-action') return 'medium';
+	// A branch event never rises above 'low' however many times it fires:
+	// creating and deleting the same branch is one piece of evidence, not two.
+	if (type === 'branch') return 'low';
 	return count >= 3 ? 'medium' : 'low';
 }
 
 function reasonLabel(type: ActivityType, count: number): string {
 	if (type === 'push') return `${count} commit${count > 1 ? 's' : ''}`;
 	if (type === 'pr-action') return `${count} PR action${count > 1 ? 's' : ''}`;
+	if (type === 'branch')
+		return `branch activity${count > 1 ? ` (${count} events)` : ''}`;
 	return `${count} PR review/comment${count > 1 ? 's' : ''}`;
 }
+
+/** Branch lifecycle — weak but real evidence that work touched a ticket. */
+const BRANCH_LIFECYCLE_EVENTS = new Set(['CreateEvent', 'DeleteEvent']);
 
 const PR_ACTION_EVENTS = new Set(['PullRequestEvent']);
 const REVIEW_EVENTS = new Set([
@@ -155,6 +170,12 @@ export async function fetchGithubSuggestions(
 	weekStart: string,
 	weekEnd: string,
 	signal?: AbortSignal,
+	/**
+	 * Jira connection, used to discard ticket-shaped strings that are not
+	 * tickets. Optional so existing callers and tests keep working unchanged —
+	 * without it every extracted key is trusted, which is the old behaviour.
+	 */
+	jiraConfig?: Parameters<typeof filterToRealIssueKeys>[0],
 ): Promise<WorklogSuggestion[]> {
 	if (!token) return [];
 
@@ -219,7 +240,22 @@ export async function fetchGithubSuggestions(
 		if (day < weekStart || day > weekEnd) continue;
 		const p = event.payload ?? {};
 
-		if (event.type === 'PushEvent') {
+		if (BRANCH_LIFECYCLE_EVENTS.has(event.type)) {
+			// Creating or deleting a branch named after a ticket means work
+			// happened on it — weak evidence, but evidence. Ignoring these left
+			// days whose only recorded activity was a branch showing nothing at
+			// all. Tags are excluded: a release tag says nothing about where the
+			// day's time went.
+			if (p.ref_type && p.ref_type !== 'branch') continue;
+			for (const key of extractJiraKeys(p.ref ?? '')) {
+				bump(
+					day,
+					key,
+					'branch',
+					`${event.type === 'DeleteEvent' ? 'deleted' : 'created'} branch ${p.ref}`,
+				);
+			}
+		} else if (event.type === 'PushEvent') {
 			const branchKeys = p.ref ? extractJiraKeys(p.ref) : [];
 			const msgKeys = (p.commits ?? []).flatMap((c) =>
 				extractJiraKeys(c.message ?? ''),
@@ -255,8 +291,17 @@ export async function fetchGithubSuggestions(
 				continue;
 			const title = p.pull_request?.title ?? p.issue?.title ?? '';
 			const body = p.comment?.body ?? p.review?.body ?? '';
+			// The branch matters as much as the text: a review body is often
+			// empty ("LGTM") and a PR title need not repeat the key, while the
+			// branch almost always carries it. Reviewing a colleague's work was
+			// producing no suggestion for exactly that reason.
+			const ref = p.pull_request?.head?.ref ?? '';
 			const keys = [
-				...new Set([...extractJiraKeys(title), ...extractJiraKeys(body)]),
+				...new Set([
+					...extractJiraKeys(title),
+					...extractJiraKeys(body),
+					...extractJiraKeys(ref),
+				]),
 			];
 			if (keys.length === 0) continue;
 			for (const key of keys) {
@@ -275,6 +320,14 @@ export async function fetchGithubSuggestions(
 		}
 	>();
 	const rank = { high: 2, medium: 1, low: 0 };
+	// A key seen in a commit, PR or review came from something a human wrote
+	// about real work; a key seen only in a branch name may be an invented
+	// convention. Only the latter is weak enough to discard on Jira's say-so.
+	const keysWithStrongEvidence = new Set<string>();
+	for (const [mapKey] of grouped) {
+		const [, issueKey, type] = mapKey.split('::');
+		if (type !== 'branch') keysWithStrongEvidence.add(issueKey);
+	}
 	for (const [mapKey, entry] of grouped) {
 		const [day, issueKey] = mapKey.split('::');
 		const dayIssueKey = `${day}::${issueKey}`;
@@ -295,9 +348,27 @@ export async function fetchGithubSuggestions(
 		}
 	}
 
+	// Drop keys Jira does not recognise. Branch names carry ticket-shaped text
+	// that is not a ticket — `APP-A-132/…` is a naming convention and `WEB-000`
+	// a placeholder, both observed on a live account. One JQL settles the whole
+	// batch; a lookup failure keeps everything (see filterToRealIssueKeys).
+	// Only branch-only keys are checked. A JQL search returns just the issues
+	// this user may browse, so validating everything would erase a push that
+	// references another team's ticket — real work, hidden. That is precisely
+	// the trade filterToRealIssueKeys says it will not make.
+	const branchOnlyKeys = new Set(
+		[...merged.keys()]
+			.map((k) => k.split('::')[1])
+			.filter((key) => !keysWithStrongEvidence.has(key)),
+	);
+	const realBranchKeys = jiraConfig
+		? await filterToRealIssueKeys(jiraConfig, branchOnlyKeys, signal)
+		: branchOnlyKeys;
+
 	const suggestions: WorklogSuggestion[] = [];
 	for (const [dayIssueKey, data] of merged) {
 		const [day, issueKey] = dayIssueKey.split('::');
+		if (branchOnlyKeys.has(issueKey) && !realBranchKeys.has(issueKey)) continue;
 		const capped = Math.min(data.seconds, 6 * 3600);
 		const hours = capped / 3600;
 		suggestions.push({
