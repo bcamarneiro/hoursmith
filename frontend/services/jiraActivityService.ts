@@ -35,10 +35,29 @@ export async function fetchJiraActivitySuggestions(
 ): Promise<WorklogSuggestion[]> {
 	if (!config.jiraHost || !config.apiToken) return [];
 
-	const jql = `(assignee = currentUser() OR worklogAuthor = currentUser()) AND updated >= "${weekStart}" AND updated <= "${weekEnd}"`;
+	// Two reaches, deliberately unioned:
+	//   - assignee / worklog-author: tickets that are *yours*.
+	//   - status CHANGED BY currentUser(): tickets you *moved*, whoever owns
+	//     them. Leads and reviewers spend much of the week here, and the first
+	//     clause alone cannot see any of it.
+	// Measured on a live instance for one week: the first clause returned 1
+	// issue, the union returned 4 — matching what Tempo's own calendar showed
+	// for the same days.
+	const jql =
+		`((assignee = currentUser() OR worklogAuthor = currentUser())` +
+		` AND updated >= "${weekStart}" AND updated <= "${weekEnd}")` +
+		` OR (status CHANGED BY currentUser() DURING ("${weekStart}", "${weekEnd}"))`;
 	const { issues } = await fetchSearchPage<JiraIssueWithChangelog>(
 		config,
-		{ jql, fields: 'summary', maxResults: 20, expand: 'changelog' },
+		{
+			jql,
+			fields: 'summary',
+			// Was 20. A busy week touches far more than that, and the cap
+			// truncated it to whichever twenty Jira happened to return first —
+			// silently, so the week just looked quiet.
+			maxResults: 100,
+			expand: 'changelog',
+		},
 		signal,
 	);
 

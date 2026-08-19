@@ -174,3 +174,88 @@ describe('fetchGithubSuggestions', () => {
 		expect(spy).not.toHaveBeenCalled();
 	});
 });
+
+describe('fetchGithubSuggestions — signal that was being dropped', () => {
+	/**
+	 * Shapes taken from a live account (2026-08-19). All of these represent
+	 * real work that produced no suggestion.
+	 */
+	function eventsRes(events: unknown[]) {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				// The events feed is matched first: /users/me/events also contains
+				// '/user', so order matters here.
+				if (String(url).includes('/events')) return jsonRes(events);
+				return jsonRes({ login: 'me' });
+			}),
+		);
+	}
+
+	it('reads the branch name on a review, not just the title and body', async () => {
+		// Reviewing a colleague's PR: the branch carries the key, the review body
+		// is often empty ("LGTM" or nothing), and the PR title need not repeat it.
+		eventsRes([
+			{
+				type: 'PullRequestReviewEvent',
+				created_at: '2026-08-18T10:00:00Z',
+				payload: {
+					pull_request: {
+						title: 'Zip happy path',
+						head: { ref: 'PAY-97-US-FE-QA-Zip-Happy-Path' },
+					},
+					review: { body: '' },
+				},
+			},
+		]);
+		const out = await fetchGithubSuggestions(
+			'tok',
+			'',
+			'',
+			'2026-08-17',
+			'2026-08-23',
+		);
+		expect(out.map((s) => s.issueKey)).toContain('PAY-97');
+	});
+
+	it('counts a branch push-and-delete cycle as weak evidence', async () => {
+		// Creating or deleting a branch named after a ticket means work happened
+		// on it. Ignoring the event entirely left days with real activity showing
+		// nothing at all.
+		eventsRes([
+			{
+				type: 'DeleteEvent',
+				created_at: '2026-08-19T10:00:00Z',
+				payload: { ref: 'PAY-222', ref_type: 'branch' },
+			},
+		]);
+		const out = await fetchGithubSuggestions(
+			'tok',
+			'',
+			'',
+			'2026-08-17',
+			'2026-08-23',
+		);
+		const s = out.find((x) => x.issueKey === 'PAY-222');
+		expect(s).toBeDefined();
+		expect(s?.confidence).toBe('low');
+	});
+
+	it('ignores a tag deletion, which says nothing about where time went', async () => {
+		eventsRes([
+			{
+				type: 'DeleteEvent',
+				created_at: '2026-08-19T10:00:00Z',
+				payload: { ref: 'PAY-222', ref_type: 'tag' },
+			},
+		]);
+		const out = await fetchGithubSuggestions(
+			'tok',
+			'',
+			'',
+			'2026-08-17',
+			'2026-08-23',
+		);
+		expect(out.find((x) => x.issueKey === 'PAY-222')).toBeUndefined();
+	});
+});

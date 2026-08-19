@@ -430,6 +430,10 @@ export function useDashboardDataFetcher(): DashboardFetchStatus {
 							weekStart,
 							weekEnd,
 							signal,
+							// Lets GitHub keys be checked against Jira, so branch
+							// naming conventions and placeholders stop becoming
+							// suggestions for tickets that do not exist.
+							config,
 						)
 							.catch((e) => {
 								if (!signal.aborted) setError('github', e.message);
