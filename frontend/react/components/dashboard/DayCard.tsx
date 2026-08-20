@@ -83,11 +83,16 @@ export const DayCard = memo<Props>(function DayCard({
 	const startedById = useMemo(() => {
 		const placed = layOutDay({
 			date: day.date,
-			suggestions: loggableSuggestions.map((s) => ({
-				id: s.id,
-				seconds: s.suggestedSeconds,
-				activityAt: s.activityAt,
-			})),
+			// Filtered inside the memo on purpose: `loggableSuggestions` is a new
+			// array on every render, so depending on it meant this never hit the
+			// cache and re-laid out the day seven times per week view.
+			suggestions: day.suggestions
+				.filter((s) => !!s.issueKey && !s.logged)
+				.map((s) => ({
+					id: s.id,
+					seconds: s.suggestedSeconds,
+					activityAt: s.activityAt,
+				})),
 			activeHours: day.rescueTime?.activeHours ?? [],
 			existing: day.loggedWorklogs
 				.filter((w) => w.startedAt)
@@ -97,7 +102,7 @@ export const DayCard = memo<Props>(function DayCard({
 				})),
 		});
 		return new Map(placed.map((p) => [p.id, p.startedAt]));
-	}, [day.date, day.rescueTime, day.loggedWorklogs, loggableSuggestions]);
+	}, [day.date, day.rescueTime, day.loggedWorklogs, day.suggestions]);
 	const loggedSuggestions = day.suggestions.filter((s) => s.logged);
 	const isToday = day.date === toLocalDateString(new Date());
 	const isTimeOff = !day.isWeekend && day.targetSeconds === 0;
@@ -235,11 +240,20 @@ export const DayCard = memo<Props>(function DayCard({
 		if (dates.length === 0) return;
 		const timeSpent = formatJiraTimeSpent(source.timeSpentSeconds);
 		try {
+			// Keep the source worklog's own time of day. Cloning is "the same
+			// work, on these days too", so its hour is the honest answer — and
+			// unlike 09:00 it does not land on top of whatever each target day
+			// already has logged at nine. The layout cannot help here: this
+			// component only holds data for its own day.
+			const sourceTime = source.startedAt?.slice(11, 19);
+			const timeOfDay = /^\d{2}:\d{2}:\d{2}$/.test(sourceTime ?? '')
+				? (sourceTime as string)
+				: '09:00:00';
 			const params = dates.map((d) => ({
 				issueKey: source.issueKey,
 				timeSpent,
 				comment: '',
-				started: withLocalOffset(`${d}T09:00`),
+				started: withLocalOffset(`${d}T${timeOfDay}`),
 			}));
 
 			const result = await createMultipleWorklogs(params);
@@ -445,12 +459,11 @@ export const DayCard = memo<Props>(function DayCard({
 
 					{loggedSuggestions.length > 0 && (
 						<div className={styles.suggestions}>
+							{/* No startedAt: the layout only places unlogged
+							    suggestions, so the lookup would always miss. These
+							    are already logged and cannot be logged again. */}
 							{loggedSuggestions.map((s) => (
-								<SuggestionCard
-									key={s.id}
-									suggestion={s}
-									startedAt={startedById.get(s.id)}
-								/>
+								<SuggestionCard key={s.id} suggestion={s} />
 							))}
 						</div>
 					)}

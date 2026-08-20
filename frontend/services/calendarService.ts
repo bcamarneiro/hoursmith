@@ -432,7 +432,11 @@ function pad2(n: number): string {
 }
 
 /** Earliest of two local stamps; either may be absent. */
-function earlierOf(a: string | undefined, b: string): string {
+function earlierOf(
+	a: string | undefined,
+	b: string | undefined,
+): string | undefined {
+	if (!b) return a;
 	return !a || b < a ? b : a;
 }
 
@@ -541,7 +545,13 @@ export async function fetchCalendarSuggestions(
 		// Local wall-clock start, matching the `date` above: both come from the
 		// same parsed instant, so a meeting never lands on a different day than
 		// the stamp that positions it.
-		const localStartStamp = `${start.iso}T${pad2(start.date.getHours())}:${pad2(start.date.getMinutes())}:00`;
+		// Only when the instant actually parsed. `parseIcsDateTime` falls back to
+		// the raw digits for `iso`, so an event with an invalid time still passes
+		// the range filter above — and `pad2(NaN)` would produce
+		// `TNaN:NaN:00`, which reads downstream as midnight.
+		const localStartStamp = Number.isNaN(start.date.getTime())
+			? undefined
+			: `${start.iso}T${pad2(start.date.getHours())}:${pad2(start.date.getMinutes())}:00`;
 		if (day < weekStart || day > weekEnd) {
 			skippedOutOfRange++;
 			continue;
@@ -624,6 +634,13 @@ export async function fetchCalendarSuggestions(
 		};
 		existingUnmapped.totalSeconds += durationSeconds;
 		existingUnmapped.eventCount++;
+		// Recorded here too: mapping the title inline turns this into a real
+		// suggestion, and it should carry the meeting's time like any other
+		// rather than falling back to 09:00.
+		existingUnmapped.earliestStart = earlierOf(
+			existingUnmapped.earliestStart,
+			localStartStamp,
+		);
 		existingUnmapped.reasons.push(`${prefix}${title.slice(0, 60)}`);
 		unmapped.set(unmappedKey, existingUnmapped);
 	}
@@ -670,6 +687,7 @@ export async function fetchCalendarSuggestions(
 					? `${Math.floor(hours)}h${hours % 1 >= 0.5 ? ' 30m' : ''}`
 					: '30m',
 			suggestedSeconds: cappedSeconds,
+			activityAt: data.earliestStart,
 			confidence: 'low',
 			reason: `${data.eventCount} calendar event${data.eventCount > 1 ? 's' : ''}: ${data.reasons.slice(0, 2).join('; ')}${data.reasons.length > 2 ? '...' : ''}`,
 			logged: false,

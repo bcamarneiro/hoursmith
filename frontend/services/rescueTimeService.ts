@@ -131,6 +131,8 @@ export async function fetchRescueTimeData(
 	// Seconds per (day, hour), summed across every activity row in that hour.
 	// Thresholded after accumulation; see the comment at the call site.
 	const secondsByDayHour = new Map<string, Map<number, number>>();
+	// First row whose Date column had no usable hour; reported once at the end.
+	let unparsedHourExample: string | undefined;
 
 	for (const row of rows) {
 		const rawDate = String(row[dateIdx] ?? '');
@@ -143,28 +145,33 @@ export async function fetchRescueTimeData(
 		// A date-only stamp would slice to '' and Number('') is 0, which passes
 		// isFinite — crediting the whole day to hour 0 and laying every
 		// suggestion out from midnight. Require the characters to be there.
-		if (rawDate.length >= 13) {
-			const hour = Number(rawDate.slice(11, 13));
-			if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
-				// Silence here is indistinguishable from "no RescueTime data":
-				// activeHours would quietly empty and the layout revert to its
-				// 09:00 fallback with nothing to explain why.
-				logger.warn(
-					`[RescueTime] Unexpected Date shape, hour not parsed: "${rawDate}"`,
-				);
-			} else {
-				// Accumulate per hour, threshold later: with restrict_kind=activity
-				// a genuinely busy hour is split across many short-lived apps, so a
-				// per-row threshold would drop an hour of twelve four-minute
-				// switches — losing the real start of the day.
-				const perHour =
-					secondsByDayHour.get(dateStr) ?? new Map<number, number>();
-				perHour.set(
-					hour,
-					(perHour.get(hour) ?? 0) + Number(row[secondsIdx] ?? 0),
-				);
-				secondsByDayHour.set(dateStr, perHour);
-			}
+		// Both failure shapes matter and neither should be silent: a
+		// day-resolution row has no hour at all, and a space-separated stamp
+		// slices to "9:" which is NaN. Either way `activeHours` empties and the
+		// layout quietly reverts to its 09:00 fallback, indistinguishable from
+		// having no RescueTime data. Warned once per fetch, not once per row —
+		// a week is ~650 rows.
+		const hour =
+			rawDate.length >= 13 ? Number(rawDate.slice(11, 13)) : Number.NaN;
+		if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+			unparsedHourExample ??= rawDate;
+		} else if (Number(row[productivityIdx] ?? 0) >= 0) {
+			// Same neutral-and-above bar as `productiveSeconds` below: an hour
+			// spent entirely on distracting activity should not receive logged
+			// time while contributing nothing to the productive total the
+			// suggestions are scaled against.
+			//
+			// Accumulated per hour and thresholded later: with
+			// restrict_kind=activity a busy hour is split across many
+			// short-lived apps, so a per-row threshold would drop an hour of
+			// twelve four-minute switches — losing the real start of the day.
+			const perHour =
+				secondsByDayHour.get(dateStr) ?? new Map<number, number>();
+			perHour.set(
+				hour,
+				(perHour.get(hour) ?? 0) + Number(row[secondsIdx] ?? 0),
+			);
+			secondsByDayHour.set(dateStr, perHour);
 		}
 
 		const seconds = Number(row[secondsIdx] ?? 0);
@@ -224,6 +231,13 @@ export async function fetchRescueTimeData(
 				.map(([hour]) => hour)
 				.sort((a, b) => a - b),
 		});
+	}
+
+	if (unparsedHourExample) {
+		logger.warn(
+			`[RescueTime] Date column carried no usable hour (e.g. "${unparsedHourExample}"). ` +
+				'Day-shape detection is off; suggestions fall back to a 09:00 start.',
+		);
 	}
 
 	return result;

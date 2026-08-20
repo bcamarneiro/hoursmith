@@ -118,9 +118,19 @@ function stamp(date: string, minutesFromMidnight: number): string {
  * would block 07:00-09:00, and the next suggestion would land at 09:00, on top
  * of it. `toTempoWriteInput` splits `started` textually for the same reason.
  */
-function minutesOf(iso: string): number {
+function minutesOf(iso: string): number | null {
 	const [h, m] = iso.slice(11, 16).split(':').map(Number);
-	return (h || 0) * 60 + (m || 0);
+	// `calendarService` can emit `TNaN:NaN` for an unparseable DTSTART.
+	// Coercing that to 0 would stamp the suggestion at midnight and block the
+	// hour — a confident wrong answer where "unknown" is the truth.
+	if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+	return h * 60 + m;
+}
+
+/** Minutes for a duration, or null when it is not a usable number. */
+function durationMinutes(seconds: number): number | null {
+	if (!Number.isFinite(seconds)) return null;
+	return Math.max(1, Math.round(seconds / 60));
 }
 
 interface Interval {
@@ -216,10 +226,17 @@ export function layOutDay(input: {
 }): LaidOutSuggestion[] {
 	const { date, suggestions, activeHours, existing } = input;
 
-	const busy: Interval[] = existing.map((e) => {
+	// An unusable start or duration means we do not know where this worklog
+	// sits. Skipping it is right: `subtract` compares against NaN, every
+	// comparison is false, and the interval is dropped whole rather than split
+	// — silently erasing the rest of the day.
+	const busy: Interval[] = [];
+	for (const e of existing) {
 		const from = minutesOf(e.startedAt);
-		return { from, to: from + Math.round(e.seconds / 60) };
-	});
+		const minutes = durationMinutes(e.seconds);
+		if (from === null || minutes === null) continue;
+		busy.push({ from, to: from + minutes });
+	}
 
 	const out: LaidOutSuggestion[] = [];
 
@@ -227,9 +244,17 @@ export function layOutDay(input: {
 	const fixed = suggestions.filter((s) => s.activityAt);
 	const floating = suggestions.filter((s) => !s.activityAt);
 
+	const unplaceableFixed: LayoutSuggestion[] = [];
 	for (const s of fixed) {
 		const from = minutesOf(s.activityAt as string);
-		busy.push({ from, to: from + Math.round(s.seconds / 60) });
+		const minutes = durationMinutes(s.seconds);
+		if (from === null) {
+			// The time did not parse, so treat it as unknown and let it take its
+			// turn in the sequence rather than trusting a bad stamp.
+			unplaceableFixed.push(s);
+			continue;
+		}
+		busy.push({ from, to: from + (minutes ?? 1) });
 		out.push({ ...s, startedAt: stamp(date, from) });
 	}
 
@@ -244,8 +269,8 @@ export function layOutDay(input: {
 	// than collapsing onto one timestamp.
 	const usedStarts = new Set<number>();
 
-	for (const s of floating) {
-		const minutes = Math.max(1, Math.round(s.seconds / 60));
+	for (const s of [...unplaceableFixed, ...floating]) {
+		const minutes = durationMinutes(s.seconds) ?? 1;
 
 		// Observed hours first; only then the rest of the day. Repeating one
 		// clamped time would rebuild the pile this module exists to remove.

@@ -274,6 +274,62 @@ describe('layOutDay', () => {
 		);
 	});
 
+	it('ignores a busy interval whose duration is not a number', () => {
+		// A calendar event with an unparseable DTEND yields NaN seconds. `subtract`
+		// compares against NaN, every comparison is false, and the whole interval
+		// is dropped rather than split — erasing the afternoon and pushing work
+		// outside the working day entirely.
+		// Six hours, so the afternoon is actually needed: if the NaN interval
+		// swallowed it, the later suggestions would spill *before* 09:00 rather
+		// than continuing through the day.
+		const out = layOutDay({
+			date: '2026-08-03',
+			suggestions: Array.from({ length: 6 }, (_, i) => ({
+				id: `s${i}`,
+				seconds: 3600,
+			})),
+			activeHours: CONTINUOUS,
+			existing: [{ startedAt: '2026-08-03T13:00:00', seconds: Number.NaN }],
+		});
+		expect(out.map((s) => s.startedAt.slice(11, 16))).toEqual([
+			'09:00',
+			'10:00',
+			'11:00',
+			'12:00',
+			'13:00',
+			'14:00',
+		]);
+	});
+
+	it('places a suggestion with an unusable duration without corrupting the day', () => {
+		const out = layOutDay({
+			date: '2026-08-03',
+			suggestions: [
+				{ id: 'bad', seconds: Number.NaN },
+				{ id: 'good', seconds: 3600 },
+			],
+			activeHours: CONTINUOUS,
+			existing: [],
+		});
+		for (const s of out) {
+			expect(s.startedAt).toMatch(/^2026-08-03T\d{2}:\d{2}:00$/);
+		}
+	});
+
+	it('ignores a fixed time that did not parse', () => {
+		// calendarService can emit `T NaN:NaN` for an invalid DTSTART; coercing
+		// that to 0 would stamp the suggestion at midnight and block 00:00.
+		const out = layOutDay({
+			date: '2026-08-03',
+			suggestions: [
+				{ id: 'meeting', seconds: 3600, activityAt: '2026-08-03TNaN:NaN:00' },
+			],
+			activeHours: CONTINUOUS,
+			existing: [],
+		});
+		expect(out[0]?.startedAt).toBe('2026-08-03T09:00:00');
+	});
+
 	it('falls back to 09:00 when nothing is known about the day', () => {
 		// No RescueTime, no timestamps: the old behaviour, but only as a last
 		// resort rather than always.
