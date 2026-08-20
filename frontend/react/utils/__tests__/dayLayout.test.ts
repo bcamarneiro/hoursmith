@@ -241,7 +241,8 @@ describe('layOutDay', () => {
 		// at 23:30, so that placement is correct — the assertion is about
 		// overlap, not about a particular hour.
 		const flo = out.find((s) => s.id === 'flo');
-		const floStart = Number(flo?.startedAt.slice(11, 13)) * 60 +
+		const floStart =
+			Number(flo?.startedAt.slice(11, 13)) * 60 +
 			Number(flo?.startedAt.slice(14, 16));
 		expect(floStart + 90).toBeLessThanOrEqual(23 * 60 + 30);
 	});

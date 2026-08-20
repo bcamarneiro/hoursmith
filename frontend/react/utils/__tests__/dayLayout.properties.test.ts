@@ -184,9 +184,9 @@ function durationMinutes(seconds: number): number | null {
 /** A strictly well-formed same-day activityAt: THH:mm with HH 00-23, mm 00-59. */
 function isValidActivityAt(at: string | undefined, date: string): boolean {
 	if (!at) return false;
-	return new RegExp(
-		`^${date}T([01]\\d|2[0-3]):([0-5]\\d)(:[0-5]\\d)?$`,
-	).test(at);
+	return new RegExp(`^${date}T([01]\\d|2[0-3]):([0-5]\\d)(:[0-5]\\d)?$`).test(
+		at,
+	);
 }
 
 /**
