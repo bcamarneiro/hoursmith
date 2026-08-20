@@ -55,12 +55,17 @@ test.describe('Premium smoke', () => {
 		expect(hostedCtaCount + waitlistCount).toBeGreaterThan(0);
 		expect(hostedCtaCount && waitlistCount).toBeFalsy();
 		if (hostedCtaCount) {
-			await expect(hostedCta).toHaveAttribute('href', '/account?upgrade=hosted');
+			await expect(hostedCta).toHaveAttribute(
+				'href',
+				'/account?upgrade=hosted',
+			);
 		}
 
 		const leadCta = page.getByRole('link', { name: /Get Lead/ });
 		if (LEAD_TIER_ENABLED) {
-			await expect(page.getByRole('heading', { level: 2, name: 'Lead' })).toBeVisible();
+			await expect(
+				page.getByRole('heading', { level: 2, name: 'Lead' }),
+			).toBeVisible();
 			if (await leadCta.count()) {
 				await expect(leadCta).toHaveAttribute('href', '/account?upgrade=lead');
 			}
