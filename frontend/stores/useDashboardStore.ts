@@ -101,9 +101,12 @@ interface DashboardState {
 	setDaySummaries: (summaries: DaySummary[]) => void;
 	setWeekWorklogs: (worklogs: WeekWorklogEntry[]) => void;
 	setWeekGhosts: (ghosts: WeekGhostEntry[]) => void;
-	markSuggestionLogged: (suggestionId: string) => void;
+	markSuggestionLogged: (suggestionId: string, startedAt?: string) => void;
 	unmarkSuggestionLogged: (suggestionId: string) => void;
-	markMultipleSuggestionsLogged: (ids: string[]) => void;
+	markMultipleSuggestionsLogged: (
+		ids: string[],
+		startedById?: ReadonlyMap<string, string>,
+	) => void;
 	unmarkMultipleSuggestionsLogged: (ids: string[]) => void;
 	dismissSuggestion: (suggestionId: string) => void;
 	mergePreviousWeekSuggestions: (suggestions: WorklogSuggestion[]) => void;
@@ -201,9 +204,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
 	setWeekGhosts: (ghosts) => set({ weekGhosts: ghosts }),
 
-	markSuggestionLogged: (suggestionId) =>
+	markSuggestionLogged: (suggestionId, startedAt) =>
 		set((state) => ({
-			daySummaries: applyMarkSuggestionLogged(state.daySummaries, suggestionId),
+			daySummaries: applyMarkSuggestionLogged(
+				state.daySummaries,
+				suggestionId,
+				startedAt,
+			),
 		})),
 
 	unmarkSuggestionLogged: (suggestionId) =>
@@ -214,9 +221,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 			),
 		})),
 
-	markMultipleSuggestionsLogged: (ids) =>
+	markMultipleSuggestionsLogged: (ids, startedById) =>
 		set((state) => ({
-			daySummaries: applyMarkMultipleLogged(state.daySummaries, ids),
+			daySummaries: applyMarkMultipleLogged(
+				state.daySummaries,
+				ids,
+				startedById,
+			),
 		})),
 
 	unmarkMultipleSuggestionsLogged: (ids) =>

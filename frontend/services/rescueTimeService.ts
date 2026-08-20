@@ -2,6 +2,7 @@ import type {
 	RescueTimeActivity,
 	RescueTimeDaySummary,
 } from '../../types/Suggestion';
+import { logger } from '../react/utils/logger';
 import { buildRescueTimeRequest } from './rescueTimeGateway';
 import { fromHttpResponse, ServiceError } from './serviceErrors';
 
@@ -38,7 +39,12 @@ export async function fetchRescueTimeData(
 	const params = new URLSearchParams({
 		perspective: 'interval',
 		restrict_kind: 'activity',
-		resolution_time: 'day',
+		// Hourly, not daily: the per-hour profile is what tells us when the day
+		// actually started and where the breaks were, and a fixed 09:00 was
+		// simply wrong for users who start earlier. The daily figures below are
+		// summed from these rows, so nothing is lost. Measured cost for a week:
+		// 656 rows / 43 KB against 231 rows / 16 KB — one call either way.
+		resolution_time: 'hour',
 		restrict_begin: weekStart,
 		restrict_end: weekEnd,
 		format: 'json',
@@ -122,10 +128,51 @@ export async function fetchRescueTimeData(
 
 	// Group activities by date
 	const byDay = new Map<string, RescueTimeActivity[]>();
+	// Seconds per (day, hour), summed across every activity row in that hour.
+	// Thresholded after accumulation; see the comment at the call site.
+	const secondsByDayHour = new Map<string, Map<number, number>>();
+	// First row whose Date column had no usable hour; reported once at the end.
+	let unparsedHourExample: string | undefined;
 
 	for (const row of rows) {
-		const dateStr = String(row[dateIdx] ?? '').slice(0, 10);
+		const rawDate = String(row[dateIdx] ?? '');
+		const dateStr = rawDate.slice(0, 10);
 		if (!dateStr) continue;
+
+		// RescueTime reports in the account's local timezone — verified against
+		// a live account, whose latest reported hour matched the browser's local
+		// hour exactly. So no conversion belongs here.
+		// A date-only stamp would slice to '' and Number('') is 0, which passes
+		// isFinite — crediting the whole day to hour 0 and laying every
+		// suggestion out from midnight. Require the characters to be there.
+		// Both failure shapes matter and neither should be silent: a
+		// day-resolution row has no hour at all, and a space-separated stamp
+		// slices to "9:" which is NaN. Either way `activeHours` empties and the
+		// layout quietly reverts to its 09:00 fallback, indistinguishable from
+		// having no RescueTime data. Warned once per fetch, not once per row —
+		// a week is ~650 rows.
+		const hour =
+			rawDate.length >= 13 ? Number(rawDate.slice(11, 13)) : Number.NaN;
+		if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+			unparsedHourExample ??= rawDate;
+		} else if (Number(row[productivityIdx] ?? 0) >= 0) {
+			// Same neutral-and-above bar as `productiveSeconds` below: an hour
+			// spent entirely on distracting activity should not receive logged
+			// time while contributing nothing to the productive total the
+			// suggestions are scaled against.
+			//
+			// Accumulated per hour and thresholded later: with
+			// restrict_kind=activity a busy hour is split across many
+			// short-lived apps, so a per-row threshold would drop an hour of
+			// twelve four-minute switches — losing the real start of the day.
+			const perHour =
+				secondsByDayHour.get(dateStr) ?? new Map<number, number>();
+			perHour.set(
+				hour,
+				(perHour.get(hour) ?? 0) + Number(row[secondsIdx] ?? 0),
+			);
+			secondsByDayHour.set(dateStr, perHour);
+		}
 
 		const seconds = Number(row[secondsIdx] ?? 0);
 		const productivity = Number(row[productivityIdx] ?? 0);
@@ -175,7 +222,22 @@ export async function fetchRescueTimeData(
 			.sort((a, b) => b.seconds - a.seconds)
 			.slice(0, 5);
 
-		result.set(date, { productiveSeconds, topActivities });
+		result.set(date, {
+			productiveSeconds,
+			topActivities,
+			activeHours: [...(secondsByDayHour.get(date) ?? new Map())]
+				// Five minutes in a whole hour is a stray notification, not work.
+				.filter(([, seconds]) => seconds >= 300)
+				.map(([hour]) => hour)
+				.sort((a, b) => a - b),
+		});
+	}
+
+	if (unparsedHourExample) {
+		logger.warn(
+			`[RescueTime] Date column carried no usable hour (e.g. "${unparsedHourExample}"). ` +
+				'Day-shape detection is off; suggestions fall back to a 09:00 start.',
+		);
 	}
 
 	return result;

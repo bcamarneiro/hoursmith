@@ -12,6 +12,12 @@ import * as styles from './SuggestionCard.module.css';
 
 type Props = {
 	suggestion: WorklogSuggestion;
+	/**
+	 * Where the day's layout placed this suggestion. Supplied by DayCard, which
+	 * computes one layout for the whole day — logging in bulk and logging the
+	 * same suggestions one at a time must not disagree about the time.
+	 */
+	startedAt?: string;
 	isFocused?: boolean;
 };
 
@@ -43,6 +49,7 @@ const CONFIDENCE_STYLES: Record<string, string> = {
 
 export const SuggestionCard = memo<Props>(function SuggestionCard({
 	suggestion,
+	startedAt,
 	isFocused,
 }) {
 	const jiraDomain = useConfigStore((s) => s.config.jiraHost);
@@ -83,14 +90,15 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 			);
 			return;
 		}
+		const started = startedAt ?? `${suggestion.date}T09:00`;
 		try {
 			const worklog = await createWorklog({
 				issueKey: suggestion.issueKey,
 				timeSpent: suggestion.suggestedTimeSpent,
 				comment: '',
-				started: withLocalOffset(`${suggestion.date}T09:00`),
+				started: withLocalOffset(started),
 			});
-			markLogged(suggestion.id);
+			markLogged(suggestion.id, started);
 			// createWorklog returns null when the backend accepted the write but
 			// answered with nothing placeable; the worklog exists, we just cannot
 			// offer Undo for it.
@@ -123,7 +131,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 		started: string;
 	}) => {
 		await createWorklog(data);
-		markLogged(suggestion.id);
+		markLogged(suggestion.id, data.started);
 		setIsEditOpen(false);
 		toast.success(`Logged to ${data.issueKey}`);
 	};
@@ -336,7 +344,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 						issueKey: suggestion.issueKey,
 						timeSpent: suggestion.suggestedTimeSpent,
 						comment: '',
-						started: `${suggestion.date}T09:00`,
+						started: startedAt ?? `${suggestion.date}T09:00`,
 					}}
 					onSubmit={handleEditSubmit}
 					onCancel={() => setIsEditOpen(false)}

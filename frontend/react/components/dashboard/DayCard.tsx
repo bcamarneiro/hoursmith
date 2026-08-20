@@ -9,6 +9,7 @@ import {
 	toLocalDateString,
 	withLocalOffset,
 } from '../../utils/date';
+import { planDayStarts } from '../../../services/dayPlan';
 import { formatHours, formatJiraTimeSpent } from '../../utils/format';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
@@ -74,6 +75,12 @@ export const DayCard = memo<Props>(function DayCard({
 	const [isBatchLogging, setIsBatchLogging] = useState(false);
 	const activeSuggestions = day.suggestions.filter((s) => !s.logged);
 	const loggableSuggestions = activeSuggestions.filter((s) => !!s.issueKey);
+
+	// One layout for the whole day, used by both "Log All" and each card's own
+	// "Log it". Computing it per-path would let the two disagree: logging in
+	// bulk placed 09:00/10:00/11:00 while logging the same suggestions one at a
+	// time stacked them all on 09:00.
+	const startedById = useMemo(() => planDayStarts(day), [day]);
 	const loggedSuggestions = day.suggestions.filter((s) => s.logged);
 	const isToday = day.date === toLocalDateString(new Date());
 	const isTimeOff = !day.isWeekend && day.targetSeconds === 0;
@@ -211,11 +218,20 @@ export const DayCard = memo<Props>(function DayCard({
 		if (dates.length === 0) return;
 		const timeSpent = formatJiraTimeSpent(source.timeSpentSeconds);
 		try {
+			// Keep the source worklog's own time of day. Cloning is "the same
+			// work, on these days too", so its hour is the honest answer — and
+			// unlike 09:00 it does not land on top of whatever each target day
+			// already has logged at nine. The layout cannot help here: this
+			// component only holds data for its own day.
+			const sourceTime = source.startedAt?.slice(11, 19);
+			const timeOfDay = /^\d{2}:\d{2}:\d{2}$/.test(sourceTime ?? '')
+				? (sourceTime as string)
+				: '09:00:00';
 			const params = dates.map((d) => ({
 				issueKey: source.issueKey,
 				timeSpent,
 				comment: '',
-				started: withLocalOffset(`${d}T09:00`),
+				started: withLocalOffset(`${d}T${timeOfDay}`),
 			}));
 
 			const result = await createMultipleWorklogs(params);
@@ -256,7 +272,7 @@ export const DayCard = memo<Props>(function DayCard({
 				issueKey: s.issueKey,
 				timeSpent: s.suggestedTimeSpent,
 				comment: '',
-				started: withLocalOffset(`${s.date}T09:00`),
+				started: withLocalOffset(startedById.get(s.id) ?? `${s.date}T09:00`),
 			}));
 
 			if (params.length === 0) {
@@ -273,7 +289,7 @@ export const DayCard = memo<Props>(function DayCard({
 				.map((s) => s.id);
 
 			if (successIds.length > 0) {
-				markMultipleSuggestionsLogged(successIds);
+				markMultipleSuggestionsLogged(successIds, startedById);
 			}
 
 			if (result.failed.length === 0) {
@@ -412,6 +428,7 @@ export const DayCard = memo<Props>(function DayCard({
 								<SuggestionCard
 									key={s.id}
 									suggestion={s}
+									startedAt={startedById.get(s.id)}
 									isFocused={isFocused && focusedSuggestionIndex === i}
 								/>
 							))}
@@ -420,6 +437,9 @@ export const DayCard = memo<Props>(function DayCard({
 
 					{loggedSuggestions.length > 0 && (
 						<div className={styles.suggestions}>
+							{/* No startedAt: the layout only places unlogged
+							    suggestions, so the lookup would always miss. These
+							    are already logged and cannot be logged again. */}
 							{loggedSuggestions.map((s) => (
 								<SuggestionCard key={s.id} suggestion={s} />
 							))}

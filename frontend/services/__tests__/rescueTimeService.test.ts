@@ -160,3 +160,65 @@ describe('fetchRescueTimeData', () => {
 		).rejects.toMatchObject({ kind: 'invalid-token', status: 403 });
 	});
 });
+
+describe("fetchRescueTimeData — the day's active hours", () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	const row = (stamp: string, seconds: number, name = 'app') => [
+		stamp,
+		seconds,
+		1,
+		name,
+		'Software Development',
+		2,
+	];
+
+	it('counts an hour that is busy across many short activities', async () => {
+		// A real hour of work is split across editor, browser and chat. A
+		// per-row threshold would see twelve four-minute rows, none of them
+		// large, and drop the hour — losing the true start of the day.
+		mockJsonOnce({
+			row_headers: HEADERS,
+			rows: Array.from({ length: 12 }, (_, i) =>
+				row('2026-08-05T09:00:00', 240, `app-${i}`),
+			),
+		});
+		const out = await fetchRescueTimeData(
+			'k',
+			'http://proxy',
+			'2026-08-05',
+			'2026-08-05',
+		);
+		expect(out.get('2026-08-05')?.activeHours).toContain(9);
+	});
+
+	it('ignores an hour with only a stray minute of activity', async () => {
+		mockJsonOnce({
+			row_headers: HEADERS,
+			rows: [row('2026-08-05T03:00:00', 60)],
+		});
+		const out = await fetchRescueTimeData(
+			'k',
+			'http://proxy',
+			'2026-08-05',
+			'2026-08-05',
+		);
+		expect(out.get('2026-08-05')?.activeHours).toEqual([]);
+	});
+
+	it('does not credit a date-only stamp to midnight', async () => {
+		// Number('') is 0 and passes isFinite, so a date-only row would mark
+		// hour 0 active and lay the whole day out from midnight.
+		mockJsonOnce({
+			row_headers: HEADERS,
+			rows: [row('2026-08-05', 3600)],
+		});
+		const out = await fetchRescueTimeData(
+			'k',
+			'http://proxy',
+			'2026-08-05',
+			'2026-08-05',
+		);
+		expect(out.get('2026-08-05')?.activeHours).toEqual([]);
+	});
+});
