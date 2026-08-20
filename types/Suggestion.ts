@@ -27,6 +27,14 @@ export interface WorklogSuggestion {
 	 * layout places these at their real time rather than guessing a slot.
 	 */
 	activityAt?: string;
+	/**
+	 * The `started` this suggestion was actually written to Jira with, recorded
+	 * when it is marked logged. The week is not refetched after a write, so
+	 * without this the suggestion leaves the layout's input without ever
+	 * appearing in `loggedWorklogs` — its time vanishes and the next suggestion
+	 * is placed straight on top of it. Cleared when the log is undone.
+	 */
+	loggedStartedAt?: string;
 }
 
 export interface RescueTimeActivity {

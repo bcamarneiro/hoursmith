@@ -90,14 +90,15 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 			);
 			return;
 		}
+		const started = startedAt ?? `${suggestion.date}T09:00`;
 		try {
 			const worklog = await createWorklog({
 				issueKey: suggestion.issueKey,
 				timeSpent: suggestion.suggestedTimeSpent,
 				comment: '',
-				started: withLocalOffset(startedAt ?? `${suggestion.date}T09:00`),
+				started: withLocalOffset(started),
 			});
-			markLogged(suggestion.id);
+			markLogged(suggestion.id, started);
 			// createWorklog returns null when the backend accepted the write but
 			// answered with nothing placeable; the worklog exists, we just cannot
 			// offer Undo for it.
@@ -130,7 +131,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 		started: string;
 	}) => {
 		await createWorklog(data);
-		markLogged(suggestion.id);
+		markLogged(suggestion.id, data.started);
 		setIsEditOpen(false);
 		toast.success(`Logged to ${data.issueKey}`);
 	};

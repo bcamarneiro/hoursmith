@@ -23,6 +23,7 @@ function formatTimeSpent(seconds: number): string {
 export function applyMarkSuggestionLogged(
 	daySummaries: DaySummary[],
 	suggestionId: string,
+	startedAt?: string,
 ): DaySummary[] {
 	return daySummaries.map((day) => {
 		const s = day.suggestions.find((s) => s.id === suggestionId);
@@ -32,7 +33,9 @@ export function applyMarkSuggestionLogged(
 			loggedSeconds: day.loggedSeconds + added,
 			gapSeconds: Math.max(0, day.gapSeconds - added),
 			suggestions: day.suggestions.map((s) =>
-				s.id === suggestionId ? { ...s, logged: true } : s,
+				s.id === suggestionId
+					? { ...s, logged: true, loggedStartedAt: startedAt }
+					: s,
 			),
 		};
 	});
@@ -54,7 +57,9 @@ export function applyUnmarkSuggestionLogged(
 			loggedSeconds: Math.max(0, day.loggedSeconds - removed),
 			gapSeconds: day.gapSeconds + removed,
 			suggestions: day.suggestions.map((s) =>
-				s.id === suggestionId ? { ...s, logged: false } : s,
+				s.id === suggestionId
+					? { ...s, logged: false, loggedStartedAt: undefined }
+					: s,
 			),
 		};
 	});
@@ -64,6 +69,7 @@ export function applyUnmarkSuggestionLogged(
 export function applyMarkMultipleLogged(
 	daySummaries: DaySummary[],
 	ids: string[],
+	startedById?: ReadonlyMap<string, string>,
 ): DaySummary[] {
 	const idSet = new Set(ids);
 	return daySummaries.map((day) => {
@@ -76,7 +82,9 @@ export function applyMarkMultipleLogged(
 			loggedSeconds: day.loggedSeconds + added,
 			gapSeconds: Math.max(0, day.gapSeconds - added),
 			suggestions: day.suggestions.map((s) =>
-				idSet.has(s.id) ? { ...s, logged: true } : s,
+				idSet.has(s.id)
+					? { ...s, logged: true, loggedStartedAt: startedById?.get(s.id) }
+					: s,
 			),
 		};
 	});
@@ -98,7 +106,9 @@ export function applyUnmarkMultipleLogged(
 			loggedSeconds: Math.max(0, day.loggedSeconds - removed),
 			gapSeconds: day.gapSeconds + removed,
 			suggestions: day.suggestions.map((s) =>
-				idSet.has(s.id) ? { ...s, logged: false } : s,
+				idSet.has(s.id)
+					? { ...s, logged: false, loggedStartedAt: undefined }
+					: s,
 			),
 		};
 	});

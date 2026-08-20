@@ -9,7 +9,7 @@ import {
 	toLocalDateString,
 	withLocalOffset,
 } from '../../utils/date';
-import { layOutDay } from '../../utils/dayLayout';
+import { planDayStarts } from '../../../services/dayPlan';
 import { formatHours, formatJiraTimeSpent } from '../../utils/format';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Modal } from '../ui/Modal';
@@ -80,29 +80,7 @@ export const DayCard = memo<Props>(function DayCard({
 	// "Log it". Computing it per-path would let the two disagree: logging in
 	// bulk placed 09:00/10:00/11:00 while logging the same suggestions one at a
 	// time stacked them all on 09:00.
-	const startedById = useMemo(() => {
-		const placed = layOutDay({
-			date: day.date,
-			// Filtered inside the memo on purpose: `loggableSuggestions` is a new
-			// array on every render, so depending on it meant this never hit the
-			// cache and re-laid out the day seven times per week view.
-			suggestions: day.suggestions
-				.filter((s) => !!s.issueKey && !s.logged)
-				.map((s) => ({
-					id: s.id,
-					seconds: s.suggestedSeconds,
-					activityAt: s.activityAt,
-				})),
-			activeHours: day.rescueTime?.activeHours ?? [],
-			existing: day.loggedWorklogs
-				.filter((w) => w.startedAt)
-				.map((w) => ({
-					startedAt: w.startedAt as string,
-					seconds: w.timeSpentSeconds,
-				})),
-		});
-		return new Map(placed.map((p) => [p.id, p.startedAt]));
-	}, [day.date, day.rescueTime, day.loggedWorklogs, day.suggestions]);
+	const startedById = useMemo(() => planDayStarts(day), [day]);
 	const loggedSuggestions = day.suggestions.filter((s) => s.logged);
 	const isToday = day.date === toLocalDateString(new Date());
 	const isTimeOff = !day.isWeekend && day.targetSeconds === 0;
@@ -311,7 +289,7 @@ export const DayCard = memo<Props>(function DayCard({
 				.map((s) => s.id);
 
 			if (successIds.length > 0) {
-				markMultipleSuggestionsLogged(successIds);
+				markMultipleSuggestionsLogged(successIds, startedById);
 			}
 
 			if (result.failed.length === 0) {
