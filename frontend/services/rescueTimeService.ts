@@ -2,6 +2,7 @@ import type {
 	RescueTimeActivity,
 	RescueTimeDaySummary,
 } from '../../types/Suggestion';
+import { logger } from '../react/utils/logger';
 import { buildRescueTimeRequest } from './rescueTimeGateway';
 import { fromHttpResponse, ServiceError } from './serviceErrors';
 
@@ -144,7 +145,14 @@ export async function fetchRescueTimeData(
 		// suggestion out from midnight. Require the characters to be there.
 		if (rawDate.length >= 13) {
 			const hour = Number(rawDate.slice(11, 13));
-			if (Number.isInteger(hour) && hour >= 0 && hour <= 23) {
+			if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+				// Silence here is indistinguishable from "no RescueTime data":
+				// activeHours would quietly empty and the layout revert to its
+				// 09:00 fallback with nothing to explain why.
+				logger.warn(
+					`[RescueTime] Unexpected Date shape, hour not parsed: "${rawDate}"`,
+				);
+			} else {
 				// Accumulate per hour, threshold later: with restrict_kind=activity
 				// a genuinely busy hour is split across many short-lived apps, so a
 				// per-row threshold would drop an hour of twelve four-minute

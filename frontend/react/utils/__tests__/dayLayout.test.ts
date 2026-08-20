@@ -143,21 +143,41 @@ describe('layOutDay', () => {
 		}
 	});
 
-	it('reads an existing worklog in local time, not raw UTC digits', () => {
-		// Jira returns `started` with its own offset. Slicing the characters
-		// treats 08:00+00:00 as 08:00 local, so a worklog logged at 09:00 local
-		// would be dodged an hour early — and written over.
+	it('reads an existing worklog at its own wall clock, matching how the day is attributed', () => {
+		// A previous version converted the offset to browser-local time. That
+		// disagrees with the rest of the pipeline: classifyWorklog →
+		// wallClockDay slices the first ten characters, so a worklog is filed
+		// under the day in *its own* offset, and Jira and Tempo display it at
+		// that same wall clock. Converting would block 07:00-09:00 for a
+		// 09:00+02:00 worklog seen from a UTC browser — and then place the next
+		// suggestion at 09:00, exactly on top of it.
 		const out = layOutDay({
 			date: '2026-08-03',
 			suggestions: [{ id: 'a', seconds: 3600 }],
 			activeHours: CONTINUOUS,
 			existing: [
-				{ startedAt: '2026-08-03T09:00:00.000+0100', seconds: 2 * 3600 },
+				{ startedAt: '2026-08-03T09:00:00.000+0200', seconds: 2 * 3600 },
 			],
 		});
-		// 09:00+01:00 is 09:00 local for a +01:00 browser; either way the
-		// suggestion must not start inside those two hours.
-		expect(out[0]?.startedAt).not.toBe('2026-08-03T09:00:00');
+		expect(out[0]?.startedAt).toBe('2026-08-03T11:00:00');
+	});
+
+	it('does not stack the overflow on a single clamped time', () => {
+		// Once the day is full, every remaining suggestion used to receive the
+		// same 23:00 stamp — reproducing the pile this whole module exists to
+		// remove. Asserting only `hour < 24`, as an earlier test did, passes
+		// straight over that.
+		const out = layOutDay({
+			date: '2026-08-07',
+			suggestions: Array.from({ length: 6 }, (_, i) => ({
+				id: `s${i}`,
+				seconds: 3600,
+			})),
+			activeHours: [20, 21, 22, 23],
+			existing: [],
+		});
+		const starts = out.map((s) => s.startedAt);
+		expect(new Set(starts).size).toBe(starts.length);
 	});
 
 	it('starts after a worklog that is already logged', () => {

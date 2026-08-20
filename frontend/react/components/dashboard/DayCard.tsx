@@ -75,6 +75,29 @@ export const DayCard = memo<Props>(function DayCard({
 	const [isBatchLogging, setIsBatchLogging] = useState(false);
 	const activeSuggestions = day.suggestions.filter((s) => !s.logged);
 	const loggableSuggestions = activeSuggestions.filter((s) => !!s.issueKey);
+
+	// One layout for the whole day, used by both "Log All" and each card's own
+	// "Log it". Computing it per-path would let the two disagree: logging in
+	// bulk placed 09:00/10:00/11:00 while logging the same suggestions one at a
+	// time stacked them all on 09:00.
+	const startedById = useMemo(() => {
+		const placed = layOutDay({
+			date: day.date,
+			suggestions: loggableSuggestions.map((s) => ({
+				id: s.id,
+				seconds: s.suggestedSeconds,
+				activityAt: s.activityAt,
+			})),
+			activeHours: day.rescueTime?.activeHours ?? [],
+			existing: day.loggedWorklogs
+				.filter((w) => w.startedAt)
+				.map((w) => ({
+					startedAt: w.startedAt as string,
+					seconds: w.timeSpentSeconds,
+				})),
+		});
+		return new Map(placed.map((p) => [p.id, p.startedAt]));
+	}, [day.date, day.rescueTime, day.loggedWorklogs, loggableSuggestions]);
 	const loggedSuggestions = day.suggestions.filter((s) => s.logged);
 	const isToday = day.date === toLocalDateString(new Date());
 	const isTimeOff = !day.isWeekend && day.targetSeconds === 0;
@@ -253,28 +276,6 @@ export const DayCard = memo<Props>(function DayCard({
 	const handleLogAll = async () => {
 		setIsBatchLogging(true);
 		try {
-			// Lay the day out instead of stacking everything on one hour: every
-			// suggestion used to be logged at 09:00, so logging four produced
-			// four overlapping worklogs. The shape comes from RescueTime's
-			// hourly profile where available — which is also why the day can
-			// start earlier than 09:00.
-			const placed = layOutDay({
-				date: day.date,
-				suggestions: loggableSuggestions.map((s) => ({
-					id: s.id,
-					seconds: s.suggestedSeconds,
-					activityAt: s.activityAt,
-				})),
-				activeHours: rt?.activeHours ?? [],
-				existing: day.loggedWorklogs
-					.filter((w) => w.startedAt)
-					.map((w) => ({
-						startedAt: w.startedAt as string,
-						seconds: w.timeSpentSeconds,
-					})),
-			});
-			const startedById = new Map(placed.map((p) => [p.id, p.startedAt]));
-
 			const params = loggableSuggestions.map((s) => ({
 				issueKey: s.issueKey,
 				timeSpent: s.suggestedTimeSpent,
@@ -435,6 +436,7 @@ export const DayCard = memo<Props>(function DayCard({
 								<SuggestionCard
 									key={s.id}
 									suggestion={s}
+									startedAt={startedById.get(s.id)}
 									isFocused={isFocused && focusedSuggestionIndex === i}
 								/>
 							))}
@@ -444,7 +446,11 @@ export const DayCard = memo<Props>(function DayCard({
 					{loggedSuggestions.length > 0 && (
 						<div className={styles.suggestions}>
 							{loggedSuggestions.map((s) => (
-								<SuggestionCard key={s.id} suggestion={s} />
+								<SuggestionCard
+									key={s.id}
+									suggestion={s}
+									startedAt={startedById.get(s.id)}
+								/>
 							))}
 						</div>
 					)}

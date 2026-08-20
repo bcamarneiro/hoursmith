@@ -15,7 +15,12 @@
  *     works for someone who breaks at 15:00 just as well as at 13:00.
  *   - **Known timestamps** (a calendar event) win over the sequence: when the
  *     real time is known, guessing a slot would be strictly worse.
- *   - **Existing worklogs** are never written over.
+ *   - **Existing worklogs** are avoided: a suggestion is placed in a free
+ *     interval, never starting inside logged time. On a day with no interval
+ *     large enough anywhere, the chosen block can still *run into* what
+ *     follows — stated plainly here rather than claimed away, because the
+ *     alternative is dropping the suggestion, and a visible overlap the user
+ *     can adjust beats work that silently disappears.
  *
  * Placement works by building the day's free intervals and filling them, rather
  * than walking a cursor. An earlier cursor-based version could not push itself
@@ -103,21 +108,17 @@ function stamp(date: string, minutesFromMidnight: number): string {
 }
 
 /**
- * Minutes past local midnight for a timestamp that may carry any offset.
+ * Minutes past midnight, read at the timestamp's **own** wall clock.
  *
- * Jira returns `started` in the worklog's own offset, which need not match the
- * browser's. Slicing the characters would read `08:00+00:00` as 08:00 local and
- * dodge a worklog an hour early — writing over time that is already logged,
- * which is the one thing this module promises not to do.
+ * Deliberately not converted to the browser's timezone. The rest of the
+ * pipeline attributes a worklog to a day by slicing characters —
+ * `classifyWorklog` → `wallClockDay` returns `input.slice(0, 10)` — and Jira
+ * and Tempo display it at that same wall clock. Converting would put the two
+ * readings an offset apart: a `09:00+02:00` worklog seen from a UTC browser
+ * would block 07:00-09:00, and the next suggestion would land at 09:00, on top
+ * of it. `toTempoWriteInput` splits `started` textually for the same reason.
  */
 function minutesOf(iso: string): number {
-	const hasOffset = /([+-]\d{2}:?\d{2}|Z)$/.test(iso);
-	if (hasOffset) {
-		const d = new Date(iso);
-		if (!Number.isNaN(d.getTime())) {
-			return d.getHours() * 60 + d.getMinutes();
-		}
-	}
 	const [h, m] = iso.slice(11, 16).split(':').map(Number);
 	return (h || 0) * 60 + (m || 0);
 }
@@ -145,17 +146,35 @@ function intervalsFromHours(hours: number[]): Interval[] {
 		prev = h;
 	}
 	out.push({ from: start * 60, to: (prev + 1) * 60 });
-	// The rest of the day, so more suggested hours than observed ones spill
-	// forward from where the day ended rather than being dumped at 23:00.
-	// Sorted last, so real active hours are always filled first.
-	const lastEnd = out[out.length - 1].to;
-	if (lastEnd < MINUTES_IN_DAY) {
-		out.push({ from: lastEnd, to: MINUTES_IN_DAY });
-	}
 	return out;
 }
 
-/** Remove busy spans from the available intervals. */
+/**
+ * Where placement may spill when the observed hours are all used up: after the
+ * day's last active hour first, then before its first.
+ *
+ * More suggested hours than observed ones means the person worked longer than
+ * RescueTime saw. Spreading into the rest of the day is a better answer than
+ * repeating one timestamp, which would rebuild the pile this module removes.
+ */
+function fallbackIntervals(active: Interval[]): Interval[] {
+	if (active.length === 0) return [];
+	const first = active[0].from;
+	const last = active[active.length - 1].to;
+	const out: Interval[] = [];
+	if (last < MINUTES_IN_DAY) out.push({ from: last, to: MINUTES_IN_DAY });
+	if (first > 0) out.push({ from: 0, to: first });
+	return out;
+}
+
+/**
+ * Remove busy spans from the available intervals, **preserving their order**.
+ *
+ * Order is priority, not chronology: the fallback list is deliberately
+ * "after the working day, then before it", and sorting would put the early
+ * hours first — placing overflow at 00:00 rather than just after the hours the
+ * user was actually seen working.
+ */
 function subtract(available: Interval[], busy: Interval[]): Interval[] {
 	let result = available;
 	for (const b of busy) {
@@ -170,7 +189,7 @@ function subtract(available: Interval[], busy: Interval[]): Interval[] {
 		}
 		result = next;
 	}
-	return result.sort((x, y) => x.from - y.from);
+	return result;
 }
 
 export function layOutDay(input: {
@@ -199,26 +218,32 @@ export function layOutDay(input: {
 		out.push({ ...s, startedAt: stamp(date, from) });
 	}
 
-	let free = subtract(
-		intervalsFromHours(workingWindowFromHours(activeHours)),
-		busy,
-	);
+	const active = intervalsFromHours(workingWindowFromHours(activeHours));
+	// Two tiers, searched in order. A single sorted list cannot express this:
+	// the spill-over before the day's first active hour would sort first and be
+	// used ahead of the hours the user actually worked.
+	let preferred = subtract(active, busy);
+	let fallback = subtract(fallbackIntervals(active), busy);
 
 	for (const s of floating) {
 		const minutes = Math.max(1, Math.round(s.seconds / 60));
 
-		// First interval with room; otherwise the first interval at all, and
-		// otherwise the end of the day. Overflowing is deliberate — refusing to
-		// place a suggestion would silently drop it — but the stamp is clamped
-		// so it stays a valid time on this date.
+		// Observed hours first; only then the rest of the day. Repeating one
+		// clamped time would rebuild the pile this module exists to remove.
 		const slot =
-			free.find((i) => i.to - i.from >= minutes) ??
-			free[0] ??
-			({ from: LATEST_START_MINUTE, to: MINUTES_IN_DAY } as Interval);
+			preferred.find((i) => i.to - i.from >= minutes) ??
+			fallback.find((i) => i.to - i.from >= minutes) ??
+			preferred[0] ??
+			fallback[0];
 
-		const start = slot.from;
+		// Nothing free anywhere: only reachable with more than a day of
+		// suggestions.
+		const start = slot ? slot.from : LATEST_START_MINUTE;
+		const taken = [{ from: start, to: start + minutes }];
+
 		out.push({ ...s, startedAt: stamp(date, start) });
-		free = subtract(free, [{ from: start, to: start + minutes }]);
+		preferred = subtract(preferred, taken);
+		fallback = subtract(fallback, taken);
 	}
 
 	// Preserve the caller's original ordering.

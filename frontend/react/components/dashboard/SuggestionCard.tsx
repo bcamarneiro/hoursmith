@@ -12,6 +12,12 @@ import * as styles from './SuggestionCard.module.css';
 
 type Props = {
 	suggestion: WorklogSuggestion;
+	/**
+	 * Where the day's layout placed this suggestion. Supplied by DayCard, which
+	 * computes one layout for the whole day — logging in bulk and logging the
+	 * same suggestions one at a time must not disagree about the time.
+	 */
+	startedAt?: string;
 	isFocused?: boolean;
 };
 
@@ -43,6 +49,7 @@ const CONFIDENCE_STYLES: Record<string, string> = {
 
 export const SuggestionCard = memo<Props>(function SuggestionCard({
 	suggestion,
+	startedAt,
 	isFocused,
 }) {
 	const jiraDomain = useConfigStore((s) => s.config.jiraHost);
@@ -88,7 +95,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 				issueKey: suggestion.issueKey,
 				timeSpent: suggestion.suggestedTimeSpent,
 				comment: '',
-				started: withLocalOffset(`${suggestion.date}T09:00`),
+				started: withLocalOffset(startedAt ?? `${suggestion.date}T09:00`),
 			});
 			markLogged(suggestion.id);
 			// createWorklog returns null when the backend accepted the write but
@@ -336,7 +343,7 @@ export const SuggestionCard = memo<Props>(function SuggestionCard({
 						issueKey: suggestion.issueKey,
 						timeSpent: suggestion.suggestedTimeSpent,
 						comment: '',
-						started: `${suggestion.date}T09:00`,
+						started: startedAt ?? `${suggestion.date}T09:00`,
 					}}
 					onSubmit={handleEditSubmit}
 					onCancel={() => setIsEditOpen(false)}
