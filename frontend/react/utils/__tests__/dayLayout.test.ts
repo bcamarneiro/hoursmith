@@ -202,6 +202,103 @@ describe('layOutDay', () => {
 		expect(new Set(starts).size).toBe(starts.length);
 	});
 
+	it('uses the whole of the last hour instead of collapsing onto 23:00', () => {
+		// Reproduced by fuzzing: the clamp was applied when stamping, not when
+		// placing, so the interval bookkeeping and the emitted times diverged —
+		// two half-hour suggestions in the 23:00 hour both came out at 23:00.
+		// 23:30 is a perfectly valid start; the only real limit is 23:59.
+		const out = layOutDay({
+			date: '2026-08-18',
+			suggestions: [
+				{ id: 'a', seconds: 1800 },
+				{ id: 'b', seconds: 1800 },
+			],
+			activeHours: [23],
+			existing: [],
+		});
+		expect(out.map((s) => s.startedAt.slice(11, 16))).toEqual([
+			'23:00',
+			'23:30',
+		]);
+	});
+
+	it('keeps a late meeting at its real time', () => {
+		// The clamp moved a 23:30 event to 23:00 while its busy span stayed at
+		// 23:30 — so a floating suggestion was then placed across it.
+		const out = layOutDay({
+			date: '2026-08-18',
+			suggestions: [
+				{ id: 'fix', seconds: 1800, activityAt: '2026-08-18T23:30:00' },
+				{ id: 'flo', seconds: 5400 },
+			],
+			activeHours: [22, 23],
+			existing: [],
+		});
+		expect(out.find((s) => s.id === 'fix')?.startedAt).toBe(
+			'2026-08-18T23:30:00',
+		);
+		// And the floating one must not run through it. 22:00 + 90m ends exactly
+		// at 23:30, so that placement is correct — the assertion is about
+		// overlap, not about a particular hour.
+		const flo = out.find((s) => s.id === 'flo');
+		const floStart = Number(flo?.startedAt.slice(11, 13)) * 60 +
+			Number(flo?.startedAt.slice(14, 16));
+		expect(floStart + 90).toBeLessThanOrEqual(23 * 60 + 30);
+	});
+
+	it('spills into the gap nearest the working day, not the earliest one', () => {
+		// A split backwards-filling interval was searched front-first, so
+		// overflow landed at 08:00 while 11:00 — right beside the observed
+		// hours — sat free.
+		const out = layOutDay({
+			date: '2026-08-18',
+			suggestions: [
+				{ id: 'big', seconds: 12 * 3600 },
+				{ id: 'ovf', seconds: 3600 },
+			],
+			activeHours: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+			existing: [{ startedAt: '2026-08-18T09:00:00', seconds: 3600 }],
+		});
+		expect(out.find((s) => s.id === 'ovf')?.startedAt).toBe(
+			'2026-08-18T11:00:00',
+		);
+	});
+
+	it('ignores a pinned time that belongs to another day', () => {
+		// minutesOf reads only the time characters, so a stamp from a different
+		// date would be silently re-dated onto this one.
+		const out = layOutDay({
+			date: '2026-08-18',
+			suggestions: [
+				{ id: 'x', seconds: 3600, activityAt: '2026-08-19T14:00:00' },
+			],
+			activeHours: [9],
+			existing: [],
+		});
+		expect(out[0]?.startedAt).toBe('2026-08-18T09:00:00');
+	});
+
+	it('does not fall back onto an existing worklog when the day is full', () => {
+		// The last-resort stepper only avoided its own previous emissions, never
+		// the already-logged spans, so a saturated day could place a suggestion
+		// at minute 0 of a real worklog while later minutes sat free.
+		const out = layOutDay({
+			date: '2026-08-18',
+			suggestions: [
+				{ id: 'big', seconds: 200000 },
+				{ id: 'a', seconds: 600 },
+			],
+			activeHours: Array.from({ length: 24 }, (_, i) => i),
+			existing: [{ startedAt: '2026-08-18T00:00:00', seconds: 3600 }],
+		});
+		const a = out.find((s) => s.id === 'a');
+		const mins =
+			Number(a?.startedAt.slice(11, 13)) * 60 +
+			Number(a?.startedAt.slice(14, 16));
+		// 00:00-01:00 is logged; the placement must not start inside it.
+		expect(mins < 0 || mins >= 60).toBe(true);
+	});
+
 	it('does not stack the overflow on a single clamped time', () => {
 		// Once the day is full, every remaining suggestion used to receive the
 		// same 23:00 stamp — reproducing the pile this whole module exists to

@@ -51,12 +51,17 @@ const FALLBACK_START_HOUR = 9;
 const MINUTES_IN_DAY = 24 * 60;
 
 /**
- * Latest start we will ever emit. A stamp of `T24:00:00` silently parses as the
- * *next* day and `T25:00:00` is an Invalid Date — which reaches Jira as
- * `NaN-NaN-NaN` and reaches Tempo as a `startTime` its own regex accepts. A
- * valid time on the correct day is better than either.
+ * Latest start that is still today. `T24:00:00` silently parses as the *next*
+ * day and `T25:00:00` is an Invalid Date — which reaches Jira as `NaN-NaN-NaN`
+ * and Tempo as a `startTime` its own regex accepts.
+ *
+ * 23:59, not 23:00: an earlier version clamped an hour early, so a 23:30
+ * meeting was emitted at 23:00 while its busy span stayed at 23:30, and the two
+ * halves of the 23:00 hour both came out as 23:00. The clamp also belongs at
+ * *placement* rather than at stamping — otherwise the interval bookkeeping and
+ * the emitted times describe different days.
  */
-const LATEST_START_MINUTE = 23 * 60;
+const LATEST_START_MINUTE = 23 * 60 + 59;
 
 /**
  * Hours further apart than this belong to different sittings — late-night work
@@ -99,12 +104,14 @@ function pad(n: number): string {
 	return String(n).padStart(2, '0');
 }
 
+/**
+ * Callers clamp before booking the interval, so this only formats. A guard
+ * remains because an out-of-range stamp is the difference between a worklog on
+ * the right day and one on the wrong day.
+ */
 function stamp(date: string, minutesFromMidnight: number): string {
-	const clamped = Math.max(
-		0,
-		Math.min(minutesFromMidnight, LATEST_START_MINUTE),
-	);
-	return `${date}T${pad(Math.floor(clamped / 60))}:${pad(clamped % 60)}:00`;
+	const safe = Math.max(0, Math.min(minutesFromMidnight, LATEST_START_MINUTE));
+	return `${date}T${pad(Math.floor(safe / 60))}:${pad(safe % 60)}:00`;
 }
 
 /**
@@ -209,12 +216,15 @@ function subtract<T extends Interval>(available: T[], busy: Interval[]): T[] {
 				next.push(a);
 				continue;
 			}
+			// Zero-width pieces are not slots. Keeping them let `preferred[0]`
+			// hand back an interval starting at 24:00, which the clamp then
+			// dragged to 23:59 — inside whatever was logged there.
 			if (b.from > a.from) next.push({ ...a, from: a.from, to: b.from });
 			if (b.to < a.to) next.push({ ...a, from: b.to, to: a.to });
 		}
 		result = next;
 	}
-	return result;
+	return result.filter((i) => i.to > i.from);
 }
 
 export function layOutDay(input: {
@@ -246,7 +256,12 @@ export function layOutDay(input: {
 
 	const unplaceableFixed: LayoutSuggestion[] = [];
 	for (const s of fixed) {
-		const from = minutesOf(s.activityAt as string);
+		const at = s.activityAt as string;
+		// A stamp from another date would be silently re-dated onto this one:
+		// `minutesOf` reads the time characters and nothing else.
+		const sameDay = at.slice(0, 10) === date;
+		const raw = sameDay ? minutesOf(at) : null;
+		const from = raw === null ? null : Math.min(raw, LATEST_START_MINUTE);
 		const minutes = durationMinutes(s.seconds);
 		if (from === null) {
 			// The time did not parse, so treat it as unknown and let it take its
@@ -263,7 +278,20 @@ export function layOutDay(input: {
 	// the spill-over before the day's first active hour would sort first and be
 	// used ahead of the hours the user actually worked.
 	let preferred = subtract(active, busy);
-	let fallback = subtract(fallbackIntervals(active), busy);
+	// Kept apart so each keeps its own priority. `subtract` splits an interval
+	// into ascending pieces, so a backwards-filling one must be searched from
+	// the last piece — the one adjacent to the working day. Searching it
+	// front-first put overflow at 08:00 while 11:00 sat free beside the
+	// observed hours.
+	const fb = fallbackIntervals(active);
+	let after = subtract(
+		fb.filter((i) => i.align !== 'end'),
+		busy,
+	);
+	let before = subtract(
+		fb.filter((i) => i.align === 'end'),
+		busy,
+	);
 	// Last resort when the day genuinely cannot hold the suggestions. Advances
 	// so the unavoidable overlaps at least stay distinct and adjustable rather
 	// than collapsing onto one timestamp.
@@ -274,33 +302,50 @@ export function layOutDay(input: {
 
 		// Observed hours first; only then the rest of the day. Repeating one
 		// clamped time would rebuild the pile this module exists to remove.
+		const fitsBefore = [...before]
+			.reverse()
+			.find((i) => i.to - i.from >= minutes);
 		const slot =
 			preferred.find((i) => i.to - i.from >= minutes) ??
-			fallback.find((i) => i.to - i.from >= minutes) ??
+			after.find((i) => i.to - i.from >= minutes) ??
+			fitsBefore ??
 			preferred[0] ??
-			fallback[0];
+			after[0] ??
+			before[before.length - 1];
 
 		let start: number;
 		if (slot) {
 			// Backwards-filling intervals place the block against their end.
-			start =
+			const raw =
 				(slot as PrioritisedInterval).align === 'end'
 					? Math.max(slot.from, slot.to - minutes)
 					: slot.from;
+			// Clamped here, before the interval is booked, so the model and the
+			// emitted stamp cannot describe different times.
+			start = Math.min(raw, LATEST_START_MINUTE);
 		} else {
-			// Nothing free anywhere — more than a day of suggestions. Overlap is
-			// unavoidable, so step to the next unused minute: distinct starts
-			// stay adjustable, whereas rows sharing one timestamp become
-			// indistinguishable from each other.
+			// Nothing free anywhere — more than a day of suggestions. Overlap
+			// between suggestions is unavoidable, so step to the next minute
+			// that is neither already used nor inside a real worklog: distinct
+			// starts stay adjustable, and logged time still comes first. An
+			// earlier version checked only its own emissions, so it could start
+			// at minute 0 of an existing worklog while later minutes sat free.
 			start = 0;
-			while (usedStarts.has(start) && start < LATEST_START_MINUTE) start++;
+			while (
+				start < LATEST_START_MINUTE &&
+				(usedStarts.has(start) ||
+					busy.some((b) => start >= b.from && start < b.to))
+			) {
+				start++;
+			}
 		}
 		const taken = [{ from: start, to: start + minutes }];
 
 		usedStarts.add(start);
 		out.push({ ...s, startedAt: stamp(date, start) });
 		preferred = subtract(preferred, taken);
-		fallback = subtract(fallback, taken);
+		after = subtract(after, taken);
+		before = subtract(before, taken);
 	}
 
 	// Preserve the caller's original ordering.
