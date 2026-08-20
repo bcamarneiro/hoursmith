@@ -70,11 +70,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The browser download is ~90MB from Playwright's CDN and was the single
+      # least reliable step in this workflow (it hung or failed on roughly one
+      # run in three, 2026-08-18/20). Caching it removes the fetch from the
+      # common path; the timeout below still bounds the miss.
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # Keyed on the exact version, with no restore-keys on purpose: a
+          # browser build from another Playwright version is not a usable
+          # partial hit, it is a mismatch that fails at run time.
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         # Observed hanging indefinitely on the browser download (2026-08-18/19),
         # which is a CDN fetch, not a test. Fail fast so a rerun can recover.
         timeout-minutes: 8
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        # The cache holds the browser binaries, not the apt packages they link
+        # against — those live in the runner's filesystem and are discarded.
+        # Skipping this on a cache hit gets a Chromium that will not launch.
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 8
+        run: npx playwright install-deps chromium
 
       - name: Start offline server
         run: npm run dev:offline > /tmp/hoursmith-offline.log 2>&1 &
@@ -133,11 +160,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The browser download is ~90MB from Playwright's CDN and was the single
+      # least reliable step in this workflow (it hung or failed on roughly one
+      # run in three, 2026-08-18/20). Caching it removes the fetch from the
+      # common path; the timeout below still bounds the miss.
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # Keyed on the exact version, with no restore-keys on purpose: a
+          # browser build from another Playwright version is not a usable
+          # partial hit, it is a mismatch that fails at run time.
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         # Observed hanging indefinitely on the browser download (2026-08-18/19),
         # which is a CDN fetch, not a test. Fail fast so a rerun can recover.
         timeout-minutes: 8
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system dependencies
+        # The cache holds the browser binaries, not the apt packages they link
+        # against — those live in the runner's filesystem and are discarded.
+        # Skipping this on a cache hit gets a Chromium that will not launch.
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 8
+        run: npx playwright install-deps chromium
 
       - name: Start premium offline server
         run: npm run dev:premium:offline:e2e > /tmp/hoursmith-premium.log 2>&1 &
