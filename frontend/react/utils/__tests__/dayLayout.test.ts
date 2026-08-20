@@ -162,6 +162,46 @@ describe('layOutDay', () => {
 		expect(out[0]?.startedAt).toBe('2026-08-03T11:00:00');
 	});
 
+	it('spills next to the observed hours, not to the far side of the day', () => {
+		// An evening worker with more suggested hours than observed: the extra
+		// time belongs just before 20:00, not at 00:00 that morning — twenty
+		// hours from anything they were seen doing.
+		const out = layOutDay({
+			date: '2026-08-07',
+			suggestions: Array.from({ length: 6 }, (_, i) => ({
+				id: `s${i}`,
+				seconds: 3600,
+			})),
+			activeHours: [20, 21, 22, 23],
+			existing: [],
+		});
+		const starts = out.map((s) => s.startedAt.slice(11, 16)).sort();
+		expect(starts).toEqual([
+			'18:00',
+			'19:00',
+			'20:00',
+			'21:00',
+			'22:00',
+			'23:00',
+		]);
+	});
+
+	it('keeps every start distinct even when the day cannot hold them', () => {
+		// 30 hours of suggestions in a 24-hour day: something must overlap, but
+		// piling six of them on one timestamp is the worst way to do it.
+		const out = layOutDay({
+			date: '2026-08-07',
+			suggestions: Array.from({ length: 30 }, (_, i) => ({
+				id: `s${i}`,
+				seconds: 3600,
+			})),
+			activeHours: [9, 10],
+			existing: [],
+		});
+		const starts = out.map((s) => s.startedAt);
+		expect(new Set(starts).size).toBe(starts.length);
+	});
+
 	it('does not stack the overflow on a single clamped time', () => {
 		// Once the day is full, every remaining suggestion used to receive the
 		// same 23:00 stamp — reproducing the pile this whole module exists to

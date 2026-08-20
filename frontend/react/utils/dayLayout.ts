@@ -128,6 +128,14 @@ interface Interval {
 	to: number;
 }
 
+/**
+ * Which end of the interval to fill from. Overflow before the working day
+ * fills backwards so it stays adjacent to the observed hours.
+ */
+interface PrioritisedInterval extends Interval {
+	align?: 'start' | 'end';
+}
+
 /** Contiguous runs of active hours, as minute intervals. */
 function intervalsFromHours(hours: number[]): Interval[] {
 	if (hours.length === 0) {
@@ -157,13 +165,20 @@ function intervalsFromHours(hours: number[]): Interval[] {
  * RescueTime saw. Spreading into the rest of the day is a better answer than
  * repeating one timestamp, which would rebuild the pile this module removes.
  */
-function fallbackIntervals(active: Interval[]): Interval[] {
+function fallbackIntervals(active: Interval[]): PrioritisedInterval[] {
 	if (active.length === 0) return [];
 	const first = active[0].from;
 	const last = active[active.length - 1].to;
-	const out: Interval[] = [];
-	if (last < MINUTES_IN_DAY) out.push({ from: last, to: MINUTES_IN_DAY });
-	if (first > 0) out.push({ from: 0, to: first });
+	const out: PrioritisedInterval[] = [];
+	// After the working day: fill forwards, so time lands next to the hours
+	// already used.
+	if (last < MINUTES_IN_DAY) {
+		out.push({ from: last, to: MINUTES_IN_DAY, align: 'start' });
+	}
+	// Before it: fill *backwards*, for the same reason. An evening worker's
+	// extra hours belong just before 20:00, not at 00:00 that morning — twenty
+	// hours from anything they were seen doing.
+	if (first > 0) out.push({ from: 0, to: first, align: 'end' });
 	return out;
 }
 
@@ -175,17 +190,17 @@ function fallbackIntervals(active: Interval[]): Interval[] {
  * hours first — placing overflow at 00:00 rather than just after the hours the
  * user was actually seen working.
  */
-function subtract(available: Interval[], busy: Interval[]): Interval[] {
+function subtract<T extends Interval>(available: T[], busy: Interval[]): T[] {
 	let result = available;
 	for (const b of busy) {
-		const next: Interval[] = [];
+		const next: T[] = [];
 		for (const a of result) {
 			if (b.to <= a.from || b.from >= a.to) {
 				next.push(a);
 				continue;
 			}
-			if (b.from > a.from) next.push({ from: a.from, to: b.from });
-			if (b.to < a.to) next.push({ from: b.to, to: a.to });
+			if (b.from > a.from) next.push({ ...a, from: a.from, to: b.from });
+			if (b.to < a.to) next.push({ ...a, from: b.to, to: a.to });
 		}
 		result = next;
 	}
@@ -224,6 +239,10 @@ export function layOutDay(input: {
 	// used ahead of the hours the user actually worked.
 	let preferred = subtract(active, busy);
 	let fallback = subtract(fallbackIntervals(active), busy);
+	// Last resort when the day genuinely cannot hold the suggestions. Advances
+	// so the unavoidable overlaps at least stay distinct and adjustable rather
+	// than collapsing onto one timestamp.
+	const usedStarts = new Set<number>();
 
 	for (const s of floating) {
 		const minutes = Math.max(1, Math.round(s.seconds / 60));
@@ -236,11 +255,24 @@ export function layOutDay(input: {
 			preferred[0] ??
 			fallback[0];
 
-		// Nothing free anywhere: only reachable with more than a day of
-		// suggestions.
-		const start = slot ? slot.from : LATEST_START_MINUTE;
+		let start: number;
+		if (slot) {
+			// Backwards-filling intervals place the block against their end.
+			start =
+				(slot as PrioritisedInterval).align === 'end'
+					? Math.max(slot.from, slot.to - minutes)
+					: slot.from;
+		} else {
+			// Nothing free anywhere — more than a day of suggestions. Overlap is
+			// unavoidable, so step to the next unused minute: distinct starts
+			// stay adjustable, whereas rows sharing one timestamp become
+			// indistinguishable from each other.
+			start = 0;
+			while (usedStarts.has(start) && start < LATEST_START_MINUTE) start++;
+		}
 		const taken = [{ from: start, to: start + minutes }];
 
+		usedStarts.add(start);
 		out.push({ ...s, startedAt: stamp(date, start) });
 		preferred = subtract(preferred, taken);
 		fallback = subtract(fallback, taken);
