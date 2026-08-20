@@ -127,7 +127,9 @@ test.describe('localStorage corruption probes', () => {
 		await page.waitForLoadState('networkidle');
 		// App should still render the home page (zustand persist tolerates
 		// malformed JSON by falling back to defaults).
-		await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+		await expect(
+			page.getByRole('navigation', { name: 'Primary' }),
+		).toBeVisible();
 	});
 
 	test('app boots with a config blob that has wrong types', async ({

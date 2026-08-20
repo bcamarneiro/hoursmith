@@ -5,7 +5,9 @@ test.describe('Navigation', () => {
 		await page.goto('/');
 
 		// Check that the navigation is present
-		await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+		await expect(
+			page.getByRole('navigation', { name: 'Primary' }),
+		).toBeVisible();
 
 		// Check for page title
 		await expect(page).toHaveTitle(/Hoursmith/i);

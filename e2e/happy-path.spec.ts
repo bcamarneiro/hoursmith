@@ -17,7 +17,9 @@ test.describe('Home Page', () => {
 			page.getByRole('link', { name: 'Open Dashboard' }),
 		).toBeVisible();
 		await expect(
-			page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Reports' }),
+			page
+				.getByRole('navigation', { name: 'Primary' })
+				.getByRole('link', { name: 'Reports' }),
 		).toBeVisible();
 	});
 
@@ -110,7 +112,9 @@ test.describe('Settings Page', () => {
 		await expect(page.getByLabel('Jira Host')).toHaveValue(
 			'mock.atlassian.net',
 		);
-		await expect(page.getByLabel('Email', { exact: true })).toHaveValue('dev@example.com');
+		await expect(page.getByLabel('Email', { exact: true })).toHaveValue(
+			'dev@example.com',
+		);
 	});
 
 	test('can edit and save settings', async ({ page }) => {
