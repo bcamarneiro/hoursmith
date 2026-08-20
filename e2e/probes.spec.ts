@@ -499,7 +499,7 @@ test.describe('Aggressive interaction sweep', () => {
 
 		await page.goto('/');
 		await page.waitForLoadState('networkidle');
-		const nav = page.getByRole('navigation');
+		const nav = page.getByRole('navigation', { name: 'Primary' });
 
 		for (const linkName of ['Dashboard', 'Reports', 'Settings', 'Hoursmith']) {
 			await nav.getByRole('link', { name: linkName }).click();

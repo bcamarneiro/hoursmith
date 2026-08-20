@@ -481,6 +481,30 @@ export const handlers = [
 		return HttpResponse.json(devUser);
 	}),
 
+	// Jira's unofficial dev-status API, queried once per issue on My Week to
+	// attribute linked commits. Unmocked, every issue produced a real request
+	// to a hostname that does not resolve — eight ERR_FAILED entries in the
+	// console on every visit, which is what the regression guardrail was
+	// reporting. devActivityService swallows per-issue failures, so the app
+	// behaved correctly; the noise was the offline harness, not the product.
+	//
+	// An empty summary is the honest offline answer: it is exactly what a Jira
+	// with no linked GitHub/GitLab integration returns, and the service already
+	// treats that as a valid outcome rather than an error.
+	http.get(
+		'https://*.atlassian.net/rest/dev-status/latest/issue/summary',
+		() => {
+			return HttpResponse.json({ summary: {} });
+		},
+	),
+
+	http.get(
+		'https://*.atlassian.net/rest/dev-status/latest/issue/detail',
+		() => {
+			return HttpResponse.json({ detail: [] });
+		},
+	),
+
 	// ─────────────────────────────────────────────────────────────────
 	// Tempo Cloud v4 (ADA-542). Offline mode serves these so the Tempo
 	// read/write path is exercisable end-to-end without a real instance.

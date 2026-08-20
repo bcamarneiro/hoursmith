@@ -12,8 +12,8 @@ test.describe('Settings Page', () => {
 		await expect(page.getByLabel('Jira Host')).toHaveValue(
 			'mock.atlassian.net',
 		);
-		await expect(page.getByLabel('Email')).toHaveValue('dev@example.com');
-		await expect(page.getByLabel('API Token')).toHaveValue('mock-token');
+		await expect(page.getByLabel('Email', { exact: true })).toHaveValue('dev@example.com');
+		await expect(page.getByLabel('API Token', { exact: true })).toHaveValue('mock-token');
 		await expect(page.getByLabel(/JQL Filter/)).toBeVisible();
 		await expect(page.getByLabel(/Allow adding worklogs/)).toBeVisible();
 		await expect(page.getByLabel('Theme')).toBeVisible();
@@ -25,7 +25,7 @@ test.describe('Settings Page', () => {
 		).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Import' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Discard' })).toBeDisabled();
-		await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 	});
 
 	test('enables discard and save for unsaved changes and can discard them', async ({
@@ -38,13 +38,13 @@ test.describe('Settings Page', () => {
 			page.getByText('Unsaved changes', { exact: true }),
 		).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Discard' })).toBeEnabled();
-		await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled();
+		await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 
 		await page.getByRole('button', { name: 'Discard' }).click();
 
 		await expect(jqlInput).toHaveValue('');
 		await expect(page.getByText('Settings up to date')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 	});
 
 	test('exports settings as a JSON backup', async ({ page }) => {
@@ -110,7 +110,7 @@ test.describe('Settings Page', () => {
 		await expect(page.getByLabel('Jira Host')).toHaveValue(
 			'imported.atlassian.net',
 		);
-		await expect(page.getByLabel('Email')).toHaveValue('imported@example.com');
+		await expect(page.getByLabel('Email', { exact: true })).toHaveValue('imported@example.com');
 		await expect(page.getByLabel(/JQL Filter/)).toHaveValue('project = IMPORT');
 		await expect(page.getByLabel('Theme')).toHaveValue('dark');
 		await expect(page.getByLabel('Time Rounding')).toHaveValue('30m');

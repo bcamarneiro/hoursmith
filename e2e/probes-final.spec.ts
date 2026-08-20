@@ -127,7 +127,7 @@ test.describe('localStorage corruption probes', () => {
 		await page.waitForLoadState('networkidle');
 		// App should still render the home page (zustand persist tolerates
 		// malformed JSON by falling back to defaults).
-		await expect(page.getByRole('navigation')).toBeVisible();
+		await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
 	});
 
 	test('app boots with a config blob that has wrong types', async ({
@@ -404,7 +404,7 @@ test.describe('Browser back/forward', () => {
 		await setMonth(page, /October\s+2025/);
 
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
 		await expect(page).toHaveURL(/settings/);
@@ -425,7 +425,7 @@ test.describe('Browser back/forward', () => {
 	test('Forward after back restores Settings page', async ({ page }) => {
 		await go(page, '/reports');
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
 		await page.goBack();
@@ -444,7 +444,7 @@ test.describe('Home + offline indicator', () => {
 		page,
 	}) => {
 		await go(page, '/');
-		const nav = page.getByRole('navigation');
+		const nav = page.getByRole('navigation', { name: 'Primary' });
 		await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Reports' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Settings' })).toBeVisible();

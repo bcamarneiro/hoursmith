@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openSettingsSection } from './helpers/settings';
 
 /**
  * Comprehensive happy-path E2E tests covering all major features.
@@ -16,7 +17,7 @@ test.describe('Home Page', () => {
 			page.getByRole('link', { name: 'Open Dashboard' }),
 		).toBeVisible();
 		await expect(
-			page.getByRole('navigation').getByRole('link', { name: 'Reports' }),
+			page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Reports' }),
 		).toBeVisible();
 	});
 
@@ -41,7 +42,7 @@ test.describe('Home Page', () => {
 test.describe('Navigation', () => {
 	test('all nav links are visible', async ({ page }) => {
 		await page.goto('/');
-		const nav = page.getByRole('navigation');
+		const nav = page.getByRole('navigation', { name: 'Primary' });
 		await expect(nav).toBeVisible();
 
 		await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
@@ -53,19 +54,19 @@ test.describe('Navigation', () => {
 		await page.goto('/');
 
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Dashboard' })
 			.click();
 		await expect(page).toHaveURL(/\/dashboard/);
 
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Reports' })
 			.click();
 		await expect(page).toHaveURL(/\/reports/);
 
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
 		await expect(page).toHaveURL(/\/settings/);
@@ -79,27 +80,28 @@ test.describe('Settings Page', () => {
 		await page.waitForLoadState('networkidle');
 	});
 
+	// Every field still exists; the rail decides which section is on screen, so
+	// this walks the rail instead of expecting the whole form at once.
 	test('displays all form sections', async ({ page }) => {
-		// Connection section
 		await expect(page.getByLabel('Jira Host')).toBeVisible();
-		await expect(page.getByLabel('Email')).toBeVisible();
-		await expect(page.getByLabel('API Token')).toBeVisible();
+		await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+		await expect(page.getByLabel('API Token', { exact: true })).toBeVisible();
 
-		// Filters section
+		await openSettingsSection(page, 'Reports Scope');
 		await expect(page.getByLabel(/JQL Filter/)).toBeVisible();
 		await expect(page.getByLabel(/Team Members/)).toBeVisible();
 
-		// Permissions section
+		await openSettingsSection(page, 'Permissions');
 		await expect(page.getByLabel(/Allow adding worklogs/)).toBeVisible();
 		await expect(page.getByLabel(/Allow editing worklogs/)).toBeVisible();
 		await expect(page.getByLabel(/Allow deleting worklogs/)).toBeVisible();
 
-		// Integrations section
+		await openSettingsSection(page, 'Services');
 		await expect(page.getByLabel('GitLab Host')).toBeVisible();
 		await expect(page.getByLabel('GitLab Token')).toBeVisible();
 		await expect(page.getByLabel('RescueTime API Key')).toBeVisible();
 
-		// Preferences section
+		await openSettingsSection(page, 'Preferences');
 		await expect(page.getByLabel('Theme')).toBeVisible();
 		await expect(page.getByLabel('Time Rounding')).toBeVisible();
 	});
@@ -108,19 +110,21 @@ test.describe('Settings Page', () => {
 		await expect(page.getByLabel('Jira Host')).toHaveValue(
 			'mock.atlassian.net',
 		);
-		await expect(page.getByLabel('Email')).toHaveValue('dev@example.com');
+		await expect(page.getByLabel('Email', { exact: true })).toHaveValue('dev@example.com');
 	});
 
 	test('can edit and save settings', async ({ page }) => {
+		await openSettingsSection(page, 'Reports Scope');
 		const jqlInput = page.getByLabel(/JQL Filter/);
 		await jqlInput.fill('project = TEST');
 		await expect(jqlInput).toHaveValue('project = TEST');
 
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.getByText('Settings saved')).toBeVisible();
 	});
 
 	test('theme select has correct options', async ({ page }) => {
+		await openSettingsSection(page, 'Preferences');
 		const themeSelect = page.getByLabel('Theme');
 		await expect(themeSelect).toBeVisible();
 
@@ -136,6 +140,7 @@ test.describe('Settings Page', () => {
 	});
 
 	test('time rounding select has correct options', async ({ page }) => {
+		await openSettingsSection(page, 'Preferences');
 		const roundingSelect = page.getByLabel('Time Rounding');
 		await expect(roundingSelect).toBeVisible();
 
@@ -151,8 +156,9 @@ test.describe('Settings Page', () => {
 	});
 
 	test('can change theme to dark', async ({ page }) => {
+		await openSettingsSection(page, 'Preferences');
 		await page.getByLabel('Theme').selectOption('dark');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.getByText('Settings saved')).toBeVisible();
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -441,11 +447,11 @@ test.describe('Cross-Feature', () => {
 		await page.waitForLoadState('networkidle');
 
 		await page.getByLabel('Theme').selectOption('dark');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.getByText('Settings saved')).toBeVisible();
 
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Dashboard' })
 			.click();
 		await expect(page).toHaveURL(/\/dashboard/);
@@ -454,10 +460,10 @@ test.describe('Cross-Feature', () => {
 
 		// Reset to system theme
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
 		await page.getByLabel('Theme').selectOption('system');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 	});
 });

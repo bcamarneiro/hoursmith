@@ -230,7 +230,7 @@ test.describe('Backdated worklog UX', () => {
 		page,
 	}) => {
 		await setMonth(page, /October\s+2025/);
-		const nav = page.getByRole('navigation');
+		const nav = page.getByRole('navigation', { name: 'Primary' });
 		await nav.getByRole('link', { name: 'Settings' }).click();
 		await expect(page).toHaveURL(/settings/);
 		await page.goBack();
@@ -254,7 +254,7 @@ test.describe('Cross-feature regression sweep', () => {
 		await expect(page).toHaveURL(/dashboard/);
 		await page.waitForLoadState('networkidle');
 
-		const nav = page.getByRole('navigation');
+		const nav = page.getByRole('navigation', { name: 'Primary' });
 		await nav.getByRole('link', { name: 'Reports' }).click();
 		await expect(page).toHaveURL(/reports/);
 		await page.waitForLoadState('networkidle');

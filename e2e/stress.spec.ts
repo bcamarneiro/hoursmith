@@ -101,12 +101,12 @@ test.describe('Reports — chaotic interaction', () => {
 		await goReports(page);
 		// Don't wait for load — go straight to dashboard.
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Dashboard' })
 			.click();
 		await expect(page).toHaveURL(/dashboard/);
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Reports' })
 			.click();
 		await expect(page).toHaveURL(/reports/);

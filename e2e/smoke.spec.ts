@@ -10,7 +10,7 @@ test.describe('Smoke rollout paths', () => {
 		await expect(
 			page.getByRole('link', { name: 'Open My Week' }),
 		).toBeVisible();
-		const nav = page.getByRole('navigation');
+		const nav = page.getByRole('navigation', { name: 'Primary' });
 		await expect(nav.getByRole('link', { name: 'My Week' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Reports' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Settings' })).toBeVisible();
