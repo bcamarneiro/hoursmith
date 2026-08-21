@@ -8,13 +8,15 @@ import { openSettingsSection } from './helpers/settings';
 
 // ── Home Page ──────────────────────────────────────────────────────
 test.describe('Home Page', () => {
-	test('shows configured state with dashboard link', async ({ page }) => {
+	test('shows configured state with My Week link', async ({ page }) => {
 		await page.goto('/');
 		await page.waitForLoadState('networkidle');
 
-		// In offline mode the config is pre-set, so we should see the configured dashboard CTA
+		// In offline mode the config is pre-set, so we should see the configured
+		// primary CTA. The redesign renamed Dashboard → My Week, so the home CTA
+		// is now "Open My Week".
 		await expect(
-			page.getByRole('link', { name: 'Open Dashboard' }),
+			page.getByRole('link', { name: 'Open My Week' }),
 		).toBeVisible();
 		await expect(
 			page
@@ -33,10 +35,11 @@ test.describe('Home Page', () => {
 		await expect(page.getByText('No backend to maintain')).toBeVisible();
 	});
 
-	test('navigates to dashboard from home', async ({ page }) => {
+	// Renamed route: the CTA now lands on /my-week (/dashboard only redirects).
+	test('navigates to My Week from home', async ({ page }) => {
 		await page.goto('/');
-		await page.getByRole('link', { name: 'Open Dashboard' }).click();
-		await expect(page).toHaveURL(/\/dashboard/);
+		await page.getByRole('link', { name: 'Open My Week' }).click();
+		await expect(page).toHaveURL(/\/my-week/);
 	});
 });
 
@@ -47,7 +50,8 @@ test.describe('Navigation', () => {
 		const nav = page.getByRole('navigation', { name: 'Primary' });
 		await expect(nav).toBeVisible();
 
-		await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+		// Nav link renamed Dashboard → My Week by the IA redesign.
+		await expect(nav.getByRole('link', { name: 'My Week' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Reports' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Settings' })).toBeVisible();
 	});
@@ -57,9 +61,9 @@ test.describe('Navigation', () => {
 
 		await page
 			.getByRole('navigation', { name: 'Primary' })
-			.getByRole('link', { name: 'Dashboard' })
+			.getByRole('link', { name: 'My Week' })
 			.click();
-		await expect(page).toHaveURL(/\/dashboard/);
+		await expect(page).toHaveURL(/\/my-week/);
 
 		await page
 			.getByRole('navigation', { name: 'Primary' })
@@ -207,8 +211,12 @@ test.describe('Dashboard Page', () => {
 	});
 
 	test('displays day cards with gaps', async ({ page }) => {
-		// "Days to fill" section should be visible with day card content
-		await expect(page.getByText('Days to fill')).toBeVisible();
+		// The redesign made the day list gap-first and always-present: the
+		// "Days to fill" heading became "This week" (complete days now collapse
+		// in place instead of being filtered out of a gaps-only section).
+		await expect(
+			page.getByRole('heading', { name: 'This week' }),
+		).toBeVisible();
 		// Day names should appear in day cards (Thursday and Friday have 0h)
 		await expect(page.getByText('Thursday')).toBeVisible();
 	});
@@ -444,21 +452,24 @@ test.describe('Reports Monthly View', () => {
 
 // ── Cross-Feature — Settings persist across pages ──────────────────
 test.describe('Cross-Feature', () => {
-	test('settings changes persist when navigating to dashboard', async ({
+	test('settings changes persist when navigating to My Week', async ({
 		page,
 	}) => {
 		await page.goto('/settings');
 		await page.waitForLoadState('networkidle');
 
+		// Theme now lives behind the Settings left rail, so the section has to be
+		// opened before the select is on screen.
+		await openSettingsSection(page, 'Preferences');
 		await page.getByLabel('Theme').selectOption('dark');
 		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.getByText('Settings saved')).toBeVisible();
 
 		await page
 			.getByRole('navigation', { name: 'Primary' })
-			.getByRole('link', { name: 'Dashboard' })
+			.getByRole('link', { name: 'My Week' })
 			.click();
-		await expect(page).toHaveURL(/\/dashboard/);
+		await expect(page).toHaveURL(/\/my-week/);
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
@@ -467,6 +478,7 @@ test.describe('Cross-Feature', () => {
 			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
+		await openSettingsSection(page, 'Preferences');
 		await page.getByLabel('Theme').selectOption('system');
 		await page.getByRole('button', { name: 'Save', exact: true }).click();
 	});

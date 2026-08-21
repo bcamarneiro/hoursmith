@@ -104,15 +104,32 @@ test.describe('Pattern B (jira-native) backdates: end-to-end visibility', () => 
 		const alex = userCard(page, 'Alex Thompson');
 		await expect(alex).toBeVisible();
 		// Alex has 23 regular October worklogs (8h each = 184h) plus 2 Pattern B
-		// reconciliations whose loggedOn lands in October. Under logged-policy
-		// the October total should be 23×8 + 2×8 = 200h.
+		// reconciliations whose loggedOn lands in October.
+		// Since 23dc12a ("exclude backdated worklogs from totals across UI")
+		// backdated hours no longer contribute to any displayed total, so the
+		// October month total is 23×8 = 184h — NOT 200h. The 2 reconciliations
+		// still have to be *visible*, as a non-counting side note on their
+		// logged-on day plus a "Backdated submissions" group.
 		const total = await readMonthTotalHours(alex);
-		expect(total).toBeGreaterThanOrEqual(200 - 0.5);
-		expect(total).toBeLessThanOrEqual(200 + 0.5);
+		expect(total).toBeGreaterThanOrEqual(184 - 0.5);
+		expect(total).toBeLessThanOrEqual(184 + 0.5);
 
-		await expect(
-			alex.getByText(/Backdated submissions \(\d+\)/i).first(),
-		).toBeVisible();
+		// Both Pattern B entries are surfaced (one per logged-on day, 8h each).
+		const groupHeaders = alex.getByText(/Backdated submissions \((\d+)\)/i);
+		const counts = (await groupHeaders.allTextContents()).map((t) =>
+			Number(t.match(/\((\d+)\)/)?.[1] ?? '0'),
+		);
+		expect(counts.reduce((a, b) => a + b, 0)).toBe(2);
+
+		// …and each shows the "+8h backdated, not counted" day side note.
+		const sideNotes = await alex
+			.getByText(/^\+\d+(\.\d+)?h backdated$/)
+			.allTextContents();
+		const backdatedHours = sideNotes.reduce(
+			(sum, t) => sum + Number(t.match(/([0-9.]+)h/)?.[1] ?? '0'),
+			0,
+		);
+		expect(backdatedHours).toBe(16);
 	});
 
 	test('Alex September shows ghost entries on intended days, no positive month total', async ({
@@ -137,7 +154,7 @@ test.describe('Pattern B (jira-native) backdates: end-to-end visibility', () => 
 		expect(sepTotal).toBe(0);
 	});
 
-	test('CSV export for Alex October contains BackdateSource=jira-native rows', async ({
+	test('CSV export for Alex October carries the Pattern B rows as IsBackdated=true', async ({
 		page,
 	}) => {
 		await goReports(page);
@@ -146,11 +163,28 @@ test.describe('Pattern B (jira-native) backdates: end-to-end visibility', () => 
 
 		const alex = userCard(page, 'Alex Thompson');
 		const { text } = await downloadFromCard(page, alex);
-		expect(text).toMatch(/;true;jira-native;/);
+
+		// 23dc12a deliberately dropped the `DaysLate` and `BackdateSource`
+		// columns from the timesheet CSV; `IsBackdated` is the retained flag,
+		// so provenance is now expressed by the IntendedDate/LoggedDate pair
+		// rather than a `jira-native` literal.
+		const lines = text.split('\n');
+		const header = lines.find((l) => l.startsWith('Name;')) ?? '';
+		expect(header).not.toContain('BackdateSource');
+		expect(header).not.toContain('DaysLate');
+		const cols = header.split(';');
+		const iIntended = cols.indexOf('IntendedDate');
+		const iLogged = cols.indexOf('LoggedDate');
+		const iBackdated = cols.indexOf('IsBackdated');
+		expect(iIntended).toBeGreaterThanOrEqual(0);
+		expect(iLogged).toBeGreaterThanOrEqual(0);
+		expect(iBackdated).toBeGreaterThanOrEqual(0);
 
 		// IsBackdated=true rows must have IntendedDate in 2025-09 and
-		// LoggedDate in 2025-10.
-		for (const line of text.split('\n')) {
+		// LoggedDate in 2025-10 — that September→October straddle is what
+		// makes them jira-native (Pattern B) reconciliations.
+		let backdatedRows = 0;
+		for (const line of lines) {
 			if (
 				!line ||
 				line.startsWith('#') ||
@@ -158,12 +192,20 @@ test.describe('Pattern B (jira-native) backdates: end-to-end visibility', () => 
 				line.startsWith(';')
 			)
 				continue;
-			const cols = line.split(';');
-			if (cols.length < 9) continue;
-			if (cols[6] !== 'true') continue;
-			expect(cols[3]).toMatch(/^2025-09-/);
-			expect(cols[4]).toMatch(/^2025-10-/);
+			const row = line.split(';');
+			if (row.length <= iBackdated) continue;
+			if (row[iBackdated] !== 'true') continue;
+			backdatedRows++;
+			expect(row[iIntended]).toMatch(/^2025-09-/);
+			expect(row[iLogged]).toMatch(/^2025-10-/);
 		}
+		expect(backdatedRows).toBe(2);
+
+		// The CSV stays inclusive but buckets the hours: 16h backdated,
+		// 184h non-backdated, 200h grand total (subtotal rows added by 23dc12a).
+		expect(text).toMatch(/;Backdated;16\.00/);
+		expect(text).toMatch(/;Non-backdated;184\.00/);
+		expect(text).toMatch(/;Total;200\.00/);
 	});
 });
 
@@ -501,7 +543,15 @@ test.describe('Aggressive interaction sweep', () => {
 		await page.waitForLoadState('networkidle');
 		const nav = page.getByRole('navigation', { name: 'Primary' });
 
-		for (const linkName of ['Dashboard', 'Reports', 'Settings', 'Hoursmith']) {
+		// Dashboard was renamed My Week in the IA rename (/dashboard → /my-week),
+		// and Pricing joined the primary nav; 'Hoursmith' is the brand lockup.
+		for (const linkName of [
+			'My Week',
+			'Reports',
+			'Pricing',
+			'Settings',
+			'Hoursmith',
+		]) {
 			await nav.getByRole('link', { name: linkName }).click();
 			await page.waitForTimeout(200);
 		}

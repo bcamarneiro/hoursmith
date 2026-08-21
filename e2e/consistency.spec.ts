@@ -18,6 +18,22 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const HOUR_PATTERN = /([0-9]+(?:\.[0-9]+)?)\s*h/g;
 
+/**
+ * Timesheet CSV column layout:
+ *
+ *   Name;TicketKey;TicketName;IntendedDate;LoggedDate;IsBackdated;BookedHours
+ *   [;IsAbsence;AbsenceKind]
+ *
+ * 23dc12a removed `DaysLate` and `BackdateSource`, and the absence pair is
+ * appended after BookedHours, so BookedHours is no longer the last column and
+ * must be addressed by index.
+ */
+const COL = {
+	isBackdated: 5,
+	bookedHours: 6,
+} as const;
+const MIN_DATA_COLUMNS = 7;
+
 function tolerant(a: number, b: number, eps = 0.05) {
 	return Math.abs(a - b) <= eps;
 }
@@ -119,8 +135,9 @@ async function downloadUserCsv(
 	};
 }
 
-function csvSumBookedHours(text: string): number {
-	let sum = 0;
+/** Data rows only — header, provenance footer and the subtotal rows dropped. */
+function csvDataRows(text: string): string[][] {
+	const rows: string[][] = [];
 	for (const line of text.split('\n')) {
 		if (
 			!line ||
@@ -130,8 +147,20 @@ function csvSumBookedHours(text: string): number {
 		)
 			continue;
 		const cols = line.split(';');
-		if (cols.length < 9) continue;
-		const v = Number(cols[cols.length - 1]);
+		if (cols.length < MIN_DATA_COLUMNS) continue;
+		rows.push(cols);
+	}
+	return rows;
+}
+
+function csvSumBookedHours(
+	text: string,
+	predicate: (cols: string[]) => boolean = () => true,
+): number {
+	let sum = 0;
+	for (const cols of csvDataRows(text)) {
+		if (!predicate(cols)) continue;
+		const v = Number(cols[COL.bookedHours]);
 		if (!Number.isNaN(v)) sum += v;
 	}
 	return sum;
@@ -144,6 +173,11 @@ function csvDeclaredTotal(text: string): number {
 
 function csvDeclaredBackdated(text: string): number {
 	const m = text.match(/;Backdated;([0-9]+\.[0-9]{2})/);
+	return m ? Number(m[1]) : Number.NaN;
+}
+
+function csvDeclaredNonBackdated(text: string): number {
+	const m = text.match(/;Non-backdated;([0-9]+\.[0-9]{2})/);
 	return m ? Number(m[1]) : Number.NaN;
 }
 
@@ -181,47 +215,79 @@ test.describe('Reports Monthly — internal consistency', () => {
 		expect(tolerant(total, sumDays, 0.1)).toBe(true);
 	});
 
-	test('CSV declared Total matches the sum of its own BookedHours rows', async ({
+	test('CSV subtotals partition its own BookedHours rows', async ({ page }) => {
+		for (const name of ['Sarah Johnson', 'Mike Chen', 'Alex Thompson']) {
+			const card = userCard(page, name);
+			const { text } = await downloadUserCsv(page, card);
+
+			const backdated = csvDeclaredBackdated(text);
+			const nonBackdated = csvDeclaredNonBackdated(text);
+			const total = csvDeclaredTotal(text);
+
+			// The CSV is the deliberate inclusive exception (23dc12a): it keeps
+			// every row, and its three subtotals partition them — Backdated and
+			// Non-backdated each reconcile to their own rows, and together they
+			// account for Total, i.e. for every row in the file.
+			expect(
+				tolerant(
+					csvSumBookedHours(text, (c) => c[COL.isBackdated] === 'true'),
+					backdated,
+					0.01,
+				),
+			).toBe(true);
+			expect(
+				tolerant(
+					csvSumBookedHours(text, (c) => c[COL.isBackdated] === 'false'),
+					nonBackdated,
+					0.01,
+				),
+			).toBe(true);
+			expect(tolerant(backdated + nonBackdated, total, 0.01)).toBe(true);
+			expect(tolerant(csvSumBookedHours(text), total, 0.01)).toBe(true);
+		}
+	});
+
+	// RE-EXPRESSED (23dc12a): "CSV Total == UI month-total header" is no longer
+	// true by design. Backdated worklogs stopped contributing to any displayed
+	// total, while the CSV deliberately keeps every row — so CSV Total is now
+	// strictly ≥ the header whenever the user has backdates. The subtotal that
+	// the header is defined against is Non-backdated, so that is what the
+	// cross-surface invariant is stated over; Total is still pinned, one line
+	// down, as Non-backdated + Backdated.
+	test('CSV Non-backdated subtotal matches the UI month-total header', async ({
 		page,
 	}) => {
 		for (const name of ['Sarah Johnson', 'Mike Chen', 'Alex Thompson']) {
 			const card = userCard(page, name);
-			const { text } = await downloadUserCsv(page, card);
-			const summed = csvSumBookedHours(text);
-			const declared = csvDeclaredTotal(text);
-			expect(tolerant(summed, declared, 0.01)).toBe(true);
-		}
-	});
-
-	test('CSV Total matches the UI month-total header', async ({ page }) => {
-		for (const name of ['Sarah Johnson', 'Mike Chen', 'Alex Thompson']) {
-			const card = userCard(page, name);
 			const headerHours = await readMonthTotalHours(card);
 			const { text } = await downloadUserCsv(page, card);
-			const declared = csvDeclaredTotal(text);
-			expect(tolerant(headerHours, declared, 0.1)).toBe(true);
+			expect(
+				tolerant(headerHours, csvDeclaredNonBackdated(text), 0.1),
+				`${name}: header showed ${headerHours}h but the CSV Non-backdated subtotal was ${csvDeclaredNonBackdated(text)}h`,
+			).toBe(true);
+			expect(
+				tolerant(
+					csvDeclaredNonBackdated(text) + csvDeclaredBackdated(text),
+					csvDeclaredTotal(text),
+					0.01,
+				),
+			).toBe(true);
 		}
 	});
 
-	test('Backdated subtotal in CSV matches the count of rows tagged IsBackdated=true', async ({
+	test('Backdated subtotal in CSV matches the hours on rows tagged IsBackdated=true', async ({
 		page,
 	}) => {
 		const card = userCard(page, 'Sarah Johnson');
 		const { text } = await downloadUserCsv(page, card);
 		const declaredBackdated = csvDeclaredBackdated(text);
-		let summed = 0;
-		for (const line of text.split('\n')) {
-			if (
-				!line ||
-				line.startsWith('#') ||
-				line.startsWith('Name;') ||
-				line.startsWith(';')
-			)
-				continue;
-			const cols = line.split(';');
-			if (cols.length < 9) continue;
-			if (cols[6] === 'true') summed += Number(cols[cols.length - 1]);
-		}
+		const summed = csvSumBookedHours(
+			text,
+			(cols) => cols[COL.isBackdated] === 'true',
+		);
+		// Sarah is the fixture's backdating user — a zero here would make the
+		// comparison vacuous rather than passing.
+		expect(declaredBackdated).toBeGreaterThan(0);
 		expect(tolerant(summed, declaredBackdated, 0.01)).toBe(true);
 	});
 });

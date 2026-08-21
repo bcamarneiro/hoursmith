@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { openSettingsSection } from './helpers/settings';
 
 /**
  * End-to-end coverage for the backdated-worklog UX.
@@ -11,12 +12,18 @@ import { expect, type Page, test } from '@playwright/test';
  * - Mike Chen: 19 regular October days + 3 backdated entries logged on
  *   Oct 6, 12, 18 with markers pointing at Sep 20, 21, 22.
  *
- * After Phase 2 changes the rules are:
- * - Day totals follow the **logged** policy. Backdated hours count on the
- *   day they were logged, never on the intended day.
+ * The rules, as of 23dc12a ("exclude backdated worklogs from totals across
+ * UI; reshape CSV exports"):
+ * - Bucketing follows the **logged** policy: a backdated entry belongs to the
+ *   month/day it was logged on, never to the intended day.
+ * - Backdated hours are counted in **no** displayed total. On the logged day
+ *   they render as a non-counting "+Xh backdated" side note.
  * - The intended day shows a non-counting ghost placeholder.
  * - The logged day groups backdated entries under a "Backdated submissions"
  *   header, separate from regular entries.
+ * - CSV exports stay inclusive (every row is present, `IsBackdated` retained,
+ *   `DaysLate` / `BackdateSource` dropped) and add Backdated / Non-backdated /
+ *   Total subtotal rows.
  */
 
 async function openMonthlyReports(page: Page) {
@@ -35,6 +42,26 @@ async function setMonth(page: Page, label: RegExp) {
 		await page.waitForTimeout(150);
 	}
 	throw new Error(`Could not navigate to month ${label}`);
+}
+
+/**
+ * Turns on the "Add a provenance footer to CSV exports" preference. Since #67
+ * the footer is opt-in and off by default, so any test that wants to assert its
+ * format has to enable it first.
+ *
+ * Caveat: `dev:offline` re-seeds the config store with `createDefaultConfig()`
+ * on every full page load (frontend/main.tsx), so the saved preference survives
+ * only in memory. Callers must reach Reports by in-app (SPA) navigation — a
+ * `page.goto` would reset the toggle back to false.
+ */
+async function enableCsvProvenance(page: Page) {
+	await page.goto('/settings');
+	await page.waitForLoadState('networkidle');
+	await openSettingsSection(page, 'Preferences');
+	const toggle = page.getByLabel('Add a provenance footer to CSV exports');
+	if (!(await toggle.isChecked())) await toggle.check();
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await page.waitForTimeout(300);
 }
 
 function userCard(page: Page, displayName: string) {
@@ -105,7 +132,9 @@ test.describe('Backdated worklog UX', () => {
 		const sepHours = Number(sepHoursMatch?.[1] ?? '0');
 
 		// The 2 backdated entries (16h) belong to October under logged policy,
-		// so September must not include them. October must include them.
+		// so September must not pick them up — and since 23dc12a they are not
+		// counted in October's total either, only shown beside it. Either way
+		// the hours must not migrate into September.
 		expect(octHours).toBeGreaterThan(sepHours);
 	});
 
@@ -126,9 +155,22 @@ test.describe('Backdated worklog UX', () => {
 		expect(borderStyle).toContain('dashed');
 	});
 
-	test('CSV export contains IsBackdated and BackdateSource columns and a provenance footer', async ({
+	test('CSV export contains the IsBackdated column, backdated subtotals and a provenance footer', async ({
 		page,
 	}) => {
+		// The provenance footer became an opt-in preference in #67 (off by
+		// default so exports don't leak the Jira host), so it has to be switched
+		// on before the export or we'd only be asserting the default.
+		await enableCsvProvenance(page);
+		// SPA navigation on purpose — see enableCsvProvenance: a full reload
+		// would re-seed the offline default config and turn the toggle off again.
+		await page
+			.getByRole('navigation', { name: 'Primary' })
+			.getByRole('link', { name: 'Reports' })
+			.click();
+		await page.waitForLoadState('networkidle');
+		await page.getByRole('button', { name: /^Monthly$/ }).click();
+		await page.waitForTimeout(300);
 		await setMonth(page, /October\s+2025/);
 
 		const sarah = userCard(page, 'Sarah Johnson');
@@ -150,12 +192,34 @@ test.describe('Backdated worklog UX', () => {
 		}
 		const text = Buffer.concat(chunks).toString('utf8');
 
+		// 23dc12a reshaped this export on purpose: the `DaysLate` and
+		// `BackdateSource` columns were dropped, `IsBackdated` stayed, and the
+		// file gained Backdated / Non-backdated / Total subtotal rows.
 		expect(text).toContain(
-			'Name;TicketKey;TicketName;IntendedDate;LoggedDate;DaysLate;IsBackdated;BackdateSource;BookedHours',
+			'Name;TicketKey;TicketName;IntendedDate;LoggedDate;IsBackdated;BookedHours',
 		);
-		expect(text).toMatch(/;true;comment;/);
+		expect(text).not.toContain('DaysLate');
+		expect(text).not.toContain('BackdateSource');
+
+		// Sarah's 2 Pattern A entries (comment marker) are still exported as
+		// rows flagged IsBackdated=true, intended in September, logged in October.
+		const backdatedRows = text
+			.split('\n')
+			.filter((l) => /^Sarah Johnson;/.test(l))
+			.map((l) => l.split(';'))
+			.filter((cols) => cols[5] === 'true');
+		expect(backdatedRows).toHaveLength(2);
+		for (const cols of backdatedRows) {
+			expect(cols[3]).toMatch(/^2025-09-/); // IntendedDate
+			expect(cols[4]).toMatch(/^2025-10-/); // LoggedDate
+		}
+
 		expect(text).toMatch(/^# generated=.* policy=logged period=2025-10/m);
-		expect(text).toMatch(/;Backdated;[0-9]+\.[0-9]{2}/);
+		// The rows stay inclusive, but the subtotals bucket them: 2×8h backdated
+		// out of a 176h grand total, so only 160h counts toward the month.
+		expect(text).toMatch(/;Backdated;16\.00/);
+		expect(text).toMatch(/;Non-backdated;160\.00/);
+		expect(text).toMatch(/;Total;176\.00/);
 		expect(text).not.toMatch(/\d{4}\/\d{2}\/\d{2}/); // no slash-style dates
 	});
 
@@ -239,7 +303,7 @@ test.describe('Backdated worklog UX', () => {
 });
 
 test.describe('Cross-feature regression sweep', () => {
-	test('home → dashboard → reports → settings without console errors', async ({
+	test('home → My Week → reports → settings without console errors', async ({
 		page,
 	}) => {
 		const errors: string[] = [];
@@ -250,8 +314,10 @@ test.describe('Cross-feature regression sweep', () => {
 
 		await page.goto('/');
 		await page.waitForLoadState('networkidle');
-		await page.getByRole('link', { name: 'Open Dashboard' }).click();
-		await expect(page).toHaveURL(/dashboard/);
+		// Dashboard was renamed My Week; the home CTA is "Open My Week" and
+		// lands on /my-week (/dashboard only redirects there).
+		await page.getByRole('link', { name: 'Open My Week' }).click();
+		await expect(page).toHaveURL(/my-week/);
 		await page.waitForLoadState('networkidle');
 
 		const nav = page.getByRole('navigation', { name: 'Primary' });

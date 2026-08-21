@@ -1,4 +1,24 @@
 import { expect, type Page, test } from '@playwright/test';
+import { openSettingsSection } from './helpers/settings';
+
+/**
+ * Timesheet CSV column layout, as emitted by `buildTimesheetCsv` with the
+ * absence columns switched on (which is what the Reports per-user export
+ * uses):
+ *
+ *   Name;TicketKey;TicketName;IntendedDate;LoggedDate;IsBackdated;BookedHours;
+ *   IsAbsence;AbsenceKind
+ *
+ * `DaysLate` and `BackdateSource` were removed on purpose in 23dc12a, so the
+ * last column is no longer BookedHours — indices are named here rather than
+ * counted from the end.
+ */
+const COL = {
+	intendedDate: 3,
+	loggedDate: 4,
+	isBackdated: 5,
+	bookedHours: 6,
+} as const;
 
 /**
  * Stress / consistency probes.
@@ -102,9 +122,9 @@ test.describe('Reports — chaotic interaction', () => {
 		// Don't wait for load — go straight to dashboard.
 		await page
 			.getByRole('navigation', { name: 'Primary' })
-			.getByRole('link', { name: 'Dashboard' })
+			.getByRole('link', { name: 'My Week' })
 			.click();
-		await expect(page).toHaveURL(/dashboard/);
+		await expect(page).toHaveURL(/my-week/);
 		await page
 			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Reports' })
@@ -208,18 +228,35 @@ test.describe('Settings — round-trip safety', () => {
 	test('opening + reloading settings preserves the page', async ({ page }) => {
 		await page.goto('/settings');
 		await page.waitForLoadState('networkidle');
-		await expect(page.getByText('Setup wizard')).toBeVisible();
+		// The old standalone "Setup wizard" panel was merged with DiagnosticsPanel
+		// into the single readiness header at the top of Settings; its kicker is
+		// the stable landmark that survives the merge.
+		await expect(page.getByText('Setup & readiness')).toBeVisible();
 		await page.reload();
 		await page.waitForLoadState('networkidle');
-		await expect(page.getByText('Setup wizard')).toBeVisible();
+		await expect(page.getByText('Setup & readiness')).toBeVisible();
 	});
 
 	test('JSON backup is valid JSON and re-importable', async ({ page }) => {
 		await page.goto('/settings');
 		await page.waitForLoadState('networkidle');
 
+		// Behind the left rail the Backup button only becomes clickable once its
+		// section is revealed, and "Backup" also substring-matches the rail item
+		// "Data & backup" — hence the exact match.
+		await openSettingsSection(page, 'Data & backup');
+		// Two Backup buttons exist (the section's own, and the persistent sticky
+		// save bar's) and "Backup" also substring-matches the rail item
+		// "Data & backup" — so scope to the section and match exactly.
+		const dataSection = page
+			.locator('section')
+			.filter({ has: page.getByRole('heading', { name: 'Data & backup' }) })
+			.first();
+
 		const downloadPromise = page.waitForEvent('download');
-		await page.getByRole('button', { name: 'Backup' }).click();
+		await dataSection
+			.getByRole('button', { name: 'Backup', exact: true })
+			.click();
 		const download = await downloadPromise;
 
 		const stream = await download.createReadStream();
@@ -236,11 +273,36 @@ test.describe('Settings — round-trip safety', () => {
 	});
 });
 
+/**
+ * The provenance footer is now the opt-in preference "Add a provenance footer
+ * to CSV exports" (Settings → Preferences), off by default so exports don't
+ * expose the Jira host or build version. A test that wants to assert the
+ * footer's format has to switch it on first — asserting it unconditionally
+ * would only be asserting today's default value.
+ *
+ * The navigation here has to stay client-side: `frontend/main.tsx` re-seeds the
+ * whole config from `createDefaultConfig()` on every full page load in offline
+ * mode, so a `page.goto` after saving would silently reset the toggle.
+ */
+async function enableCsvProvenanceViaSettings(page: Page) {
+	const nav = page.getByRole('navigation', { name: 'Primary' });
+	await nav.getByRole('link', { name: 'Settings' }).click();
+	await expect(page).toHaveURL(/settings/);
+	await openSettingsSection(page, 'Preferences');
+	const toggle = page.getByLabel('Add a provenance footer to CSV exports');
+	if (!(await toggle.isChecked())) await toggle.check();
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await expect(toggle).toBeChecked();
+	await nav.getByRole('link', { name: 'Reports' }).click();
+	await expect(page).toHaveURL(/reports/);
+}
+
 test.describe('CSV export — finance-grade format invariants', () => {
 	test('all CSVs use ISO dates, declare policy in filename, and carry provenance footer', async ({
 		page,
 	}) => {
 		await goReports(page);
+		await enableCsvProvenanceViaSettings(page);
 		await ensureMonthly(page);
 		await setMonth(page, /October\s+2025/);
 
@@ -266,19 +328,22 @@ test.describe('CSV export — finance-grade format invariants', () => {
 		}
 		const text = Buffer.concat(chunks).toString('utf8');
 
-		// Header
+		// Header. 23dc12a dropped DaysLate and BackdateSource on purpose; the
+		// per-user Reports export additionally carries the absence column pair.
 		expect(text.split('\n')[0]).toBe(
-			'Name;TicketKey;TicketName;IntendedDate;LoggedDate;DaysLate;IsBackdated;BackdateSource;BookedHours',
+			'Name;TicketKey;TicketName;IntendedDate;LoggedDate;IsBackdated;BookedHours;IsAbsence;AbsenceKind',
 		);
 		// No slash dates anywhere
 		expect(text).not.toMatch(/\d{4}\/\d{2}\/\d{2}/);
 		// Provenance footer
 		expect(text).toMatch(/^# generated=.* policy=logged period=2025-10/m);
-		// Total + Backdated subtotal lines exist
+		// All three subtotal lines exist (Backdated / Non-backdated / Total).
 		expect(text).toMatch(/;Total;[0-9]+\.[0-9]{2}/);
 		expect(text).toMatch(/;Backdated;[0-9]+\.[0-9]{2}/);
+		expect(text).toMatch(/;Non-backdated;[0-9]+\.[0-9]{2}/);
 
-		// Every data row's BookedHours has 2 decimals.
+		// Every data row's BookedHours has 2 decimals. BookedHours is no longer
+		// the last column, so it is addressed by index.
 		const rows = text
 			.split('\n')
 			.filter(
@@ -289,14 +354,23 @@ test.describe('CSV export — finance-grade format invariants', () => {
 					!l.startsWith(';') &&
 					l.includes(';'),
 			);
+		expect(rows.length).toBeGreaterThan(0);
 		for (const row of rows) {
 			const cols = row.split(';');
-			const hours = cols[cols.length - 1];
-			expect(hours).toMatch(/^[0-9]+\.[0-9]{2}$/);
+			expect(cols[COL.bookedHours]).toMatch(/^[0-9]+\.[0-9]{2}$/);
 		}
 	});
 
-	test('IsBackdated rows are consistent with DaysLate>0 and source!=none', async ({
+	// RE-EXPRESSED (23dc12a): the CSV no longer carries DaysLate or
+	// BackdateSource, so the original "IsBackdated ⇒ DaysLate>0 and
+	// source!='none'" wording is unwriteable against the current format. Both
+	// dropped columns were derived from the two date columns that remain:
+	// `classifyWorklog` only moves LoggedDate away from IntendedDate when it
+	// assigns a source ('comment' or 'jira-native'), and DaysLate is exactly
+	// max(0, LoggedDate - IntendedDate). So the same invariant, stated in the
+	// surviving columns, is the strict biconditional below — no weaker than
+	// before, just spelled with the columns that still exist.
+	test('IsBackdated is exactly "LoggedDate is later than IntendedDate"', async ({
 		page,
 	}) => {
 		await goReports(page);
@@ -322,19 +396,30 @@ test.describe('CSV export — finance-grade format invariants', () => {
 		const text = Buffer.concat(chunks).toString('utf8');
 
 		const lines = text.split('\n').slice(1);
+		let inspected = 0;
+		let backdatedSeen = 0;
 		for (const line of lines) {
 			if (!line || line.startsWith('#') || line.startsWith(';')) continue;
 			const cols = line.split(';');
 			if (cols.length < 9) continue;
-			const daysLate = Number(cols[5]);
-			const isBackdated = cols[6];
-			const source = cols[7];
+			const intended = cols[COL.intendedDate];
+			const logged = cols[COL.loggedDate];
+			const isBackdated = cols[COL.isBackdated];
+			expect(intended).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			expect(logged).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			expect(['true', 'false']).toContain(isBackdated);
+			inspected += 1;
+			// ISO dates compare correctly as strings.
 			if (isBackdated === 'true') {
-				expect(daysLate).toBeGreaterThan(0);
-				expect(['comment', 'jira-native']).toContain(source);
+				backdatedSeen += 1;
+				expect(logged > intended).toBe(true);
 			} else {
-				expect(source).toBe('none');
+				expect(logged > intended).toBe(false);
 			}
 		}
+		expect(inspected).toBeGreaterThan(0);
+		// Sarah is the fixture's backdating user — if no row is tagged, the
+		// classifier stopped seeing her backdates and the check above is vacuous.
+		expect(backdatedSeen).toBeGreaterThan(0);
 	});
 });

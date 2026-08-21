@@ -447,7 +447,8 @@ test.describe('Home + offline indicator', () => {
 	}) => {
 		await go(page, '/');
 		const nav = page.getByRole('navigation', { name: 'Primary' });
-		await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+		// Nav link renamed Dashboard → My Week by the IA redesign.
+		await expect(nav.getByRole('link', { name: 'My Week' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Reports' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Settings' })).toBeVisible();
 	});
