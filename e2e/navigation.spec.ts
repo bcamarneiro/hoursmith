@@ -5,10 +5,12 @@ test.describe('Navigation', () => {
 		await page.goto('/');
 
 		// Check that the navigation is present
-		await expect(page.getByRole('navigation')).toBeVisible();
+		await expect(
+			page.getByRole('navigation', { name: 'Primary' }),
+		).toBeVisible();
 
 		// Check for page title
-		await expect(page).toHaveTitle(/Timesheet/i);
+		await expect(page).toHaveTitle(/Hoursmith/i);
 	});
 
 	test('should navigate to reports page', async ({ page }) => {
@@ -24,7 +26,7 @@ test.describe('Navigation', () => {
 
 		// Click on settings link in navigation
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
 

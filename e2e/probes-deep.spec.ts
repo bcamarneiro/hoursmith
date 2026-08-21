@@ -16,7 +16,9 @@ test.describe('Settings backup integrity probe', () => {
 	}) => {
 		await go(page, '/settings');
 		const downloadPromise = page.waitForEvent('download');
-		await page.getByRole('button', { name: 'Backup' }).click();
+		// A loose "Backup" also matches the "Data & backup" rail item added by
+		// the Settings redesign.
+		await page.getByRole('button', { name: 'Backup', exact: true }).click();
 		const download = await downloadPromise;
 
 		const stream = await download.createReadStream();
@@ -264,23 +266,37 @@ test.describe('Edge data probes', () => {
 		await exportAll.click();
 		await page.waitForTimeout(2500);
 
-		const sources = new Set<string>();
+		// Columns are resolved from each file's header row instead of being
+		// hard-coded. IsAbsence/AbsenceKind were appended to the timesheet CSV,
+		// so BookedHours is no longer last and IsBackdated sits at index 5, not
+		// 6 — the old cols[6]/cols[7] reads matched nothing, so this probe was
+		// counting zero rows and checking neither pattern.
+		const backdatedKeys = new Set<string>();
 		let backdatedRows = 0;
 		for (const { filename, text } of downloads) {
 			if (!filename.startsWith('timesheet_')) continue;
-			for (const line of text.split('\n')) {
+			const lines = text.split('\n');
+			const header = (lines[0] ?? '').split(';');
+			const keyIndex = header.indexOf('TicketKey');
+			const backdatedIndex = header.indexOf('IsBackdated');
+			if (keyIndex === -1 || backdatedIndex === -1) continue;
+			for (const line of lines.slice(1)) {
 				const cols = line.split(';');
-				if (cols.length < 9) continue;
-				if (cols[6] === 'true') {
-					backdatedRows++;
-					sources.add(cols[7]);
-				}
+				if (cols[backdatedIndex] !== 'true') continue;
+				backdatedRows++;
+				backdatedKeys.add(cols[keyIndex]);
 			}
 		}
 
 		expect(backdatedRows).toBeGreaterThanOrEqual(7);
-		expect(sources.has('comment')).toBe(true);
-		expect(sources.has('jira-native')).toBe(true);
+		// There is no BackdateSource column in the CSV, so the two patterns are
+		// told apart by the mock issue that carries them (see
+		// frontend/mocks/MockWorklogsSimple.ts): PROJ-102 / PROJ-104 hold the
+		// comment-marker worklogs (Pattern A), PROJ-100 the jira-native ones
+		// (Pattern B), which now reach Reports instead of being dropped.
+		expect(backdatedKeys.has('PROJ-102')).toBe(true);
+		expect(backdatedKeys.has('PROJ-104')).toBe(true);
+		expect(backdatedKeys.has('PROJ-100')).toBe(true);
 	});
 });
 

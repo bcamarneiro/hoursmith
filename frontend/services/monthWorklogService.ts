@@ -19,7 +19,7 @@ export interface FetchMonthOptions {
 	onProgress?: (progress: WorklogFetchProgress) => void;
 }
 
-interface EmbeddedWorklog {
+export interface EmbeddedWorklog {
 	self?: string;
 	id?: string;
 	author?: JiraUser;
@@ -77,6 +77,33 @@ function emitProgress(
 		...progress,
 		percent: clampPercent(progress.percent),
 	});
+}
+
+/**
+ * Does this worklog belong in `[startStr, endStr]`'s dataset?
+ *
+ * Jira is asked for `worklogDate`, which is the *started* date, but the app
+ * reasons in `loggedOn` — and for a backdated entry those are different days,
+ * often different months. Filtering the response on `loggedOn` alone dropped
+ * every jira-native backdate: started in September so only September's request
+ * delivered it, logged in October so only October's filter would have kept it.
+ * October never asked. The worklog fell through the gap between two months and
+ * was absent from Reports entirely — no total, no ghost, no row (ADA-984).
+ *
+ * A worklog is in scope when *either* date lands in the month, which is what
+ * the two consumers actually need: totals key off `loggedOn`, ghost
+ * placeholders off `intendedFor`. Adjacent months are merged downstream, so
+ * keeping an entry in both months costs nothing — the merge dedupes by id.
+ */
+export function worklogBelongsToMonth(
+	worklog: EmbeddedWorklog,
+	startStr: string,
+	endStr: string,
+): boolean {
+	const inWindow = (day: string | undefined): boolean =>
+		!!day && day >= startStr && day <= endStr;
+	const classified = classifyWorklog(worklog as never);
+	return inWindow(classified.loggedOn) || inWindow(classified.intendedFor);
 }
 
 export async function fetchMonthWorklogs(
@@ -229,8 +256,7 @@ export async function fetchMonthWorklogs(
 			// Embedded worklogs are COMPLETE — use them directly, filter by date in JS
 			for (const wl of embedded.worklogs) {
 				if (!matchesAuthor(wl)) continue;
-				const day = classifyWorklog(wl).loggedOn;
-				if (day && day >= startStr && day <= endStr) {
+				if (worklogBelongsToMonth(wl, startStr, endStr)) {
 					allWorklogs.push({ ...wl, issue });
 				}
 			}
