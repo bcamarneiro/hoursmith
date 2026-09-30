@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openSettingsSection } from './helpers/settings';
 
 test.describe('Settings Page', () => {
 	test.beforeEach(async ({ page }) => {
@@ -9,14 +10,30 @@ test.describe('Settings Page', () => {
 	test('shows the real settings sections and offline defaults', async ({
 		page,
 	}) => {
+		// The Settings redesign moved each fieldset behind a left rail, so a
+		// section has to be opened before its fields are visible. Connection is
+		// the section the page opens on.
 		await expect(page.getByLabel('Jira Host')).toHaveValue(
 			'mock.atlassian.net',
 		);
-		await expect(page.getByLabel('Email')).toHaveValue('dev@example.com');
-		await expect(page.getByLabel('API Token')).toHaveValue('mock-token');
+		await expect(page.getByLabel('Email', { exact: true })).toHaveValue(
+			'dev@example.com',
+		);
+		await expect(page.getByLabel('API Token', { exact: true })).toHaveValue(
+			'mock-token',
+		);
+
+		await openSettingsSection(page, 'Reports Scope');
 		await expect(page.getByLabel(/JQL Filter/)).toBeVisible();
+
+		await openSettingsSection(page, 'Permissions');
 		await expect(page.getByLabel(/Allow adding worklogs/)).toBeVisible();
+
+		await openSettingsSection(page, 'Preferences');
 		await expect(page.getByLabel('Theme')).toBeVisible();
+
+		// Backup / Share Pack / Import / Discard / Save live in the persistent
+		// save bar, so they stay reachable whichever section is open.
 		await expect(
 			page.getByRole('button', { name: 'Backup', exact: true }),
 		).toBeVisible();
@@ -25,12 +42,15 @@ test.describe('Settings Page', () => {
 		).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Import' })).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Discard' })).toBeDisabled();
-		await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+		await expect(
+			page.getByRole('button', { name: 'Save', exact: true }),
+		).toBeDisabled();
 	});
 
 	test('enables discard and save for unsaved changes and can discard them', async ({
 		page,
 	}) => {
+		await openSettingsSection(page, 'Reports Scope');
 		const jqlInput = page.getByLabel(/JQL Filter/);
 		await jqlInput.fill('project = PLAY');
 
@@ -38,13 +58,17 @@ test.describe('Settings Page', () => {
 			page.getByText('Unsaved changes', { exact: true }),
 		).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Discard' })).toBeEnabled();
-		await expect(page.getByRole('button', { name: 'Save' })).toBeEnabled();
+		await expect(
+			page.getByRole('button', { name: 'Save', exact: true }),
+		).toBeEnabled();
 
 		await page.getByRole('button', { name: 'Discard' }).click();
 
 		await expect(jqlInput).toHaveValue('');
 		await expect(page.getByText('Settings up to date')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
+		await expect(
+			page.getByRole('button', { name: 'Save', exact: true }),
+		).toBeDisabled();
 	});
 
 	test('exports settings as a JSON backup', async ({ page }) => {
@@ -110,10 +134,19 @@ test.describe('Settings Page', () => {
 		await expect(page.getByLabel('Jira Host')).toHaveValue(
 			'imported.atlassian.net',
 		);
-		await expect(page.getByLabel('Email')).toHaveValue('imported@example.com');
+		await expect(page.getByLabel('Email', { exact: true })).toHaveValue(
+			'imported@example.com',
+		);
+
+		await openSettingsSection(page, 'Reports Scope');
 		await expect(page.getByLabel(/JQL Filter/)).toHaveValue('project = IMPORT');
+
+		await openSettingsSection(page, 'Preferences');
 		await expect(page.getByLabel('Theme')).toHaveValue('dark');
 		await expect(page.getByLabel('Time Rounding')).toHaveValue('30m');
+
+		// Calendar mappings now sit inside the Services section of the rail.
+		await openSettingsSection(page, 'Services');
 		await expect(page.getByText('Planning', { exact: true })).toBeVisible();
 		await expect(page.getByText('IMP-42', { exact: true })).toBeVisible();
 	});

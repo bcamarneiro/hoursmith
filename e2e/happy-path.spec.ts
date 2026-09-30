@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openSettingsSection } from './helpers/settings';
 
 /**
  * Comprehensive happy-path E2E tests covering all major features.
@@ -7,16 +8,20 @@ import { expect, test } from '@playwright/test';
 
 // ── Home Page ──────────────────────────────────────────────────────
 test.describe('Home Page', () => {
-	test('shows configured state with dashboard link', async ({ page }) => {
+	test('shows configured state with My Week link', async ({ page }) => {
 		await page.goto('/');
 		await page.waitForLoadState('networkidle');
 
-		// In offline mode the config is pre-set, so we should see the configured dashboard CTA
+		// In offline mode the config is pre-set, so we should see the configured
+		// primary CTA. The redesign renamed Dashboard → My Week, so the home CTA
+		// is now "Open My Week".
 		await expect(
-			page.getByRole('link', { name: 'Open Dashboard' }),
+			page.getByRole('link', { name: 'Open My Week' }),
 		).toBeVisible();
 		await expect(
-			page.getByRole('navigation').getByRole('link', { name: 'Reports' }),
+			page
+				.getByRole('navigation', { name: 'Primary' })
+				.getByRole('link', { name: 'Reports' }),
 		).toBeVisible();
 	});
 
@@ -30,10 +35,11 @@ test.describe('Home Page', () => {
 		await expect(page.getByText('No backend to maintain')).toBeVisible();
 	});
 
-	test('navigates to dashboard from home', async ({ page }) => {
+	// Renamed route: the CTA now lands on /my-week (/dashboard only redirects).
+	test('navigates to My Week from home', async ({ page }) => {
 		await page.goto('/');
-		await page.getByRole('link', { name: 'Open Dashboard' }).click();
-		await expect(page).toHaveURL(/\/dashboard/);
+		await page.getByRole('link', { name: 'Open My Week' }).click();
+		await expect(page).toHaveURL(/\/my-week/);
 	});
 });
 
@@ -41,10 +47,11 @@ test.describe('Home Page', () => {
 test.describe('Navigation', () => {
 	test('all nav links are visible', async ({ page }) => {
 		await page.goto('/');
-		const nav = page.getByRole('navigation');
+		const nav = page.getByRole('navigation', { name: 'Primary' });
 		await expect(nav).toBeVisible();
 
-		await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+		// Nav link renamed Dashboard → My Week by the IA redesign.
+		await expect(nav.getByRole('link', { name: 'My Week' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Reports' })).toBeVisible();
 		await expect(nav.getByRole('link', { name: 'Settings' })).toBeVisible();
 	});
@@ -53,19 +60,19 @@ test.describe('Navigation', () => {
 		await page.goto('/');
 
 		await page
-			.getByRole('navigation')
-			.getByRole('link', { name: 'Dashboard' })
+			.getByRole('navigation', { name: 'Primary' })
+			.getByRole('link', { name: 'My Week' })
 			.click();
-		await expect(page).toHaveURL(/\/dashboard/);
+		await expect(page).toHaveURL(/\/my-week/);
 
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Reports' })
 			.click();
 		await expect(page).toHaveURL(/\/reports/);
 
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
 		await expect(page).toHaveURL(/\/settings/);
@@ -79,27 +86,28 @@ test.describe('Settings Page', () => {
 		await page.waitForLoadState('networkidle');
 	});
 
+	// Every field still exists; the rail decides which section is on screen, so
+	// this walks the rail instead of expecting the whole form at once.
 	test('displays all form sections', async ({ page }) => {
-		// Connection section
 		await expect(page.getByLabel('Jira Host')).toBeVisible();
-		await expect(page.getByLabel('Email')).toBeVisible();
-		await expect(page.getByLabel('API Token')).toBeVisible();
+		await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+		await expect(page.getByLabel('API Token', { exact: true })).toBeVisible();
 
-		// Filters section
+		await openSettingsSection(page, 'Reports Scope');
 		await expect(page.getByLabel(/JQL Filter/)).toBeVisible();
 		await expect(page.getByLabel(/Team Members/)).toBeVisible();
 
-		// Permissions section
+		await openSettingsSection(page, 'Permissions');
 		await expect(page.getByLabel(/Allow adding worklogs/)).toBeVisible();
 		await expect(page.getByLabel(/Allow editing worklogs/)).toBeVisible();
 		await expect(page.getByLabel(/Allow deleting worklogs/)).toBeVisible();
 
-		// Integrations section
+		await openSettingsSection(page, 'Services');
 		await expect(page.getByLabel('GitLab Host')).toBeVisible();
 		await expect(page.getByLabel('GitLab Token')).toBeVisible();
 		await expect(page.getByLabel('RescueTime API Key')).toBeVisible();
 
-		// Preferences section
+		await openSettingsSection(page, 'Preferences');
 		await expect(page.getByLabel('Theme')).toBeVisible();
 		await expect(page.getByLabel('Time Rounding')).toBeVisible();
 	});
@@ -108,19 +116,23 @@ test.describe('Settings Page', () => {
 		await expect(page.getByLabel('Jira Host')).toHaveValue(
 			'mock.atlassian.net',
 		);
-		await expect(page.getByLabel('Email')).toHaveValue('dev@example.com');
+		await expect(page.getByLabel('Email', { exact: true })).toHaveValue(
+			'dev@example.com',
+		);
 	});
 
 	test('can edit and save settings', async ({ page }) => {
+		await openSettingsSection(page, 'Reports Scope');
 		const jqlInput = page.getByLabel(/JQL Filter/);
 		await jqlInput.fill('project = TEST');
 		await expect(jqlInput).toHaveValue('project = TEST');
 
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.getByText('Settings saved')).toBeVisible();
 	});
 
 	test('theme select has correct options', async ({ page }) => {
+		await openSettingsSection(page, 'Preferences');
 		const themeSelect = page.getByLabel('Theme');
 		await expect(themeSelect).toBeVisible();
 
@@ -136,6 +148,7 @@ test.describe('Settings Page', () => {
 	});
 
 	test('time rounding select has correct options', async ({ page }) => {
+		await openSettingsSection(page, 'Preferences');
 		const roundingSelect = page.getByLabel('Time Rounding');
 		await expect(roundingSelect).toBeVisible();
 
@@ -151,8 +164,9 @@ test.describe('Settings Page', () => {
 	});
 
 	test('can change theme to dark', async ({ page }) => {
+		await openSettingsSection(page, 'Preferences');
 		await page.getByLabel('Theme').selectOption('dark');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.getByText('Settings saved')).toBeVisible();
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -197,8 +211,12 @@ test.describe('Dashboard Page', () => {
 	});
 
 	test('displays day cards with gaps', async ({ page }) => {
-		// "Days to fill" section should be visible with day card content
-		await expect(page.getByText('Days to fill')).toBeVisible();
+		// The redesign made the day list gap-first and always-present: the
+		// "Days to fill" heading became "This week" (complete days now collapse
+		// in place instead of being filtered out of a gaps-only section).
+		await expect(
+			page.getByRole('heading', { name: 'This week' }),
+		).toBeVisible();
 		// Day names should appear in day cards (Thursday and Friday have 0h)
 		await expect(page.getByText('Thursday')).toBeVisible();
 	});
@@ -434,30 +452,34 @@ test.describe('Reports Monthly View', () => {
 
 // ── Cross-Feature — Settings persist across pages ──────────────────
 test.describe('Cross-Feature', () => {
-	test('settings changes persist when navigating to dashboard', async ({
+	test('settings changes persist when navigating to My Week', async ({
 		page,
 	}) => {
 		await page.goto('/settings');
 		await page.waitForLoadState('networkidle');
 
+		// Theme now lives behind the Settings left rail, so the section has to be
+		// opened before the select is on screen.
+		await openSettingsSection(page, 'Preferences');
 		await page.getByLabel('Theme').selectOption('dark');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 		await expect(page.getByText('Settings saved')).toBeVisible();
 
 		await page
-			.getByRole('navigation')
-			.getByRole('link', { name: 'Dashboard' })
+			.getByRole('navigation', { name: 'Primary' })
+			.getByRole('link', { name: 'My Week' })
 			.click();
-		await expect(page).toHaveURL(/\/dashboard/);
+		await expect(page).toHaveURL(/\/my-week/);
 
 		await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
 		// Reset to system theme
 		await page
-			.getByRole('navigation')
+			.getByRole('navigation', { name: 'Primary' })
 			.getByRole('link', { name: 'Settings' })
 			.click();
+		await openSettingsSection(page, 'Preferences');
 		await page.getByLabel('Theme').selectOption('system');
-		await page.getByRole('button', { name: 'Save' }).click();
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
 	});
 });

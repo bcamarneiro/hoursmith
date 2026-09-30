@@ -49,11 +49,23 @@ jobs:
           path: dist/
           retention-days: 7
 
+  # Runs the WHOLE e2e suite, not just the smoke spec. The job keeps the name
+  # `e2e-smoke` because branch protection on main requires that exact context;
+  # renaming the job without updating the protection rule would leave the
+  # required check permanently pending and block every merge. Rename both
+  # together when convenient.
+  #
+  # Until 2026-08-21 this ran only smoke.spec.ts + paid-lifecycle, and the other
+  # ~150 specs were written, maintained, and executed by nothing. They had been
+  # failing on main since May, one of them since the day it was written, and
+  # they were hiding a real under-reporting bug the whole time (ADA-984). A
+  # suite that never runs is worse than no suite: it reads as coverage on the
+  # PR checklist and provides none.
   e2e-smoke:
     runs-on: ubuntu-latest
     # Without a ceiling a stalled step runs until GitHub's 6h default, burning
-    # the runner budget and leaving the PR "pending" rather than failing. Real
-    # runs finish in 2-3 minutes.
+    # the runner budget and leaving the PR "pending" rather than failing. The
+    # full suite runs in about a minute locally.
     timeout-minutes: 20
     needs: quality
 
@@ -117,8 +129,8 @@ jobs:
           cat /tmp/hoursmith-offline.log
           exit 1
 
-      - name: Run E2E smoke tests
-        run: npm run test:e2e:smoke
+      - name: Run E2E suite
+        run: npm run test:e2e
 
       - name: Upload Playwright report
         if: failure()

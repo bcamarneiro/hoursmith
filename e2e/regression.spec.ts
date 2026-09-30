@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openSettingsSection } from './helpers/settings';
 
 async function duplicateIds(page: import('@playwright/test').Page) {
 	return page.evaluate(() =>
@@ -42,10 +43,18 @@ test.describe('Regression guardrails', () => {
 		await page.goto('/settings');
 		await page.waitForLoadState('networkidle');
 
+		// The Settings redesign split these three decisions across rail
+		// sections: the proxy copy stays in Connection (the section the page
+		// opens on), Team Members moved to Reports Scope, and the time-off
+		// calendars moved to Services.
 		await expect(
 			page.getByRole('heading', { name: 'Try direct browser access first' }),
 		).toBeVisible();
+
+		await openSettingsSection(page, 'Reports Scope');
 		await expect(page.getByLabel(/Team Members/)).toBeVisible();
+
+		await openSettingsSection(page, 'Services');
 		await expect(
 			page.getByRole('heading', { name: 'Time off calendars', exact: true }),
 		).toBeVisible();
@@ -55,8 +64,13 @@ test.describe('Regression guardrails', () => {
 			.getByLabel('Attribution mode for time off calendar')
 			.selectOption('shared');
 
+		// Shared time-off calendars no longer attribute via the Team Members
+		// list; commit 47e6809 replaced that with explicit AbsenceAssignment
+		// rules, and the hint shown for "shared" changed to match.
 		await expect(
-			page.getByText('Suggestions come from the Team Members list above.'),
+			page.getByText(
+				'Shared calendars use the assignment rules below to match event titles to the right teammate.',
+			),
 		).toBeVisible();
 	});
 

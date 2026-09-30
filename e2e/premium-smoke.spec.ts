@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { LEAD_TIER_ENABLED } from '../frontend/featureFlags';
 
 /**
  * Premium-tier smoke. Covers the paywall-adjacent surfaces a paying user
  * encounters before they actually hit Polar:
- *   - Pricing page renders the three fixed-price tiers (Free / Hosted / Lead).
+ *   - Pricing page renders the fixed-price tiers (Free / Hosted, plus Lead
+ *     when LEAD_TIER_ENABLED is on — it ships dark until ADA-376).
  *   - Each paid tier has a CTA pointing at /account?upgrade=<tier>.
  *   - /auth/sign-in renders form fields (only on premium builds; skipped otherwise).
  *
@@ -12,7 +14,12 @@ import { expect, test } from '@playwright/test';
  */
 
 test.describe('Premium smoke', () => {
-	test('pricing shows three fixed-price tiers with checkout CTAs', async ({
+	// Lead is gated by LEAD_TIER_ENABLED (currently off, ADA-376). The flag is
+	// imported rather than its current value hard-coded, so this asserts the
+	// intended behaviour in both states: hiding the tier while it is off, and
+	// covering it the moment it is switched on. Pinning the assertions to
+	// "two tiers" instead would go quietly green on a broken Lead tier.
+	test('pricing shows the enabled fixed-price tiers with checkout CTAs', async ({
 		page,
 	}) => {
 		await page.goto('/pricing');
@@ -20,28 +27,56 @@ test.describe('Premium smoke', () => {
 
 		await expect(page.getByRole('heading', { name: 'Pricing.' })).toBeVisible();
 
-		// All three tier names visible.
-		for (const tier of ['Free', 'Hosted', 'Lead']) {
+		const tiers = ['Free', 'Hosted', ...(LEAD_TIER_ENABLED ? ['Lead'] : [])];
+		for (const tier of tiers) {
 			await expect(
 				page.getByRole('heading', { level: 2, name: tier }),
 			).toBeVisible();
 		}
 
-		// Headline prices visible (€0 / €29 / €60).
-		for (const price of ['€0', '€29', '€60']) {
+		const prices = ['€0', '€29', ...(LEAD_TIER_ENABLED ? ['€60'] : [])];
+		for (const price of prices) {
 			await expect(
 				page.getByText(price, { exact: false }).first(),
 			).toBeVisible();
 		}
 
-		// Paid tiers route into the existing /account upgrade flow with a tier hint.
+		// CTA honesty (ADA-301/ADA-341). The paid CTA is deliberately gated on
+		// runtime flags: an open paywall routes to /account, a closed one offers
+		// the waitlist instead. Asserting either state on its own would just pin
+		// the test to today's flags and break the day they flip, so this asserts
+		// the invariant that holds either way — exactly one of the two is
+		// offered. Both would sell something twice; neither would strand a
+		// visitor who wants to pay.
 		const hostedCta = page.getByRole('link', { name: /Get Hosted/ });
-		await expect(hostedCta).toBeVisible();
-		await expect(hostedCta).toHaveAttribute('href', '/account?upgrade=hosted');
+		const waitlist = page.getByRole('button', { name: /Notify me/ });
+		const hostedCtaCount = await hostedCta.count();
+		const waitlistCount = await waitlist.count();
+		expect(hostedCtaCount + waitlistCount).toBeGreaterThan(0);
+		expect(hostedCtaCount && waitlistCount).toBeFalsy();
+		if (hostedCtaCount) {
+			await expect(hostedCta).toHaveAttribute(
+				'href',
+				'/account?upgrade=hosted',
+			);
+		}
 
 		const leadCta = page.getByRole('link', { name: /Get Lead/ });
-		await expect(leadCta).toBeVisible();
-		await expect(leadCta).toHaveAttribute('href', '/account?upgrade=lead');
+		if (LEAD_TIER_ENABLED) {
+			await expect(
+				page.getByRole('heading', { level: 2, name: 'Lead' }),
+			).toBeVisible();
+			if (await leadCta.count()) {
+				await expect(leadCta).toHaveAttribute('href', '/account?upgrade=lead');
+			}
+		} else {
+			// A gated tier must be absent, not merely unstyled: a visible Lead CTA
+			// would sell something that cannot be bought.
+			await expect(leadCta).toHaveCount(0);
+			await expect(
+				page.getByRole('heading', { level: 2, name: 'Lead' }),
+			).toHaveCount(0);
+		}
 	});
 
 	test('pricing no longer surfaces name-your-price controls', async ({
@@ -74,7 +109,7 @@ test.describe('Premium smoke', () => {
 			return;
 		}
 
-		await expect(page.getByLabel('Email')).toBeVisible();
+		await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
 		await expect(page.getByLabel('Password')).toBeVisible();
 		await expect(
 			page.getByRole('button', { name: /Continue with GitHub/i }),
